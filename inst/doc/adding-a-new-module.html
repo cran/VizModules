@@ -1,0 +1,907 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+
+<meta charset="utf-8" />
+<meta name="generator" content="pandoc" />
+<meta http-equiv="X-UA-Compatible" content="IE=EDGE" />
+
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+
+
+
+<title>Adding a New Module</title>
+
+<script>// Pandoc 2.9 adds attributes on both header and div. We remove the former (to
+// be compatible with the behavior of Pandoc < 2.8).
+document.addEventListener('DOMContentLoaded', function(e) {
+  var hs = document.querySelectorAll("div.section[class*='level'] > :first-child");
+  var i, h, a;
+  for (i = 0; i < hs.length; i++) {
+    h = hs[i];
+    if (!/^h[1-6]$/i.test(h.tagName)) continue;  // it should be a header h1-h6
+    a = h.attributes;
+    while (a.length > 0) h.removeAttribute(a[0].name);
+  }
+});
+</script>
+
+<style type="text/css">
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+span.underline{text-decoration: underline;}
+div.column{display: inline-block; vertical-align: top; width: 50%;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+</style>
+
+
+
+<style type="text/css">
+code {
+white-space: pre;
+}
+.sourceCode {
+overflow: visible;
+}
+</style>
+<style type="text/css" data-origin="pandoc">
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+{ counter-reset: source-line 0; }
+pre.numberSource code > span
+{ position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+{ content: counter(source-line);
+position: relative; left: -1em; text-align: right; vertical-align: baseline;
+border: none; display: inline-block;
+-webkit-touch-callout: none; -webkit-user-select: none;
+-khtml-user-select: none; -moz-user-select: none;
+-ms-user-select: none; user-select: none;
+padding: 0 4px; width: 4em;
+color: #aaaaaa;
+}
+pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa; padding-left: 4px; }
+div.sourceCode
+{ }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+code span.al { color: #ff0000; font-weight: bold; } 
+code span.an { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.at { color: #7d9029; } 
+code span.bn { color: #40a070; } 
+code span.bu { color: #008000; } 
+code span.cf { color: #007020; font-weight: bold; } 
+code span.ch { color: #4070a0; } 
+code span.cn { color: #880000; } 
+code span.co { color: #60a0b0; font-style: italic; } 
+code span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.do { color: #ba2121; font-style: italic; } 
+code span.dt { color: #902000; } 
+code span.dv { color: #40a070; } 
+code span.er { color: #ff0000; font-weight: bold; } 
+code span.ex { } 
+code span.fl { color: #40a070; } 
+code span.fu { color: #06287e; } 
+code span.im { color: #008000; font-weight: bold; } 
+code span.in { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.kw { color: #007020; font-weight: bold; } 
+code span.op { color: #666666; } 
+code span.ot { color: #007020; } 
+code span.pp { color: #bc7a00; } 
+code span.sc { color: #4070a0; } 
+code span.ss { color: #bb6688; } 
+code span.st { color: #4070a0; } 
+code span.va { color: #19177c; } 
+code span.vs { color: #4070a0; } 
+code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } 
+</style>
+<script>
+// apply pandoc div.sourceCode style to pre.sourceCode instead
+(function() {
+  var sheets = document.styleSheets;
+  for (var i = 0; i < sheets.length; i++) {
+    if (sheets[i].ownerNode.dataset["origin"] !== "pandoc") continue;
+    try { var rules = sheets[i].cssRules; } catch (e) { continue; }
+    var j = 0;
+    while (j < rules.length) {
+      var rule = rules[j];
+      // check if there is a div.sourceCode rule
+      if (rule.type !== rule.STYLE_RULE || rule.selectorText !== "div.sourceCode") {
+        j++;
+        continue;
+      }
+      var style = rule.style.cssText;
+      // check if color or background-color is set
+      if (rule.style.color === '' && rule.style.backgroundColor === '') {
+        j++;
+        continue;
+      }
+      // replace div.sourceCode by a pre.sourceCode rule
+      sheets[i].deleteRule(j);
+      sheets[i].insertRule('pre.sourceCode{' + style + '}', j);
+    }
+  }
+})();
+</script>
+
+
+
+
+<style type="text/css">body {
+background-color: #fff;
+margin: 1em auto;
+max-width: 700px;
+overflow: visible;
+padding-left: 2em;
+padding-right: 2em;
+font-family: "Open Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
+font-size: 14px;
+line-height: 1.35;
+}
+#TOC {
+clear: both;
+margin: 0 0 10px 10px;
+padding: 4px;
+width: 400px;
+border: 1px solid #CCCCCC;
+border-radius: 5px;
+background-color: #f6f6f6;
+font-size: 13px;
+line-height: 1.3;
+}
+#TOC .toctitle {
+font-weight: bold;
+font-size: 15px;
+margin-left: 5px;
+}
+#TOC ul {
+padding-left: 40px;
+margin-left: -1.5em;
+margin-top: 5px;
+margin-bottom: 5px;
+}
+#TOC ul ul {
+margin-left: -2em;
+}
+#TOC li {
+line-height: 16px;
+}
+table {
+margin: 1em auto;
+border-width: 1px;
+border-color: #DDDDDD;
+border-style: outset;
+border-collapse: collapse;
+}
+table th {
+border-width: 2px;
+padding: 5px;
+border-style: inset;
+}
+table td {
+border-width: 1px;
+border-style: inset;
+line-height: 18px;
+padding: 5px 5px;
+}
+table, table th, table td {
+border-left-style: none;
+border-right-style: none;
+}
+table thead, table tr.even {
+background-color: #f7f7f7;
+}
+p {
+margin: 0.5em 0;
+}
+blockquote {
+background-color: #f6f6f6;
+padding: 0.25em 0.75em;
+}
+hr {
+border-style: solid;
+border: none;
+border-top: 1px solid #777;
+margin: 28px 0;
+}
+dl {
+margin-left: 0;
+}
+dl dd {
+margin-bottom: 13px;
+margin-left: 13px;
+}
+dl dt {
+font-weight: bold;
+}
+ul {
+margin-top: 0;
+}
+ul li {
+list-style: circle outside;
+}
+ul ul {
+margin-bottom: 0;
+}
+pre, code {
+background-color: #f7f7f7;
+border-radius: 3px;
+color: #333;
+white-space: pre-wrap; 
+}
+pre {
+border-radius: 3px;
+margin: 5px 0px 10px 0px;
+padding: 10px;
+}
+pre:not([class]) {
+background-color: #f7f7f7;
+}
+code {
+font-family: Consolas, Monaco, 'Courier New', monospace;
+font-size: 85%;
+}
+p > code, li > code {
+padding: 2px 0px;
+}
+div.figure {
+text-align: center;
+}
+img {
+background-color: #FFFFFF;
+padding: 2px;
+border: 1px solid #DDDDDD;
+border-radius: 3px;
+border: 1px solid #CCCCCC;
+margin: 0 5px;
+}
+h1 {
+margin-top: 0;
+font-size: 35px;
+line-height: 40px;
+}
+h2 {
+border-bottom: 4px solid #f7f7f7;
+padding-top: 10px;
+padding-bottom: 2px;
+font-size: 145%;
+}
+h3 {
+border-bottom: 2px solid #f7f7f7;
+padding-top: 10px;
+font-size: 120%;
+}
+h4 {
+border-bottom: 1px solid #f7f7f7;
+margin-left: 8px;
+font-size: 105%;
+}
+h5, h6 {
+border-bottom: 1px solid #ccc;
+font-size: 105%;
+}
+a {
+color: #0033dd;
+text-decoration: none;
+}
+a:hover {
+color: #6666ff; }
+a:visited {
+color: #800080; }
+a:visited:hover {
+color: #BB00BB; }
+a[href^="http:"] {
+text-decoration: underline; }
+a[href^="https:"] {
+text-decoration: underline; }
+
+code > span.kw { color: #555; font-weight: bold; } 
+code > span.dt { color: #902000; } 
+code > span.dv { color: #40a070; } 
+code > span.bn { color: #d14; } 
+code > span.fl { color: #d14; } 
+code > span.ch { color: #d14; } 
+code > span.st { color: #d14; } 
+code > span.co { color: #888888; font-style: italic; } 
+code > span.ot { color: #007020; } 
+code > span.al { color: #ff0000; font-weight: bold; } 
+code > span.fu { color: #900; font-weight: bold; } 
+code > span.er { color: #a61717; background-color: #e3d2d2; } 
+</style>
+
+
+
+
+</head>
+
+<body>
+
+
+
+
+<h1 class="title toc-ignore">Adding a New Module</h1>
+
+
+
+<p>This checklist walks through how to add a new plotting module to
+<strong>VizModules</strong> so it matches the package’s organization,
+documentation, and testing standards.</p>
+<div id="quick-checklist" class="section level2">
+<h2>Quick Checklist</h2>
+<ul class="task-list">
+<li><label><input type="checkbox"></input>Pick the plot function you are
+wrapping and name your module accordingly:</label>
+<ul>
+<li>For <strong>dittoViz</strong> functions: use
+<code>dittoViz_&lt;PlotName&gt;</code> (e.g.,
+<code>dittoViz_scatterPlot</code> for
+<code>dittoViz::scatterPlot</code>)</li>
+<li>For <strong>plotthis</strong> functions: use
+<code>plotthis_&lt;PlotName&gt;</code> (e.g.,
+<code>plotthis_AreaPlot</code> for <code>plotthis::AreaPlot</code>)</li>
+<li>For <strong>custom/standalone</strong> functions: use the plot name
+directly (e.g., <code>linePlot</code>, <code>piePlot</code>)</li>
+</ul></li>
+<li><label><input type="checkbox"></input>If adding a brand-new plotting
+function (e.g., <code>piePlot</code>), define and document that plot
+function first, then wrap it with the module.</label></li>
+<li><label><input type="checkbox"></input>Create the three core files:
+<code>R/&lt;moduleName&gt;_module_ui.R</code>,
+<code>R/&lt;moduleName&gt;_module_server.R</code>, and
+<code>R/&lt;moduleName&gt;_module_app.R</code>.</label></li>
+<li><label><input type="checkbox"></input>Document UI, server, and app
+functions with roxygen (<code>@export</code>, params,
+examples).</label></li>
+<li><label><input type="checkbox"></input>In the UI function docstring, add
+<strong>three required sections</strong>:</label>
+<ul>
+<li><code>@section Plot parameters not implemented or with altered functionality:</code>
+- List inputs not exposed and why</li>
+<li><code>@section Plot parameters and defaults:</code> - Document all
+exposed parameters with UI labels and defaults</li>
+<li><code>@section Plot parameters implementing new functionality:</code>
+- Document any new or plotly-specific controls (axes, ticks, reference
+lines, etc)</li>
+</ul></li>
+<li><label><input type="checkbox"></input>Add an example app that uses the
+module twice to prove multi-instance behavior.</label></li>
+<li><label><input type="checkbox"></input>Cover the base plotting function
+with <code>testthat</code>; cover the module/app with
+<code>shinytest2</code>.</label></li>
+<li><label><input type="checkbox"></input>Note any <code>ggplotly</code>
+conversion quirks that change or drop functionality.</label></li>
+<li><label><input type="checkbox"></input><strong>Never use
+<code>eval(str2expression())</code> on raw user input.</strong> Use
+<code>safe_eval_filter()</code>, <code>validate_expression()</code>, or
+<code>safe_resolve_adj_fxn()</code> instead (see <a href="#sanitizing-user-provided-expressions">Sanitizing User-Provided
+Expressions</a> below).</label></li>
+</ul>
+</div>
+<div id="naming-organization" class="section level2">
+<h2>Naming &amp; Organization</h2>
+<ul class="task-list">
+<li><label><input type="checkbox"></input>File names follow the module naming
+pattern:</label>
+<ul>
+<li><strong>dittoViz wrappers</strong>:
+<code>dittoViz_&lt;PlotName&gt;_module_ui.R</code> (e.g.,
+<code>dittoViz_scatterPlot_module_ui.R</code>)</li>
+<li><strong>plotthis wrappers</strong>:
+<code>plotthis_&lt;PlotName&gt;_module_ui.R</code> (e.g.,
+<code>plotthis_AreaPlot_module_ui.R</code>)</li>
+<li><strong>Custom modules</strong>:
+<code>&lt;plotName&gt;_module_ui.R</code> (e.g.,
+<code>linePlot_module_ui.R</code>)</li>
+</ul></li>
+<li><label><input type="checkbox"></input>Function names follow the pattern:
+<code>&lt;moduleName&gt;InputsUI()</code>,
+<code>&lt;moduleName&gt;OutputUI()</code>,
+<code>&lt;moduleName&gt;Server()</code>,
+<code>&lt;moduleName&gt;App()</code>.</label>
+<ul>
+<li>Examples: <code>plotthis_AreaPlotInputsUI()</code>,
+<code>dittoViz_scatterPlotServer()</code>,
+<code>linePlotApp()</code></li>
+</ul></li>
+<li><label><input type="checkbox"></input>Internal helpers stay in existing
+helper files when broadly useful; otherwise keep them inside the module
+file.</label></li>
+</ul>
+</div>
+<div id="documentation-standards" class="section level2">
+<h2>Documentation Standards</h2>
+<ul class="task-list">
+<li><label><input type="checkbox"></input>Roxygen headers include title,
+description, parameters, return value, authors, and
+<code>@export</code>.</label></li>
+<li><label><input type="checkbox"></input>Examples show minimal, runnable
+usage with a small dataset.</label></li>
+<li><label><input type="checkbox"></input><strong>The UI function must include
+three documentation sections:</strong></label></li>
+</ul>
+<div id="section-plot-parameters-not-implemented-or-with-altered-functionality" class="section level3">
+<h3>1.
+<code>@section Plot parameters not implemented or with altered functionality:</code></h3>
+<p>List all parameters from the base plot function that are
+<strong>not</strong> exposed via UI inputs, with explanations:</p>
+<div class="sourceCode" id="cb1"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" tabindex="-1"></a><span class="co">#&#39; @section Plot parameters not implemented or with altered functionality:</span></span>
+<span id="cb1-2"><a href="#cb1-2" tabindex="-1"></a><span class="co">#&#39; The following [plotthis::AreaPlot()] parameters are not available via UI inputs:</span></span>
+<span id="cb1-3"><a href="#cb1-3" tabindex="-1"></a><span class="co">#&#39; \itemize{</span></span>
+<span id="cb1-4"><a href="#cb1-4" tabindex="-1"></a><span class="co">#&#39;   \item \code{xlab} - X-axis label (plotly allows interactive editing)</span></span>
+<span id="cb1-5"><a href="#cb1-5" tabindex="-1"></a><span class="co">#&#39;   \item \code{ylab} - Y-axis label (plotly allows interactive editing)</span></span>
+<span id="cb1-6"><a href="#cb1-6" tabindex="-1"></a><span class="co">#&#39;   \item \code{title} - Plot title (plotly allows interactive editing)</span></span>
+<span id="cb1-7"><a href="#cb1-7" tabindex="-1"></a><span class="co">#&#39;   \item \code{subtitle} - Plot subtitle (not supported in plotly)</span></span>
+<span id="cb1-8"><a href="#cb1-8" tabindex="-1"></a><span class="co">#&#39;   \item \code{legend.position} - Legend positioning (plotly allows interactive repositioning)</span></span>
+<span id="cb1-9"><a href="#cb1-9" tabindex="-1"></a><span class="co">#&#39;   \item \code{split_by} - Split variable (returns a patchwork object, not supported in plotly)</span></span>
+<span id="cb1-10"><a href="#cb1-10" tabindex="-1"></a><span class="co">#&#39;   \item \code{palette} - Managed internally via the palette selection UI</span></span>
+<span id="cb1-11"><a href="#cb1-11" tabindex="-1"></a><span class="co">#&#39; }</span></span></code></pre></div>
+</div>
+<div id="section-plot-parameters-and-defaults" class="section level3">
+<h3>2. <code>@section Plot parameters and defaults:</code></h3>
+<p>Document all parameters that <strong>are</strong> exposed, listing
+their UI label and default value:</p>
+<div class="sourceCode" id="cb2"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" tabindex="-1"></a><span class="co">#&#39; @section Plot parameters and defaults:</span></span>
+<span id="cb2-2"><a href="#cb2-2" tabindex="-1"></a><span class="co">#&#39; The following [plotthis::AreaPlot()] parameters can be accessed via UI inputs and/or the \code{defaults} argument:</span></span>
+<span id="cb2-3"><a href="#cb2-3" tabindex="-1"></a><span class="co">#&#39; \itemize{</span></span>
+<span id="cb2-4"><a href="#cb2-4" tabindex="-1"></a><span class="co">#&#39;   \item \code{x} - X-axis variable (UI: &quot;X values&quot;, default: 2nd categorical variable)</span></span>
+<span id="cb2-5"><a href="#cb2-5" tabindex="-1"></a><span class="co">#&#39;   \item \code{y} - Y-axis variable (UI: &quot;Y values&quot;, default: 2nd numeric variable)</span></span>
+<span id="cb2-6"><a href="#cb2-6" tabindex="-1"></a><span class="co">#&#39;   \item \code{group_by} - Grouping variable (UI: &quot;Group by&quot;, default: 3rd categorical variable or &quot;&quot;)</span></span>
+<span id="cb2-7"><a href="#cb2-7" tabindex="-1"></a><span class="co">#&#39;   \item \code{facet_by} - Faceting variable (UI: &quot;Facet by&quot;, default: &quot;&quot;)</span></span>
+<span id="cb2-8"><a href="#cb2-8" tabindex="-1"></a><span class="co">#&#39;   \item \code{theme} - ggplot2 theme (UI: &quot;Theme&quot;, default: &quot;theme_this&quot;)</span></span>
+<span id="cb2-9"><a href="#cb2-9" tabindex="-1"></a><span class="co">#&#39;   \item \code{alpha} - Area fill transparency (UI: &quot;Alpha&quot;, default: 1)</span></span>
+<span id="cb2-10"><a href="#cb2-10" tabindex="-1"></a><span class="co">#&#39; }</span></span></code></pre></div>
+</div>
+<div id="section-plot-parameters-implementing-new-functionality" class="section level3">
+<h3>3.
+<code>@section Plot parameters implementing new functionality:</code></h3>
+<p>Document all module-specific parameters (plotly controls, reference
+lines, etc.):</p>
+<div class="sourceCode" id="cb3"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" tabindex="-1"></a><span class="co">#&#39; The following parameters implementing new functionality or controlling plotly-specific features are also available:</span></span>
+<span id="cb3-2"><a href="#cb3-2" tabindex="-1"></a><span class="co">#&#39; \itemize{</span></span>
+<span id="cb3-3"><a href="#cb3-3" tabindex="-1"></a><span class="co">#&#39;   \item \code{axis.font.size} - Axis title font size (UI: &quot;Axis font size&quot;, default: 18)</span></span>
+<span id="cb3-4"><a href="#cb3-4" tabindex="-1"></a><span class="co">#&#39;   \item \code{axis.showline} - Show axis border lines (UI: &quot;Show axis lines&quot;, default: TRUE)</span></span>
+<span id="cb3-5"><a href="#cb3-5" tabindex="-1"></a><span class="co">#&#39;   \item \code{axis.tickfont.size} - Size of tick labels (UI: &quot;Tick label size&quot;, default: 12)</span></span>
+<span id="cb3-6"><a href="#cb3-6" tabindex="-1"></a><span class="co">#&#39;   \item \code{hline.intercepts} - Y-coordinates for horizontal reference lines (UI: &quot;Y-intercepts&quot;, default: &quot;&quot;)</span></span>
+<span id="cb3-7"><a href="#cb3-7" tabindex="-1"></a><span class="co">#&#39;   \item \code{hline.colors} - Colors for horizontal lines, comma-separated (UI: &quot;Colors&quot;, default: &quot;#000000&quot;)</span></span>
+<span id="cb3-8"><a href="#cb3-8" tabindex="-1"></a><span class="co">#&#39;   \item \code{hline.linetypes} - Line types for horizontal lines, comma-separated (UI: &quot;Line types&quot;, default: &quot;dashed&quot;)</span></span>
+<span id="cb3-9"><a href="#cb3-9" tabindex="-1"></a><span class="co">#&#39;   \item \code{vline.intercepts} - X-coordinates for vertical reference lines (UI: &quot;X-intercepts&quot;, default: &quot;&quot;)</span></span>
+<span id="cb3-10"><a href="#cb3-10" tabindex="-1"></a><span class="co">#&#39;   \item \code{abline.slopes} - Slopes for diagonal reference lines (UI: &quot;Slopes&quot;, default: &quot;&quot;)</span></span>
+<span id="cb3-11"><a href="#cb3-11" tabindex="-1"></a><span class="co">#&#39; }</span></span></code></pre></div>
+<p><strong>Note:</strong> Reference line parameters
+(<code>hline.*</code>, <code>vline.*</code>, <code>abline.*</code>)
+accept comma-separated values to control each line individually.</p>
+</div>
+</div>
+<div id="functionality-non-exposed-inputs" class="section level2">
+<h2>Functionality &amp; Non-Exposed Inputs</h2>
+<ul class="task-list">
+<li><label><input type="checkbox"></input>For each plot function argument,
+decide: expose, set a fixed default, or drop.</label></li>
+<li><label><input type="checkbox"></input>If dropped or fixed, document it
+inside the UI function (description + reason).</label></li>
+<li><label><input type="checkbox"></input>If <code>ggplotly</code> alters or
+drops a feature (e.g., certain geoms, annotations), note that limitation
+in the UI docs so users know what to expect.</label></li>
+</ul>
+</div>
+<div id="example-app-requirement" class="section level2">
+<h2>Example App Requirement</h2>
+<ul class="task-list">
+<li><label><input type="checkbox"></input>Provide an app in
+<code>&lt;plot&gt;_module_app.R</code> as a thin wrapper around
+[createModuleApp()]:</label></li>
+</ul>
+<div class="sourceCode" id="cb4"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" tabindex="-1"></a>myPlotApp <span class="ot">&lt;-</span> <span class="cf">function</span>(<span class="at">data_list =</span> <span class="cn">NULL</span>) {</span>
+<span id="cb4-2"><a href="#cb4-2" tabindex="-1"></a>    <span class="cf">if</span> (<span class="fu">is.null</span>(data_list)) {</span>
+<span id="cb4-3"><a href="#cb4-3" tabindex="-1"></a>        data_list <span class="ot">&lt;-</span> <span class="fu">list</span>(<span class="st">&quot;example&quot;</span> <span class="ot">=</span> my_default_data)</span>
+<span id="cb4-4"><a href="#cb4-4" tabindex="-1"></a>    }</span>
+<span id="cb4-5"><a href="#cb4-5" tabindex="-1"></a>    <span class="fu">createModuleApp</span>(</span>
+<span id="cb4-6"><a href="#cb4-6" tabindex="-1"></a>        <span class="at">inputs_ui_fn =</span> myPlotInputsUI,</span>
+<span id="cb4-7"><a href="#cb4-7" tabindex="-1"></a>        <span class="at">output_ui_fn =</span> myPlotOutputUI,</span>
+<span id="cb4-8"><a href="#cb4-8" tabindex="-1"></a>        <span class="at">server_fn    =</span> myPlotServer,</span>
+<span id="cb4-9"><a href="#cb4-9" tabindex="-1"></a>        <span class="at">data_list    =</span> data_list,</span>
+<span id="cb4-10"><a href="#cb4-10" tabindex="-1"></a>        <span class="at">title        =</span> <span class="st">&quot;Modular myPlots&quot;</span></span>
+<span id="cb4-11"><a href="#cb4-11" tabindex="-1"></a>    )</span>
+<span id="cb4-12"><a href="#cb4-12" tabindex="-1"></a>}</span></code></pre></div>
+<ul class="task-list">
+<li><label><input type="checkbox"></input><code>createModuleApp()</code>
+already handles validation, data import, data filtering, and dataset
+switching — no need to duplicate that logic.</label></li>
+<li><label><input type="checkbox"></input>Add the module to the gallery app
+(<code>inst/apps/module-gallery/app.R</code>), placing it in its own tab
+alongside the other modules.</label></li>
+</ul>
+</div>
+<div id="testing-requirements" class="section level2">
+<h2>Testing Requirements</h2>
+<ul class="task-list">
+<li><label><input type="checkbox"></input><code>testthat</code>: cover the
+base plotting function’s core behavior and arguments (data handling,
+grouping, palette handling, etc.).</label></li>
+<li><label><input type="checkbox"></input><code>shinytest2</code>: cover the
+module/app (rendering inputs, updating outputs, download buttons if
+present).</label></li>
+<li><label><input type="checkbox"></input>Place tests under
+<code>tests/testthat/</code> with clear file names
+(<code>test-&lt;plot&gt;.R</code>,
+<code>test-&lt;plot&gt;-app.R</code>).</label></li>
+<li><label><input type="checkbox"></input>Ensure tests run headless and
+deterministically (seed randomness where needed).</label></li>
+<li><label><input type="checkbox"></input>For new plotting functions, add
+dedicated <code>testthat</code> coverage of the plotting helper itself
+(input validation, defaults, edge cases) in addition to the module
+tests.</label></li>
+</ul>
+</div>
+<div id="implementing-a-new-plotting-function-e.g.-pieplot" class="section level2">
+<h2>Implementing a New Plotting Function (e.g.,
+<code>piePlot</code>)</h2>
+<ul class="task-list">
+<li><label><input type="checkbox"></input>Add the plotting function under
+<code>R/</code> with full roxygen docs, inputs/returns, and
+examples.</label></li>
+<li><label><input type="checkbox"></input>Keep arguments consistent with
+existing plot functions (data first, <code>...</code> last,
+palette/palcolor patterns).</label></li>
+<li><label><input type="checkbox"></input>Document any assumptions about input
+shape (e.g., pre-summarized table for pies).</label></li>
+<li><label><input type="checkbox"></input>Add <code>testthat</code> coverage
+for the plotting function (happy paths + invalid inputs).</label></li>
+<li><label><input type="checkbox"></input>Only after the plotting function is
+stable, build the module UI/server/app wrappers around it.</label></li>
+</ul>
+</div>
+<div id="integrating-statistical-testing-stats-tab" class="section level2">
+<h2>Integrating Statistical Testing (Stats Tab)</h2>
+<p>Modules for categorical-vs-numeric plots (box, violin, etc.) can
+include an optional <strong>Stats</strong> tab that provides pairwise
+statistical testing with plotly bracket annotations. If your new module
+supports grouped comparisons along a categorical x-axis, follow this
+pattern:</p>
+<div id="ui" class="section level3">
+<h3>UI</h3>
+<ul class="task-list">
+<li><label><input type="checkbox"></input>Add a <code>&quot;Stats&quot;</code> tab to
+the module’s <code>tabsetPanel</code> containing
+<code>.uniform_stats_inputs_ui(ns, defaults)</code>.</label></li>
+<li><label><input type="checkbox"></input>Pass <code>has.stats = TRUE</code>
+to <code>module_tack_ui()</code> so the conditionally visible “Save
+Stats” button is included.</label></li>
+</ul>
+</div>
+<div id="server" class="section level3">
+<h3>Server</h3>
+<ul class="task-list">
+<li><label><input type="checkbox"></input>Create a <code>reactiveVal</code> to
+store the last computed stats table:
+<code>last_stats_df &lt;- reactiveVal(NULL)</code>.</label></li>
+<li><label><input type="checkbox"></input>When
+<code>input$stats.enabled</code> is TRUE in the plot rendering block,
+call <code>.compute_pairwise_stats()</code> to run tests, then
+<code>.create_stat_annotations()</code> to build bracket
+shapes/annotations, then <code>.apply_stat_annotations()</code> to
+append them to the plotly figure.</label></li>
+<li><label><input type="checkbox"></input>Store the result:
+<code>last_stats_df(stats_df)</code>.</label></li>
+<li><label><input type="checkbox"></input>Add an <code>observeEvent</code> to
+update <code>stat.pairs</code> choices when the x or grouping column
+changes, using <code>.generate_pair_strings()</code>.</label></li>
+<li><label><input type="checkbox"></input>Add an
+<code>observeEvent(input$stats.enabled)</code> to show/hide the “Save
+Stats” button via <code>shinyjs::show(&quot;download.stats.col&quot;)</code> /
+<code>shinyjs::hide(&quot;download.stats.col&quot;)</code>.</label></li>
+<li><label><input type="checkbox"></input>Add a <code>downloadHandler</code>
+for <code>output$download.stats</code> that calls
+<code>.write_stats_csv()</code>.</label></li>
+<li><label><input type="checkbox"></input>Call
+<code>.reset_stats_inputs(session)</code> in the reset
+observer.</label></li>
+</ul>
+</div>
+<div id="key-helpers-all-in-rstat_helper.r" class="section level3">
+<h3>Key helpers (all in <code>R/stat_helper.R</code>)</h3>
+<table>
+<colgroup>
+<col width="50%" />
+<col width="50%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Function</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>.compute_pairwise_stats()</code></td>
+<td>Run pairwise or omnibus tests with p-value adjustment</td>
+</tr>
+<tr class="even">
+<td><code>.create_stat_annotations()</code></td>
+<td>Convert stats to plotly shapes/annotations with bracket packing</td>
+</tr>
+<tr class="odd">
+<td><code>.apply_stat_annotations()</code></td>
+<td>Append shapes/annotations to the plotly figure and adjust
+y-axes</td>
+</tr>
+<tr class="even">
+<td><code>.generate_pair_strings()</code></td>
+<td>Build <code>&quot;A vs B&quot;</code> strings for the comparison selector</td>
+</tr>
+<tr class="odd">
+<td><code>.parse_pair_strings()</code></td>
+<td>Convert selected pair strings back to list of length-2 vectors</td>
+</tr>
+<tr class="even">
+<td><code>.write_stats_csv()</code></td>
+<td>Write stats CSV with metadata comment header</td>
+</tr>
+</tbody>
+</table>
+<p>See the <code>plotthis_BoxPlotServer</code>,
+<code>plotthis_ViolinPlotServer</code>, or
+<code>dittoViz_yPlotServer</code> implementations for complete
+integration examples.</p>
+</div>
+</div>
+<div id="gallery-app" class="section level2">
+<h2>Gallery App</h2>
+<ul class="task-list">
+<li><label><input type="checkbox"></input>Add or update the gallery app at
+<code>inst/apps/module-gallery/app.R</code> to include the new module in
+its own tab.</label></li>
+<li><label><input type="checkbox"></input>Each tab should load a small sample
+dataset and show the module’s inputs and outputs together.</label></li>
+<li><label><input type="checkbox"></input>Verify namespacing: each module
+instance should have a unique <code>id</code> and independent
+state.</label></li>
+<li><label><input type="checkbox"></input>Keep dependencies minimal (prefer
+built-in or generated datasets).</label></li>
+</ul>
+</div>
+<div id="review-before-submitting" class="section level2">
+<h2>Review Before Submitting</h2>
+<ul class="task-list">
+<li><label><input type="checkbox"></input>Run
+<code>devtools::document()</code> to update NAMESPACE and Rd
+files.</label></li>
+<li><label><input type="checkbox"></input>Run <code>devtools::check()</code>
+and ensure tests pass locally.</label></li>
+<li><label><input type="checkbox"></input>Confirm UI text/tooltips mention any
+missing or altered plot features.</label></li>
+<li><label><input type="checkbox"></input>Verify both module instances in the
+example app work independently (namespacing correct).</label></li>
+</ul>
+</div>
+<div id="style-guide" class="section level2">
+<h2>Style Guide</h2>
+<p>Following a consistent style makes the package easier to read,
+maintain, and extend. Apply these conventions to every new module.</p>
+<div id="input-labels" class="section level3">
+<h3>Input Labels</h3>
+<ul>
+<li><strong>Capitalize</strong> the first word of every input label:
+<code>&quot;Group By&quot;</code>, not <code>&quot;group by&quot;</code>.</li>
+<li><strong>Be concise</strong> — prefer short, scannable labels over
+long descriptions. Move detail into a <code>tipify</code> tooltip
+instead.</li>
+<li><strong>Avoid redundant words.</strong> <code>&quot;Color&quot;</code> is
+better than <code>&quot;Select a Color&quot;</code>.</li>
+<li><strong>Match plotthis/dittoViz parameter names loosely</strong>, so
+users can cross-reference the upstream docs. E.g., label the
+<code>group_by</code> input <code>&quot;Group By&quot;</code>.</li>
+</ul>
+</div>
+<div id="tooltips-with-tipify" class="section level3">
+<h3>Tooltips with <code>tipify</code></h3>
+<p>Wrap any non-obvious input in <code>shinyBS::tipify()</code> to show
+a tooltip on hover. This keeps labels concise while still informing the
+user.</p>
+<p>Apply <code>tipify</code> when:</p>
+<ul>
+<li>The input’s purpose is not immediately clear from its label
+alone.</li>
+<li>The input accepts a specific format that users might not guess
+(e.g., comma-separated values, index positions for categorical
+axes).</li>
+<li>The input has a non-trivial effect on the plot (e.g., stat
+correction methods, bracket inset).</li>
+</ul>
+<p>Standard pattern — always use <code>placement = &quot;top&quot;</code> and
+<code>options = list(container = &quot;body&quot;)</code> so tooltips render
+correctly inside sidebar panels:</p>
+<div class="sourceCode" id="cb5"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" tabindex="-1"></a><span class="fu">tipify</span>(</span>
+<span id="cb5-2"><a href="#cb5-2" tabindex="-1"></a>    <span class="fu">textInput</span>(<span class="fu">ns</span>(<span class="st">&quot;hline.intercepts&quot;</span>), <span class="st">&quot;Y-intercepts&quot;</span>,</span>
+<span id="cb5-3"><a href="#cb5-3" tabindex="-1"></a>        <span class="at">placeholder =</span> <span class="st">&quot;e.g. 2, -2&quot;</span>,</span>
+<span id="cb5-4"><a href="#cb5-4" tabindex="-1"></a>        <span class="at">value =</span> <span class="fu">.get_default</span>(defaults, <span class="st">&quot;hline.intercepts&quot;</span>, <span class="st">&quot;&quot;</span>)</span>
+<span id="cb5-5"><a href="#cb5-5" tabindex="-1"></a>    ),</span>
+<span id="cb5-6"><a href="#cb5-6" tabindex="-1"></a>    <span class="fu">paste</span>(</span>
+<span id="cb5-7"><a href="#cb5-7" tabindex="-1"></a>        <span class="st">&quot;For categorical or factor axes, enter the index (position) of the&quot;</span>,</span>
+<span id="cb5-8"><a href="#cb5-8" tabindex="-1"></a>        <span class="st">&quot;category rather than its name.&quot;</span></span>
+<span id="cb5-9"><a href="#cb5-9" tabindex="-1"></a>    ),</span>
+<span id="cb5-10"><a href="#cb5-10" tabindex="-1"></a>    <span class="at">placement =</span> <span class="st">&quot;top&quot;</span>, <span class="at">options =</span> <span class="fu">list</span>(<span class="at">container =</span> <span class="st">&quot;body&quot;</span>)</span>
+<span id="cb5-11"><a href="#cb5-11" tabindex="-1"></a>)</span></code></pre></div>
+<p>Inputs that are self-explanatory from their label (e.g.,
+<code>&quot;Plot Title&quot;</code>, <code>&quot;X-axis Variable&quot;</code>) do not need a
+tooltip.</p>
+</div>
+<div id="reuse-uniform-input-helpers" class="section level3">
+<h3>Reuse Uniform Input Helpers</h3>
+<p>In time, these helpers will be further formalized and exported, but
+they can be used with the <code>VizModules:::</code> prefix in the
+meantime.</p>
+<p>Before writing custom inputs, check whether a uniform helper already
+covers your needs:</p>
+<table>
+<colgroup>
+<col width="50%" />
+<col width="50%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Helper</th>
+<th>Provides</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>.uniform_lines_inputs_ui()</code></td>
+<td>Horizontal, vertical, and diagonal reference line controls</td>
+</tr>
+<tr class="even">
+<td><code>.uniform_axes_inputs_ui()</code></td>
+<td>Font, axis border, gridline, tick, and facet styling</td>
+</tr>
+<tr class="odd">
+<td><code>.uniform_stats_inputs_ui()</code></td>
+<td>Pairwise statistical testing and bracket annotation controls</td>
+</tr>
+<tr class="even">
+<td><code>.uniform_plotly_inputs_ui()</code></td>
+<td>Download buttons, margins, subplot spacing, and draw-shape
+styling</td>
+</tr>
+</tbody>
+</table>
+<p>Pass <code>ns</code> and a <code>defaults</code> list to each helper.
+Use the <code>include.*</code> arguments to opt in to optional groups
+(e.g., <code>include.fit.lines = TRUE</code> for scatter plots,
+<code>include.rotate = TRUE</code> for bar plots).</p>
+<p>Using the uniform helpers ensures that shared inputs behave
+identically across every module and that future changes to those helpers
+propagate automatically.</p>
+</div>
+<div id="imports-importfrom-over" class="section level3">
+<h3>Imports: <code>@importFrom</code> Over <code>::</code></h3>
+<ul>
+<li><strong>Always use <code>@importFrom pkg fun</code></strong> in the
+roxygen header of any file that calls an external function, then call
+the function directly (<code>fun()</code>) in the body.</li>
+<li><strong>Avoid <code>pkg::fun()</code> calls</strong> in module
+code.</li>
+</ul>
+<p>The only exception is a one-off call in an <code>@examples</code>
+block or vignette where the full qualified name aids readability.</p>
+</div>
+<div id="additional-conventions" class="section level3">
+<h3>Additional Conventions</h3>
+<ul>
+<li>Use <strong>4-space indentation</strong> and keep lines to
+<strong>120 characters</strong> max (enforced by
+<code>.lintr</code>).</li>
+<li>Avoid <code>sapply()</code> — use <code>vapply()</code> or
+<code>lapply()</code> with explicit types instead.</li>
+<li>Do not edit <code>NAMESPACE</code> manually; always regenerate with
+<code>devtools::document()</code>.</li>
+</ul>
+</div>
+</div>
+<div id="sanitizing-user-provided-expressions" class="section level2">
+<h2>Sanitizing User-Provided Expressions</h2>
+<p><strong>Never use <code>eval(str2expression())</code> or
+<code>eval(parse())</code> on raw user input.</strong> If a Shiny app is
+deployed publicly, this allows arbitrary code execution on the server
+(e.g., <code>system(&quot;rm -rf /&quot;)</code>). VizModules provides three
+exported helper functions for safely handling user-typed expressions.
+Use them whenever your module accepts free-text input that will be
+evaluated or passed to a plotting function.</p>
+<div id="safe_eval_filterexpr_text-data" class="section level3">
+<h3><code>safe_eval_filter(expr_text, data)</code></h3>
+<p>Use when a module <strong>evaluates</strong> a user-typed filter
+expression directly to produce a logical vector for row subsetting. The
+expression is parsed, its AST is walked to ensure only allowed
+operations are present (comparisons, logical operators, column
+references, and literals), and then it is evaluated in a restricted
+environment containing only the data frame’s columns.</p>
+<div class="sourceCode" id="cb6"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" tabindex="-1"></a><span class="co"># In a module server — filtering rows by a textInput:</span></span>
+<span id="cb6-2"><a href="#cb6-2" tabindex="-1"></a>rows.use <span class="ot">=</span> <span class="fu">safe_eval_filter</span>(<span class="fu">isolate_fn</span>(input<span class="sc">$</span>rows.use), <span class="fu">data</span>())</span></code></pre></div>
+<p>Returns a logical vector (same length as <code>nrow(data)</code>), or
+<code>NULL</code> if the input is empty, unparseable, or contains
+disallowed operations.</p>
+</div>
+<div id="validate_expressionexpr_text-col_names" class="section level3">
+<h3><code>validate_expression(expr_text, col_names)</code></h3>
+<p>Use when a module <strong>passes</strong> a user-typed expression
+string through to a downstream plotting function that will evaluate it
+internally (e.g., <code>plotthis::BoxPlot(highlight = ...)</code>). The
+string is validated but not executed.</p>
+<div class="sourceCode" id="cb7"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" tabindex="-1"></a><span class="co"># In a module server — passing a highlight expression to plotthis:</span></span>
+<span id="cb7-2"><a href="#cb7-2" tabindex="-1"></a>highlight <span class="ot">&lt;-</span> <span class="fu">validate_expression</span>(<span class="fu">isolate_fn</span>(input<span class="sc">$</span>highlight), <span class="fu">names</span>(<span class="fu">data</span>()))</span></code></pre></div>
+<p>Returns the original string if safe, or <code>NULL</code>.</p>
+</div>
+<div id="safe_resolve_adj_fxnfn_name" class="section level3">
+<h3><code>safe_resolve_adj_fxn(fn_name)</code></h3>
+<p>Use when a module resolves a function name from a dropdown or text
+input into an actual function reference (e.g., for
+<code>x.adj.fxn</code>, <code>y.adj.fxn</code>). Only function names in
+the allowed list (<code>&quot;log2&quot;</code>, <code>&quot;log&quot;</code>,
+<code>&quot;log10&quot;</code>, <code>&quot;neg_log10&quot;</code>, <code>&quot;log1p&quot;</code>,
+<code>&quot;as.factor&quot;</code>, <code>&quot;abs&quot;</code>, <code>&quot;sqrt&quot;</code>) are
+accepted.</p>
+<div class="sourceCode" id="cb8"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" tabindex="-1"></a><span class="co"># In a module server — resolving an adjustment function:</span></span>
+<span id="cb8-2"><a href="#cb8-2" tabindex="-1"></a>x.adj.fxn <span class="ot">=</span> <span class="fu">safe_resolve_adj_fxn</span>(<span class="fu">isolate_fn</span>(input<span class="sc">$</span>x.adj.fxn))</span></code></pre></div>
+<p>Returns the function, or <code>NULL</code> if the name is empty or
+not in the allowed list.</p>
+</div>
+<div id="what-counts-as-allowed" class="section level3">
+<h3>What counts as “allowed”?</h3>
+<p>All three helpers share the same whitelist of safe AST nodes:</p>
+<ul>
+<li><strong>Comparisons:</strong> <code>&lt;</code>, <code>&gt;</code>,
+<code>&lt;=</code>, <code>&gt;=</code>, <code>==</code>,
+<code>!=</code></li>
+<li><strong>Logical operators:</strong> <code>&amp;</code>,
+<code>&amp;&amp;</code>, <code>|</code>, <code>||</code>,
+<code>!</code></li>
+<li><strong>Utilities:</strong> <code>%in%</code>, <code>c()</code>,
+<code>is.na()</code>, <code>is.null()</code></li>
+<li><strong>Arithmetic:</strong> <code>-</code>, <code>+</code>,
+<code>*</code>, <code>/</code>, <code>:</code>, <code>%%</code></li>
+<li><strong>Grouping:</strong> <code>()</code></li>
+<li><strong>Column names</strong> from the data</li>
+<li><strong>Literals:</strong> numbers, strings, <code>TRUE</code>,
+<code>FALSE</code>, <code>NA</code>, <code>NULL</code>,
+<code>Inf</code>, <code>NaN</code></li>
+</ul>
+<p>Anything outside this list (including function calls like
+<code>system()</code>, <code>file.remove()</code>,
+<code>library()</code>, etc.) is rejected and a warning is issued.</p>
+</div>
+</div>
+
+
+
+<!-- code folding -->
+
+
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+  (function () {
+    var script = document.createElement("script");
+    script.type = "text/javascript";
+    script.src  = "https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML";
+    document.getElementsByTagName("head")[0].appendChild(script);
+  })();
+</script>
+
+</body>
+</html>

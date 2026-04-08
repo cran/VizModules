@@ -1,0 +1,274 @@
+#' Server logic for AreaPlot module
+#'
+#' @param id The ID for the Shiny module.
+#' @param data A `reactive` containing the data frame to plot.
+#' @param hide.inputs A character vector of input IDs to hide.
+#'   These will still be initialized and their values passed to the plot function,
+#'   but the user will not be able to see/adjust them in the UI.
+#' @param hide.tabs A character vector of tab names to hide.
+#'   Inputs in these tabs will still be initialized and their values passed to the plot function,
+#'   but the user will not be able to see/adjust them in the UI.
+#' @param defaults A named list of default values for the inputs. When the reset button is
+#'   clicked, inputs are reset to these values rather than hardcoded fallbacks. Typically
+#'   the same list passed to the corresponding UI function.
+#' @return The `moduleServer` function for the AreaPlot module.
+#'
+#' @import shiny
+#' @import plotly
+#' @importFrom stats na.omit
+#' @importFrom ggplot2 unit
+#' @importFrom plotthis AreaPlot
+#' @importFrom shinyjs hide
+#' @importFrom shinyWidgets updateMaterialSwitch
+#'
+#' @export
+#' @author Jacob Martin, Jared Andrews
+plotthis_AreaPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs = NULL, defaults = NULL) {
+    stopifnot(is.reactive(data))
+
+    moduleServer(id, function(input, output, session) {
+        # Hide individual inputs if specified
+        if (!is.null(hide.inputs)) {
+            for (input.name in hide.inputs) hide(input.name)
+        }
+
+        # Hide tabs if specified
+        if (!is.null(hide.tabs)) {
+            for (tab.name in hide.tabs) hideTab(inputId = "AreaPlotTabsetPanel", target = tab.name)
+        }
+
+        ns <- session$ns
+        default_palette_name <- "dittoColors"
+        palette_lookup <- .flatten_palette_options(default_palettes()[["choices"]])
+        default_palette_values <- palette_lookup[[default_palette_name]]
+        if (is.null(default_palette_values) || length(default_palette_values) == 0) {
+            default_palette_values <- if (length(palette_lookup) > 0) palette_lookup[[1]] else character(0)
+        }
+
+        palette_groups <- reactive({
+            df <- data()
+            if (is.null(df)) {
+                return(character(0))
+            }
+
+            group_col <- input$group.by
+            x_col <- input$x.data
+
+            if (!is.null(group_col) && nzchar(group_col) && group_col %in% names(df)) {
+                unique(na.omit(as.character(df[[group_col]])))
+            } else if (!is.null(x_col) && nzchar(x_col) && x_col %in% names(df)) {
+                unique(na.omit(as.character(df[[x_col]])))
+            } else {
+                character(0)
+            }
+        })
+
+        output$palette.selection <- renderUI({
+            groups <- palette_groups()
+            if (length(groups) == 0) {
+                return(NULL)
+            }
+
+            initial_colors <- isolate(resolve_palette(groups, input$palette.colours, default_palette_values))
+
+            multiColorPicker(
+                ns("palette.colours"),
+                label = "Plot colors",
+                groups = groups,
+                palette_options = default_palettes()[["choices"]],
+                selected_palette = default_palette_name,
+                colors = initial_colors,
+                compact = TRUE
+            )
+        })
+
+        observeEvent(input$x.data, ignoreInit = TRUE, {
+            char.choices <- c("", names(data())[vapply(data(), function(x) !is.numeric(x), logical(1))])
+            group_facet_choices <- setdiff(char.choices, input$x.data)
+            updateSelectInput(session, "group.by", choices = c(group_facet_choices), selected = if (input$group.by %in% group_facet_choices) input$group.by else "")
+            updateSelectInput(session, "facet.by", choices = c("", group_facet_choices), selected = if (input$facet.by %in% group_facet_choices) input$facet.by else "")
+        })
+
+        # Reset functionality
+        observeEvent(input$reset, {
+            char.choices <- c("", names(data())[vapply(data(), function(x) !is.numeric(x), logical(1))])
+            num.choices <- c("", names(data())[vapply(data(), is.numeric, logical(1))])
+
+            x_default <- .get_default(defaults, "x.data", char.choices[2], function(x) x %in% char.choices)
+            group_facet_choices <- setdiff(char.choices, x_default)
+
+            # Data
+            updateSelectInput(session, "x.data", selected = x_default)
+            updateSelectInput(session, "y.data",
+                selected = .get_default(defaults, "y.data", num.choices[2], function(x) x %in% num.choices))
+            updateSelectInput(session, "group.by",
+                selected = .get_default(defaults, "group.by", char.choices[3], function(x) x %in% c("", group_facet_choices)))
+
+            # Facet
+            updateSelectInput(session, "facet.by",
+                selected = .get_default(defaults, "facet.by", "", function(x) x == "" || x %in% group_facet_choices))
+            updateSelectInput(session, "facet.scale",
+                selected = .get_default(defaults, "facet.scale", "fixed"))
+            updateNumericInput(session, "facet.ncol", value = .get_default(defaults, "facet.ncol", NA, is.numeric))
+            updateNumericInput(session, "facet.nrow", value = .get_default(defaults, "facet.nrow", NA, is.numeric))
+            updateMaterialSwitch(session, "facet.by.row", value = .get_default(defaults, "facet.by.row", TRUE, is.logical))
+
+            # Aesthetic
+            # (palette.selection is UI output, so no reset call here)
+            updateNumericInput(session, "alpha", value = .get_default(defaults, "alpha", 1, is.numeric))
+            updateMaterialSwitch(session, "scale.y", value = .get_default(defaults, "scale.y", FALSE, is.logical))
+
+            # Axes
+            updateNumericInput(session, "axis.title.font.size",
+                value = .get_default(defaults, "axis.title.font.size", 18, is.numeric))
+            updateNumericInput(session, "title.font.size",
+                value = .get_default(defaults, "title.font.size", 26, is.numeric))
+            .reset_axes_inputs(session, defaults)
+
+            # Plotly
+            .reset_plotly_inputs(session, defaults)
+
+            # Lines
+            .reset_lines_inputs(session, defaults = defaults)
+        })
+
+        observeEvent(input$facet.by, {
+            if (!input$facet.by == "") {
+                show("facet.title.font.size")
+                show("facet.title.font.color")
+                show("facet.title.font.family")
+            } else {
+                hide("facet.title.font.size")
+                hide("facet.title.font.color")
+                hide("facet.title.font.family")
+            }
+        })
+
+        generate_AreaPlot <- reactive({
+            isolate_fn <- setup_auto_update_logic(input)
+
+            group.by <- NULL
+            if (!isolate_fn(input$group.by) == "") {
+                group.by <- isolate_fn(input$group.by)
+            }
+
+            # Null Values:
+            facet.by <- NULL
+            if (!isolate_fn(input$facet.by) == "") {
+                facet.by <- isolate_fn(input$facet.by)
+            }
+
+            # Convert NA to NULL for facet.ncol and facet.nrow
+            facet.ncol <- .na_to_null(isolate_fn(input$facet.ncol))
+            facet.nrow <- .na_to_null(isolate_fn(input$facet.nrow))
+
+            palette_values <- resolve_palette(
+                isolate_fn(palette_groups()),
+                isolate_fn(input$palette.colours),
+                default_palette_values
+            )
+
+            palcolor_arg <- NULL
+
+            if (!is.null(palette_values) && length(palette_values) > 0) {
+                palcolor_arg <- as.list(palette_values)
+            }
+
+            theme_args <- .create_ggplot_axis_style(input, isolate_fn = isolate_fn)
+            theme_args$panel.spacing <- unit(isolate_fn(input$subplot.margin), "npc")
+
+            p <- AreaPlot(
+                data(),
+                x = isolate_fn(input$x.data),
+                y = isolate_fn(input$y.data),
+                group_by = group.by,
+                theme = "theme_this",
+                theme_args = theme_args,
+                palcolor = palcolor_arg,
+                alpha = isolate_fn(input$alpha),
+                facet_by = facet.by,
+                facet_scales = isolate_fn(input$facet.scale),
+                facet_ncol = facet.ncol,
+                facet_nrow = facet.nrow,
+                facet_byrow = isolate_fn(input$facet.by.row),
+                scale_y = isolate_fn(input$scale.y)
+            )
+
+
+            # Remove ggplot panel borders to prevent double borders with plotly
+
+            fig <- ggplotly(p) |>
+                layout(
+                    title = list(
+                        font = list(
+                            size = isolate_fn(input$title.font.size),
+                            family = isolate_fn(input$title.font.family),
+                            color = isolate_fn(input$title.font.color)
+                        ),
+                        x = 0.5, xanchor = "center", y = 0.98, yanchor = "top"
+                    )
+                )
+
+            # Apply axis styling to all subplot axes (handles faceting/split_by)
+            xaxis_style <- .create_axis_styles(input, axis_side = "x", isolate_fn = isolate_fn)
+            yaxis_style <- .create_axis_styles(input, axis_side = "y", isolate_fn = isolate_fn)
+
+            fig <- .apply_subplot_axis_styling(fig, xaxis_style, yaxis_style)
+
+            # Apply axis title font to shared facet annotation titles
+            if (!is.null(facet.by) && nzchar(facet.by)) {
+                fig <- .apply_axis_title_to_annotations(fig, input, isolate_fn)
+            }
+
+            # Add reference lines
+            fig <- .add_reference_lines(fig,
+                hline.intercepts = isolate_fn(input$hline.intercepts),
+                hline.colors = isolate_fn(input$hline.colors),
+                hline.widths = isolate_fn(input$hline.widths),
+                hline.linetypes = isolate_fn(input$hline.linetypes),
+                hline.opacities = isolate_fn(input$hline.opacities),
+                vline.intercepts = isolate_fn(input$vline.intercepts),
+                vline.colors = isolate_fn(input$vline.colors),
+                vline.widths = isolate_fn(input$vline.widths),
+                vline.linetypes = isolate_fn(input$vline.linetypes),
+                vline.opacities = isolate_fn(input$vline.opacities),
+                abline.slopes = isolate_fn(input$abline.slopes),
+                abline.intercepts = isolate_fn(input$abline.intercepts),
+                abline.colors = isolate_fn(input$abline.colors),
+                abline.widths = isolate_fn(input$abline.widths),
+                abline.linetypes = isolate_fn(input$abline.linetypes),
+                abline.opacities = isolate_fn(input$abline.opacities)
+            )
+
+            config_list <- .add_plot_config(download.format = isolate_fn(input$download.format), include.modebar.buttons = TRUE, facet.by = facet.by)
+            fig <- do.call(config, c(list(p = fig), config_list))
+            fig <- .apply_plotly_newshape(fig, input, isolate_fn)
+
+            return(fig)
+        })
+
+        # Render the plot output
+        output$AreaPlot <- renderPlotly({
+            req(input$x.data, input$y.data)
+
+            fig <- generate_AreaPlot() |>
+                layout(
+                    margin = list(
+                        t = input$margin.t,
+                        b = input$margin.b,
+                        l = input$margin.l,
+                        r = input$margin.r,
+                        autoexpand = TRUE
+                    )
+                )
+
+            return(fig)
+        })
+
+        # Download handler for interactive plot
+        output$download.interactive <- .create_plot_download_handler(
+            plot_reactive = generate_AreaPlot,
+            filename_base = "AreaPlot"
+        )
+    })
+}
