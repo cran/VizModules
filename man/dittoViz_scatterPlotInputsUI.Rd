@@ -49,12 +49,16 @@ The module will parse such inputs into the appropriate format for \code{\link[di
 
 The following \code{\link[dittoViz:scatterPlot]{dittoViz::scatterPlot()}} parameters are not available via UI inputs or have been superseded:
 \itemize{
-\item \code{xlab} - X-axis label (plotly allows interactive editing)
-\item \code{ylab} - Y-axis label (plotly allows interactive editing)
+\item \code{xlab} - X-axis label (auto-generated to reflect any applied X adjustment,
+e.g. \code{"log2(z-score(units))"}; plotly allows interactive editing)
+\item \code{ylab} - Y-axis label (auto-generated to reflect any applied Y adjustment,
+e.g. \code{"log2(z-score(units))"}; plotly allows interactive editing)
 \item \code{main} - Plot title (plotly allows interactive editing)
 \item \code{sub} - Plot subtitle (not supported in plotly)
 \item \code{theme} - ggplot2 theme (not applicable to plotly)
 \item \code{legend.title} - Legend title (managed by plotly interactively)
+\item \code{legend.color.size} - Legend color size (not supported in plotly)
+\item \code{legend.shape.size} - Legend shape size (not supported in plotly)
 \item \code{add.xline} - Use \code{vline.intercepts} instead for vertical lines with full styling options
 \item \code{add.yline} - Use \code{hline.intercepts} instead for horizontal lines with full styling options
 \item \code{xline.linetype} - Use \code{vline.linetypes} instead
@@ -63,6 +67,17 @@ The following \code{\link[dittoViz:scatterPlot]{dittoViz::scatterPlot()}} parame
 \item \code{yline.color} - Use \code{hline.colors} instead
 \item \code{do.letter} - Lettering subplots (not implemented for plotly)
 \item \code{do.label} - Labeling points interactively (not compatible with plotly hover)
+\item \code{labels.size}, \code{labels.highlight}, \code{labels.use.numbers},
+\code{labels.numbers.spacer}, \code{labels.repel}, \code{labels.repel.adjust},
+\code{labels.split.by} - Point-label styling (tied to \code{do.label}, not implemented)
+\item \code{rename.color.groups} - Rename color groups (not implemented)
+\item \code{rename.shape.groups} - Rename shape groups (not implemented)
+\item \code{add.trajectory.curves} - Add trajectory curves from coordinate matrices
+(not implemented; use \code{add.trajectory.by.groups} instead)
+\item \code{do.raster} - Rasterize the point layer (not implemented; use \code{webgl} for performance instead)
+\item \code{raster.dpi} - Rasterization DPI (not applicable without \code{do.raster})
+\item \code{show.grid.lines} - Toggle grid lines (managed via the Axes tab gridline controls)
+\item \code{legend.color.breaks.labels} - Labels for color-scale breaks (not implemented)
 }
 The new Lines tab provides enhanced functionality including multiple lines per type,
 individual line widths, opacities, and diagonal/ablines with slope control.
@@ -85,6 +100,8 @@ The following \code{\link[dittoViz:scatterPlot]{dittoViz::scatterPlot()}} parame
 \item \code{y.adj.fxn} - Y adjustment function (UI: "Y Adjustment Function", default: "")
 \item \code{color.adj.fxn} - Color adjustment function (UI: "Color Adjustment Function", default: "")
 \item \code{size} - Point size (UI: "Point Size", default: 1)
+\item \code{size.by} - Numeric column mapped to point size (UI: "Size By", default: ""); when set,
+a custom circle size legend is drawn since plotly cannot render a native size legend
 \item \code{opacity} - Point opacity (UI: "Point Opacity", default: 1)
 \item \code{show.others} - Show others (UI: "Show Others", default: TRUE)
 \item \code{split.show.all.others} - Show split others (UI: "Show Split Others", default: TRUE)
@@ -95,8 +112,8 @@ The following \code{\link[dittoViz:scatterPlot]{dittoViz::scatterPlot()}} parame
 \item \code{contour.color} - Contour color (UI: "Contour Color", default: "black")
 \item \code{contour.linetype} - Contour linetype (UI: "Contour Linetype", default: "solid")
 \item \code{color.panel} - Custom color values (UI: color.panel.ui, derived from palette)
-\item \code{split.nrow} - Number of split rows (UI: "Split Rows", default: NA)
-\item \code{split.ncol} - Number of split columns (UI: "Split Columns", default: NA)
+\item \code{split.nrow} - Number of split rows (UI: "Rows", default: NA)
+\item \code{split.ncol} - Number of split columns (UI: "Columns", default: NA)
 \item \code{multivar.split.dir} - Multivar split direction (UI: "Multivar Split Dir", default: "col")
 \item \code{split.adjust.scales} - Facet scales (UI: "Facet Scales", default: "fixed")
 \item \code{annotate.by} - Annotate by column (UI: "Annotate By", default: "")
@@ -114,11 +131,11 @@ The following \code{\link[dittoViz:scatterPlot]{dittoViz::scatterPlot()}} parame
 \item \code{annotation.arrowcolor} - Arrow color (UI: "Arrow Color", default: "black")
 \item \code{annotation.arrowhead} - Arrowhead style (UI: "Arrowhead Style", default: 2)
 \item \code{annotation.arrowwidth} - Arrow linewidth (UI: "Arrow Linewidth", default: 1.5)
-\item \code{legend.show} - Show legend (UI: "Show Legend", default: TRUE)
-\item \code{legend.color.title} - Legend title (UI: "Legend Title", default: "make")
-\item \code{legend.color.size} - Legend color size (UI: "Legend Color Size", default: 5)
-\item \code{legend.shape.size} - Legend shape size (UI: "Legend Shape Size", default: 5)
 \item \code{legend.color.breaks} - Legend tick breaks (UI: "Legend Tick Breaks", default: "")
+\item \code{size.legend.x} - Custom size-legend x position (UI: "Size Legend X Position",
+default: 1.02); nudges the manual size legend (drawn when \code{size.by} is set) along the x-axis.
+\item \code{size.legend.y} - Custom size-legend y position (UI: "Size Legend Y Position",
+default: 0.95); nudges the manual size legend (drawn when \code{size.by} is set) along the y-axis.
 \item \code{min.value} - Minimum value (UI: "Min Value", default: NA)
 \item \code{max.value} - Maximum value (UI: "Max Value", default: NA)
 \item \code{trajectory.group.by} - Trajectory group by (UI: "Trajectory Group By", default: "")

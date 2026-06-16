@@ -148,6 +148,7 @@ dumbbellPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs = NULL, d
 
             # Plotly
             .reset_plotly_inputs(session, defaults)
+            .reset_legend_inputs(session, defaults)
 
             # Lines
             .reset_lines_inputs(session, defaults = defaults)
@@ -223,7 +224,7 @@ dumbbellPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs = NULL, d
                 show.legend = TRUE,
                 facet.by = facet.by,
                 facet.scales = isolate_fn(input$facet.scales),
-                subplot.margin = isolate_fn(input$subplot.margin),
+                subplot.margin = c(isolate_fn(input$subplot.margin.x), isolate_fn(input$subplot.margin.y)),
                 axis.showline = isolate_fn(input$axis.showline),
                 axis.mirror = isolate_fn(input$axis.mirror),
                 axis.linecolor = isolate_fn(input$axis.linecolor),
@@ -240,6 +241,7 @@ dumbbellPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs = NULL, d
                 title.font.size = isolate_fn(input$title.font.size),
                 title.font.family = isolate_fn(input$title.font.family),
                 title.font.color = isolate_fn(input$title.font.color),
+                title.x.position = isolate_fn(input$axis.title.horizontal.position),
                 x.title = x_title,
                 y.title = y_title,
                 flip.x = isolate_fn(input$flip.x),
@@ -276,6 +278,16 @@ dumbbellPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs = NULL, d
             fig <- do.call(config, c(list(p = fig), config_list))
             fig <- .apply_plotly_newshape(fig, input, isolate_fn)
 
+            # Apply uniform legend title/label font sizes
+            fig <- .apply_legend_styling(
+                fig,
+                title.size = isolate_fn(input$legend.title.size),
+                text.size = isolate_fn(input$legend.text.size)
+            )
+
+            # Make single-panel x/y axis titles draggable (matches faceted behaviour)
+            fig <- .axis_titles_as_annotations(fig)
+
             return(fig)
         })
 
@@ -283,24 +295,30 @@ dumbbellPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs = NULL, d
         output$dumbbellPlot <- renderPlotly({
             req(input$x.value, input$y.value)
 
-            fig <- generate_dumbbellPlot() |>
-                layout(
-                    margin = list(
-                        t = input$margin.t,
-                        b = input$margin.b,
-                        l = input$margin.l,
-                        r = input$margin.r,
-                        autoexpand = TRUE
-                    )
-                )
+            fig <- .apply_render_margins(generate_dumbbellPlot(), input)
 
             return(fig)
         })
 
-        # Download handler for interactive plot
-        output$download.interactive <- .create_plot_download_handler(
-            plot_reactive = generate_dumbbellPlot,
-            filename_base = "dumbbellPlot"
+        # Download handler for source (plot + data)
+        # Capture all UI inputs for the source download
+        AllInputs <- reactive({
+            x <- reactiveValuesToList(input)
+            return(x)
+        })
+
+        plot_source_reactive <- reactive({
+            collect_source_data(
+                plot_reactive = generate_dumbbellPlot,
+                inputs_reactive = AllInputs()
+            )
+        })
+
+        output$download.source <- create_source_download_handler(
+            data_list = plot_source_reactive,
+            filename_base = "dumbbellPlot_source"
         )
+
+        return(plot_source_reactive)
     })
 }

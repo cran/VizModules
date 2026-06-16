@@ -26,20 +26,20 @@
 #'   \item \code{in_form} - Data input format (not applicable - always long form)
 #'   \item \code{split_by} - Split variable (returns a patchwork object, not supported in plotly), use `facet_by` instead
 #'   \item \code{split_by_sep} - Only applies if `split_by` is used
-#'   \item \code{symnum_args} - Significance symbol arguments (not implemented)
-#'   \item \code{flip} - Flip axes (not implemented in current UI)
+#'   \item \code{symnum_args} - Significance symbol arguments (the Stats tab manages symbol display)
 #'   \item \code{keep_empty} - Keep empty values (not implemented)
 #'   \item \code{keep_na} - Keep NA values (not implemented)
 #'   \item \code{group_by_sep} - Separator for group columns (not applicable in UI context)
 #'   \item \code{group_name} - Group legend name (handled by plotly)
-#'   \item \code{paired_by} - Pairing variable for paired tests (not implemented)
+#'   \item \code{paired_by} - Pairing variable for paired tests (use the Stats tab "Paired Test" input instead)
 #'   \item \code{x_text_angle} - X-axis text angle (handled by plotly axis settings)
-#'   \item \code{step_increase} - Step increase for significance brackets (not implemented)
+#'   \item \code{step_increase} - Step increase for significance brackets (set via the Stats tab "Bracket Spacing")
 #'   \item \code{fill_mode} - Fill mode for grouped data (handled automatically)
-#'   \item \code{fill_reverse} - Reverse fill order (not implemented)
+#'   \item \code{position_dodge_preserve} - Preserve dodge width (not implemented)
 #'   \item \code{theme} - ggplot2 theme (not applicable in plotly)
 #'   \item \code{theme_args} - Theme arguments (not applicable in plotly)
 #'   \item \code{palette} - Managed internally via the palette selection UI
+#'   \item \code{palreverse} - Reverse the color palette (not implemented)
 #'   \item \code{alpha} - Alpha transparency (not implemented in UI)
 #'   \item \code{stack} - Stack violins (not implemented)
 #'   \item \code{add_beeswarm} - Add beeswarm points (not implemented in UI)
@@ -65,14 +65,15 @@
 #'   \item \code{line_color} - Line color (not implemented)
 #'   \item \code{line_width} - Line width (not implemented)
 #'   \item \code{line_type} - Line type (not implemented)
-#'   \item \code{comparisons} - Group comparisons for significance tests (not implemented)
-#'   \item \code{ref_group} - Reference group for comparisons (not implemented)
-#'   \item \code{pairwise_method} - Pairwise test method (not implemented)
-#'   \item \code{multiplegroup_comparisons} - Multiple group comparison flag (not implemented)
-#'   \item \code{multiple_method} - Multiple group test method (not implemented)
-#'   \item \code{sig_label} - Significance label format (not implemented)
-#'   \item \code{sig_labelsize} - Significance label size (not implemented)
-#'   \item \code{hide_ns} - Hide non-significant comparisons (not implemented)
+#'   \item \code{comparisons} - plotthis pairwise comparisons are not passed; equivalent pairwise
+#'     significance testing is provided via the module's Stats tab (see "Statistical annotation parameters")
+#'   \item \code{ref_group} - Reference group for comparisons (use the Stats tab instead)
+#'   \item \code{pairwise_method} - Pairwise test method (set via the Stats tab "Test" input instead)
+#'   \item \code{multiplegroup_comparisons} - Multiple-group comparison flag (use the Stats tab instead)
+#'   \item \code{multiple_method} - Multiple-group test method (set via the Stats tab "Test" input instead)
+#'   \item \code{sig_label} - Significance label format (set via the Stats tab "Display" input instead)
+#'   \item \code{sig_labelsize} - Significance label size (handled by the Stats tab)
+#'   \item \code{hide_ns} - Hide non-significant comparisons (use the Stats tab "Hide Non-Significant" input)
 #'   \item \code{seed} - Random seed (not applicable)
 #'   \item \code{combine} - Only applies if `split_by` is used
 #'   \item \code{nrow} - Only applies if `split_by` is used
@@ -81,7 +82,7 @@
 #'   \item \code{axes} - Only applies if `split_by` is used
 #'   \item \code{axis_titles} - Only applies if `split_by` is used
 #'   \item \code{guides} - Only applies if `split_by` is used
-#'   \item \code{legend_direction} - Managed position of legend however this can be handled via plotly
+#'   \item \code{legend.direction} - Managed position of legend however this can be handled via plotly
 #' }
 #'
 #' @section Plot parameters and defaults:
@@ -90,6 +91,7 @@
 #'   \item \code{x} - X-axis variable (UI: "X Data", default: 2nd categorical variable)
 #'   \item \code{y} - Y-axis variable (UI: "Y Data", default: 2nd numeric variable)
 #'   \item \code{group_by} - Grouping variable (UI: "Group By", default: "")
+#'   \item \code{flip} - Flip/swap the x and y axes (UI: "Rotate (swap X/Y)", default: FALSE)
 #'   \item \code{sort_x} - Sort X-axis by statistic (UI: "Sort X By", default: "none")
 #'   \item \code{y_max} - Maximum Y-axis value (UI: "Y Max", default: calculated)
 #'   \item \code{y_min} - Minimum Y-axis value (UI: "Y Min", default: calculated)
@@ -113,6 +115,26 @@
 #'   \item \code{facet_nrow} - Number of facet rows (UI: "Rows", default: NULL)
 #'   \item \code{facet_byrow} - Facet ordering direction (UI: "Facet By Row", default: TRUE)
 #'   \item \code{palcolor} - Custom color values (UI: palette picker, derived from palette)
+#' }
+#'
+#' @section Statistical annotation parameters:
+#' The module provides plotly-based significance testing via the Stats tab. The following inputs are available:
+#' \itemize{
+#'   \item \code{stats.enabled} - Enable statistical annotations (UI: "Enable Stats", default: FALSE)
+#'   \item \code{stat.test} - Test to apply: Wilcoxon, t-test, Kruskal-Wallis, or ANOVA (UI: "Test")
+#'   \item \code{stat.p.adjust} - P-value adjustment method (UI: "P-value Adjustment", default: "holm")
+#'   \item \code{stat.display} - Value to display: adjusted p-value, p-value, or symbols (UI: "Display")
+#'   \item \code{stat.sig.threshold} - Significance threshold for symbols/hiding (UI: "Significance Threshold")
+#'   \item \code{stat.hide.ns} - Hide non-significant comparisons (UI: "Hide Non-Significant", default: FALSE)
+#'   \item \code{stat.paired} - Use a paired test (UI: "Paired Test", default: FALSE)
+#'   \item \code{stat.pairs} - Group comparisons to test (UI: "Comparisons", multiple selection)
+#'   \item \code{stat.line.color} - Bracket line color (UI: "Line Color", default: "#000000")
+#'   \item \code{stat.line.width} - Bracket line width (UI: "Line Width")
+#'   \item \code{stat.bracket.style} - Bracket style, capped or flat (UI: "Bracket Style")
+#'   \item \code{stat.step.increase} - Vertical spacing between stacked brackets (UI: "Bracket Spacing")
+#'   \item \code{stat.text.bump} - Offset of the significance text above the bracket (UI: "Text Offset")
+#'   \item \code{stat.bracket.inset} - Horizontal inset of the brackets (UI: "Bracket Inset")
+#'   \item \code{stat.per.facet} - Compute statistics independently per facet panel (UI: "Per Facet Panel")
 #' }
 #'
 #' @section Parameters controlling additional functionality:
@@ -217,7 +239,7 @@ plotthis_ViolinPlotInputsUI <- function(id, data, defaults = NULL, title = NULL,
                     selected = .get_default(
                         defaults, "x.data", char.choices[2],
                         function(x) x %in% char.choices
-                    )
+                    ), selectize = FALSE
                 ),
                 documentParameters$x,
                 placement = "top", options = list(container = "body")
@@ -228,7 +250,7 @@ plotthis_ViolinPlotInputsUI <- function(id, data, defaults = NULL, title = NULL,
                     selected = .get_default(
                         defaults, "y.data", num.choices[2],
                         function(x) x %in% num.choices
-                    )
+                    ), selectize = FALSE
                 ),
                 documentParameters$y,
                 placement = "top", options = list(container = "body")
@@ -239,7 +261,7 @@ plotthis_ViolinPlotInputsUI <- function(id, data, defaults = NULL, title = NULL,
                         defaults, "group.by", "",
                         function(x) x %in% c("", char.choices)
                     ),
-                    choices = c("", char.choices)
+                    choices = c("", char.choices), selectize = FALSE
                 ),
                 documentParameters$group_by,
                 placement = "top", options = list(container = "body")
@@ -335,7 +357,7 @@ plotthis_ViolinPlotInputsUI <- function(id, data, defaults = NULL, title = NULL,
         "Facet" = tagList(
             tipify(selectInput(ns("facet.by"), "Facet By",
                 selected = .get_default(defaults, "facet.by", "", function(x) x == "" || x %in% char.choices),
-                choices = c(char.choices, "")),
+                choices = c(char.choices, ""), selectize = FALSE),
                 documentParameters$facet_by,
                 placement = "top", options = list(container = "body")
             ),
@@ -344,7 +366,7 @@ plotthis_ViolinPlotInputsUI <- function(id, data, defaults = NULL, title = NULL,
                     defaults, "facet.scale", "fixed",
                     function(x) x %in% c("fixed", "free", "free_x", "free_y")
                 ),
-                choices = c("fixed", "free", "free_x", "free_y")),
+                choices = c("fixed", "free", "free_x", "free_y"), selectize = FALSE),
                 documentParameters$facet_scales,
                 placement = "top", options = list(container = "body")
             ),
@@ -362,9 +384,11 @@ plotthis_ViolinPlotInputsUI <- function(id, data, defaults = NULL, title = NULL,
                 value = .get_default(defaults, "facet.by.row", TRUE, is.logical), status = "success"),
                 documentParameters$facet_byrow,
                 placement = "top", options = list(container = "body")
-            )
+            ),
+            .uniform_subplot_spacing_inputs_ui(ns, defaults)
         ),
         "Stats" = .uniform_stats_inputs_ui(ns, defaults),
+        "Legend" = .uniform_legend_inputs_ui(ns, defaults),
         "Plotly" = .uniform_plotly_inputs_ui(ns, defaults),
         "Axes" = .uniform_axes_inputs_ui(ns, defaults, include.rotate = TRUE),
         "Lines" = .uniform_lines_inputs_ui(ns, defaults)
@@ -374,7 +398,7 @@ plotthis_ViolinPlotInputsUI <- function(id, data, defaults = NULL, title = NULL,
         inputs,
         id = ns("ViolinPlotTabsetPanel"),
         title = title,
-        tack = module_tack_ui(ns, defaults = defaults, has.stats = TRUE),
+        tack = module_tack_ui(ns, defaults = defaults),
         columns = columns
     )
 }
@@ -385,6 +409,10 @@ plotthis_ViolinPlotInputsUI <- function(id, data, defaults = NULL, title = NULL,
 #' This should be placed in the UI where the plot should be shown.
 #'
 #' @param id The ID for the Shiny module.
+#' @param resizable Logical; when \code{TRUE} (the default) the plot output
+#'   is wrapped in \code{\link[shinyjqui]{jqui_resizable}} so it can be resized
+#'   by dragging. Set to \code{FALSE} when embedding the output in a container
+#'   that already provides resizing.
 #'
 #' @return A Shiny plotlyOutput for the ViolinPlot
 #'
@@ -394,9 +422,11 @@ plotthis_ViolinPlotInputsUI <- function(id, data, defaults = NULL, title = NULL,
 #'
 #' @export
 #' @author Jacob Martin
-plotthis_ViolinPlotOutputUI <- function(id) {
+plotthis_ViolinPlotOutputUI <- function(id, resizable = TRUE) {
     ns <- NS(id)
-    jqui_resizable(
-        plotlyOutput(ns("ViolinPlot"))
-    )
+    plot_output <- plotlyOutput(ns("ViolinPlot"))
+    if (isTRUE(resizable)) {
+        plot_output <- jqui_resizable(plot_output)
+    }
+    plot_output
 }

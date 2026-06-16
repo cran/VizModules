@@ -32,12 +32,12 @@ The inputs will automatically be organized into a grid layout via the \code{orga
 with \code{columns} controlling the number of columns in the grid.
 
 Defaults can be set for each input by providing a named list of values to the \code{defaults} argument.
-Nearly all parameters for \code{\link[plotthis:barplot]{plotthis::BarPlot()}} can be set via these inputs, so see the help
+Nearly all parameters for \code{\link[plotthis:BarPlot]{plotthis::BarPlot()}} can be set via these inputs, so see the help
 for that function for an exhaustive list.
 }
 \section{Plot parameters not implemented or with altered functionality}{
 
-The following \code{\link[plotthis:barplot]{plotthis::BarPlot()}} parameters are not available via UI inputs:
+The following \code{\link[plotthis:BarPlot]{plotthis::BarPlot()}} parameters are not available via UI inputs:
 \itemize{
 \item \code{xlab} - X-axis label (plotly allows interactive editing)
 \item \code{ylab} - Y-axis label (plotly allows interactive editing)
@@ -50,8 +50,7 @@ The following \code{\link[plotthis:barplot]{plotthis::BarPlot()}} parameters are
 \item \code{x_sep} - Separator for multiple x columns (not yet implemented)
 \item \code{group_by_sep} - Separator for multiple group_by columns (not yet implemented)
 \item \code{split_by_sep} - Separator for multiple split_by columns (not yet implemented)
-\item \code{flip} - Flip axes (not yet implemented)
-\item \code{fill_by_x_if_no_group} - Fill bars by x values (not yet implemented)
+\item \code{fill_name} - Name of the fill legend (not yet implemented)
 \item \code{line_name} - Name of line (not yet implemented)
 \item \code{label} - Bar labels on top (not yet implemented)
 \item \code{label_nudge} - Label nudge distance (not yet implemented)
@@ -94,11 +93,13 @@ The following \code{\link[plotthis:barplot]{plotthis::BarPlot()}} parameters are
 
 \section{Plot parameters and defaults}{
 
-The following \code{\link[plotthis:barplot]{plotthis::BarPlot()}} parameters can be accessed via UI inputs and/or the \code{defaults} argument:
+The following \code{\link[plotthis:BarPlot]{plotthis::BarPlot()}} parameters can be accessed via UI inputs and/or the \code{defaults} argument:
 \itemize{
 \item \code{x} - X-axis variable (UI: "X values", default: 2nd categorical variable)
 \item \code{y} - Y-axis variable (UI: "Y values", default: 2nd numeric variable)
 \item \code{group_by} - Grouping variable for bar fill (UI: "Group by", default: 2nd categorical variable)
+\item \code{fill_by} - Variable used to fill the bars (UI: "Fill by", default: "")
+\item \code{flip} - Flip/swap the x and y axes (UI: "Rotate (swap X/Y)", default: FALSE)
 \item \code{split_by} - Split variable for separate plots (UI: "Split by", default: "")
 \item \code{facet_by} - Faceting variable (UI: "Facet by", default: "")
 \item \code{facet_scales} - Facet scale behavior (UI: "Facet scale", default: "fixed")
@@ -106,6 +107,7 @@ The following \code{\link[plotthis:barplot]{plotthis::BarPlot()}} parameters can
 \item \code{facet_nrow} - Number of facet rows (UI: "Facet number of rows", default: NULL)
 \item \code{facet_byrow} - Facet ordering direction (UI: "Facet by row", default: TRUE)
 \item \code{palcolor} - Custom color values (UI: palette picker, derived from palette)
+\item \code{palreverse} - Reverse the color palette (UI: "Reverse palette", default: FALSE)
 \item \code{alpha} - Bar fill transparency (UI: "Alpha", default: 1)
 \item \code{width} - Bar width (UI: "Width", default: NA)
 \item \code{expand} - Axis expansion values (UI: "Expand", default: "")
@@ -164,7 +166,7 @@ data(mtcars)
 plotthis_BarPlotInputsUI("BarPlot", mtcars)
 }
 \seealso{
-\code{\link[plotthis:barplot]{plotthis::BarPlot()}}, \code{\link[=organize_inputs]{organize_inputs()}},
+\code{\link[plotthis:BarPlot]{plotthis::BarPlot()}}, \code{\link[=organize_inputs]{organize_inputs()}},
 \code{\link[=plotthis_BarPlotOutputUI]{plotthis_BarPlotOutputUI()}}, \code{\link[=plotthis_BarPlotServer]{plotthis_BarPlotServer()}}, \code{\link[=plotthis_BarPlotApp]{plotthis_BarPlotApp()}}
 }
 \author{

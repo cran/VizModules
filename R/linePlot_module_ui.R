@@ -30,8 +30,13 @@
 #'   \item \code{y.adjustment} - Y-axis adjustment function (UI: "Y Adjustment", default: "")
 #'   \item \code{facet.by} - Faceting variable (UI: "Facet by", default: "")
 #'   \item \code{facet.scales} - Facet scale behavior (UI: "Facet scales", default: "fixed")
+#'   \item \code{facet.nrow} - Number of rows in the facet grid (UI: "Rows", default: NULL; blank = auto)
+#'   \item \code{facet.ncol} - Number of columns in the facet grid (UI: "Columns", default: NULL; blank = auto)
 #'   \item \code{plot.mode} - Plot type (UI: "Plot type", default: "lines")
 #'   \item \code{line.type} - Line type (UI: "Line type", default: "solid")
+#'   \item \code{error.bar} - Show error bars (UI: "Error Bars", default: TRUE; requires a categorical X and a single Y)
+#'   \item \code{error.colour} - Error bar color (UI: "Error Bar Colour", default: "#000000")
+#'   \item \code{error.width} - Error bar cap width (UI: "Error Bar Width", default: 1)
 #'   \item \code{palette.selection} - Color palette (UI: palette picker, derived from palette)
 #'   \item \code{axis.showline} - Show axis border lines (UI: "Show Axis Borders", default: TRUE)
 #'   \item \code{axis.mirror} - Mirror axis lines on opposite side (UI: "Mirror Axis Borders", default: TRUE)
@@ -102,6 +107,11 @@
 linePlotInputsUI <- function(id, data, defaults = NULL, title = NULL, columns = 2) {
     ns <- NS(id)
 
+    # linePlot-specific default for subplot spacing (tighter than the global 0.1)
+    if (is.null(defaults) || is.null(defaults[["subplot.margin"]])) {
+        defaults <- c(defaults, list("subplot.margin" = 0.05))
+    }
+
     # Get variables of data.
     choices <- c("", names(data))
     num.choices <- c("", names(data)[vapply(data, is.numeric, logical(1))])
@@ -130,21 +140,21 @@ linePlotInputsUI <- function(id, data, defaults = NULL, title = NULL, columns = 
                     defaults, "x.value", names(data)[1],
                     function(x) all(x %in% names(data))
                 ),
-                choices = names(data), multiple = TRUE
+                choices = names(data), multiple = TRUE, selectize = TRUE
             ), paste(documentParameters$x, ".", "If you want error bars the X input must be a category and the Y input must only be length = 1"), placement = "top", options = list(container = "body")),
             tipify(selectInput(ns("y.value"), "Y Values",
                 selected = .get_default(
                     defaults, "y.value", names(data)[2],
                     function(x) all(x %in% names(data))
                 ),
-                choices = names(data), multiple = TRUE
+                choices = names(data), multiple = TRUE, selectize = TRUE
             ), documentParameters$y, placement = "top", options = list(container = "body")),
             tipify(selectInput(ns("group.by"), "Group By",
                 selected = .get_default(
                     defaults, "group.by", cat.choices[1],
                     function(x) x %in% cat.choices
                 ),
-                choices = cat.choices
+                choices = cat.choices, selectize = FALSE
             ), documentParameters$colour.group.by, placement = "top", options = list(container = "body")),
             tipify(materialSwitch(ns("error.bar"), "Error Bars",
                 value = .get_default(defaults, "error.bar", TRUE, is.logical)),
@@ -160,14 +170,14 @@ linePlotInputsUI <- function(id, data, defaults = NULL, title = NULL, columns = 
                 selected = .get_default(
                     defaults, "x.adjustment", "",
                     function(x) x %in% adj.choices
-                )
+                ), selectize = FALSE
             ), documentParameters$x.adjustment, placement = "top", options = list(container = "body")),
             tipify(selectInput(ns("y.adjustment"), "Y Adjustment",
                 choices = adj.choices,
                 selected = .get_default(
                     defaults, "y.adjustment", "",
                     function(x) x %in% adj.choices
-                )
+                ), selectize = FALSE
             ), documentParameters$y.adjustment, placement = "top", options = list(container = "body"))
         ),
         "Facet" = tagList(
@@ -176,15 +186,28 @@ linePlotInputsUI <- function(id, data, defaults = NULL, title = NULL, columns = 
                     defaults, "facet.by", "",
                     function(x) x == "" || x %in% cat.choices
                 ),
-                choices = cat.choices
+                choices = cat.choices, selectize = FALSE
             ), documentParameters$facet.by, placement = "top", options = list(container = "body")),
             tipify(selectInput(ns("facet.scales"), "Facet Scales",
                 choices = c("fixed", "free", "free_x", "free_y"),
                 selected = .get_default(
                     defaults, "facet.scales", "fixed",
                     function(x) x %in% c("fixed", "free", "free_x", "free_y")
-                )
-            ), documentParameters$facet.scales, placement = "top", options = list(container = "body"))
+                ), selectize = FALSE
+            ), documentParameters$facet.scales, placement = "top", options = list(container = "body")),
+            tipify(numericInput(ns("facet.nrow"), "Rows",
+                value = .get_default(defaults, "facet.nrow", NULL, is.numeric), min = 1),
+                paste("Number of rows in the facet grid.",
+                    "Leave blank to auto-compute; only one of rows/columns needs to be set."),
+                placement = "top", options = list(container = "body")
+            ),
+            tipify(numericInput(ns("facet.ncol"), "Columns",
+                value = .get_default(defaults, "facet.ncol", NULL, is.numeric), min = 1),
+                paste("Number of columns in the facet grid.",
+                    "Leave blank to auto-compute; only one of rows/columns needs to be set."),
+                placement = "top", options = list(container = "body")
+            ),
+            .uniform_subplot_spacing_inputs_ui(ns, defaults)
         ),
         "Aesthetics" = tagList(
             tipify(selectInput(ns("plot.mode"), "Plot Type",
@@ -192,14 +215,14 @@ linePlotInputsUI <- function(id, data, defaults = NULL, title = NULL, columns = 
                     defaults, "plot.mode", "lines",
                     function(x) x %in% c("lines", "markers", "lines+markers")
                 ),
-                choices  = c("lines", "markers", "lines+markers")
+                choices  = c("lines", "markers", "lines+markers"), selectize = FALSE
             ), documentParameters$plot.mode, placement = "top", options = list(container = "body")),
             tipify(selectInput(ns("line.type"), "Line Type",
                 selected = .get_default(
                     defaults, "line.type", "solid",
                     function(x) x %in% c("solid", "dot", "dash", "longdash", "dashdot", "longdashdot")
                 ),
-                choices  = c("solid", "dot", "dash", "longdash", "dashdot", "longdashdot")
+                choices  = c("solid", "dot", "dash", "longdash", "dashdot", "longdashdot"), selectize = FALSE
             ), documentParameters$line.type, placement = "top", options = list(container = "body")),
             uiOutput(ns("palette.selection")),
             tipify(colourpicker::colourInput(ns("error.bar.colour"), "Error Bar Colour",
@@ -213,6 +236,8 @@ linePlotInputsUI <- function(id, data, defaults = NULL, title = NULL, columns = 
                 placement = "top", options = list(container = "body")
             )
         ),
+
+        "Legend" = .uniform_legend_inputs_ui(ns, defaults),
 
         "Plotly" = .uniform_plotly_inputs_ui(ns, defaults),
         "Axes" = .uniform_axes_inputs_ui(ns, defaults, include.rotate = FALSE, include.flip = TRUE),
@@ -235,6 +260,10 @@ linePlotInputsUI <- function(id, data, defaults = NULL, title = NULL, columns = 
 #' This should be placed in the UI where the plot should be shown.
 #'
 #' @param id The ID for the Shiny module.
+#' @param resizable Logical; when \code{TRUE} (the default) the plot output
+#'   is wrapped in \code{\link[shinyjqui]{jqui_resizable}} so it can be resized
+#'   by dragging. Set to \code{FALSE} when embedding the output in a container
+#'   that already provides resizing.
 #'
 #' @return A Shiny plotlyOutput for the linePlot
 #'
@@ -244,9 +273,11 @@ linePlotInputsUI <- function(id, data, defaults = NULL, title = NULL, columns = 
 #'
 #' @export
 #' @author Jacob Martin
-linePlotOutputUI <- function(id) {
+linePlotOutputUI <- function(id, resizable = TRUE) {
     ns <- NS(id)
-    jqui_resizable(
-        plotlyOutput(ns("linePlot"))
-    )
+    plot_output <- plotlyOutput(ns("linePlot"))
+    if (isTRUE(resizable)) {
+        plot_output <- jqui_resizable(plot_output)
+    }
+    plot_output
 }

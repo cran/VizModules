@@ -28,6 +28,12 @@ linePlotServer <- function(id, data, hide.inputs = NULL, hide.tabs = NULL, defau
     stopifnot(is.reactive(data))
     data_reactive <- data
 
+    # linePlot-specific default for subplot spacing (tighter than the global 0.1),
+    # matching the default used in linePlotInputsUI().
+    if (is.null(defaults) || is.null(defaults[["subplot.margin"]])) {
+        defaults <- c(defaults, list("subplot.margin" = 0.05))
+    }
+
     moduleServer(id, function(input, output, session) {
         # Hide individual inputs if specified
 
@@ -137,6 +143,10 @@ linePlotServer <- function(id, data, hide.inputs = NULL, hide.tabs = NULL, defau
                 selected = .get_default(defaults, "facet.by", "", function(x) x == "" || x %in% choices))
             updateSelectInput(session, "facet.scales",
                 selected = .get_default(defaults, "facet.scales", "fixed"))
+            updateNumericInput(session, "facet.nrow",
+                value = .get_default(defaults, "facet.nrow", NA, is.numeric))
+            updateNumericInput(session, "facet.ncol",
+                value = .get_default(defaults, "facet.ncol", NA, is.numeric))
             updateSelectInput(session, "x.adjustment", selected = .get_default(defaults, "x.adjustment", ""))
             updateSelectInput(session, "y.adjustment", selected = .get_default(defaults, "y.adjustment", ""))
             updateMaterialSwitch(session, "error.bar",
@@ -150,6 +160,7 @@ linePlotServer <- function(id, data, hide.inputs = NULL, hide.tabs = NULL, defau
 
             # Plotly
             .reset_plotly_inputs(session, defaults)
+            .reset_legend_inputs(session, defaults)
 
             # Lines
             .reset_lines_inputs(session, defaults = defaults)
@@ -161,10 +172,14 @@ linePlotServer <- function(id, data, hide.inputs = NULL, hide.tabs = NULL, defau
                 show("facet.title.font.size")
                 show("facet.title.font.color")
                 show("facet.title.font.family")
+                show("facet.nrow")
+                show("facet.ncol")
             } else {
                 hide("facet.title.font.size")
                 hide("facet.title.font.color")
                 hide("facet.title.font.family")
+                hide("facet.nrow")
+                hide("facet.ncol")
             }
         })
 
@@ -250,10 +265,17 @@ linePlotServer <- function(id, data, hide.inputs = NULL, hide.tabs = NULL, defau
                 y.adjustment <- NULL
             }
 
+            # Reflect any applied data adjustment in the axis titles so they accurately
+            # describe the values displayed (e.g. "log2(units)"), matching other modules.
+            x_title <- .adjusted_axis_label(x_title, NULL, x.adjustment)
+            y_title <- .adjusted_axis_label(y_title, NULL, y.adjustment)
+
             facet.by <- NULL
             if (!isolate_fn(input$facet.by) == "") {
                 facet.by <- isolate_fn(input$facet.by)
             }
+            facet.nrow.val <- .clean_facet_dim(isolate_fn(input$facet.nrow))
+            facet.ncol.val <- .clean_facet_dim(isolate_fn(input$facet.ncol))
 
             fig <- linePlot(
                 data = d,
@@ -266,7 +288,9 @@ linePlotServer <- function(id, data, hide.inputs = NULL, hide.tabs = NULL, defau
                 show.legend = show_legend,
                 facet.by = facet.by,
                 facet.scales = isolate_fn(input$facet.scales),
-                subplot.margin = isolate_fn(input$subplot.margin),
+                facet.nrow = facet.nrow.val,
+                facet.ncol = facet.ncol.val,
+                subplot.margin = c(isolate_fn(input$subplot.margin.x), isolate_fn(input$subplot.margin.y)),
                 order.by = order_by,
                 axis.showline = isolate_fn(input$axis.showline),
                 axis.mirror = isolate_fn(input$axis.mirror),
@@ -286,6 +310,7 @@ linePlotServer <- function(id, data, hide.inputs = NULL, hide.tabs = NULL, defau
                 title.font.size = isolate_fn(input$title.font.size),
                 title.font.family = isolate_fn(input$title.font.family),
                 title.font.color = isolate_fn(input$title.font.color),
+                title.x.position = isolate_fn(input$axis.title.horizontal.position),
                 x.title = x_title,
                 y.title = y_title,
                 flip.x = isolate_fn(input$flip.x),
@@ -296,12 +321,10 @@ linePlotServer <- function(id, data, hide.inputs = NULL, hide.tabs = NULL, defau
                 error.width = isolate_fn(input$error.bar.width),
                 error.bar = isolate_fn(input$error.bar)
             )
-
             # Apply axis title font to shared facet annotation titles
             if (!is.null(facet.by) && nzchar(facet.by)) {
                 fig <- .apply_axis_title_to_annotations(fig, input, isolate_fn)
             }
-
             # Add reference lines
             fig <- .add_reference_lines(fig,
                 hline.intercepts = isolate_fn(input$hline.intercepts),
@@ -325,6 +348,16 @@ linePlotServer <- function(id, data, hide.inputs = NULL, hide.tabs = NULL, defau
             config_list <- .add_plot_config(download.format = isolate_fn(input$download.format), include.modebar.buttons = FALSE, facet.by = facet.by)
             fig <- do.call(plotly::config, c(list(p = fig), config_list))
             fig <- .apply_plotly_newshape(fig, input, isolate_fn)
+
+            # Apply uniform legend title/label font sizes
+            fig <- .apply_legend_styling(
+                fig,
+                title.size = isolate_fn(input$legend.title.size),
+                text.size = isolate_fn(input$legend.text.size)
+            )
+
+            # Make single-panel x/y axis titles draggable (matches faceted behaviour)
+            fig <- .axis_titles_as_annotations(fig)
 
             return(fig)
         })
@@ -366,27 +399,33 @@ linePlotServer <- function(id, data, hide.inputs = NULL, hide.tabs = NULL, defau
             }
 
             if (return_empty) {
-                fig <- .empty_plot(text = txt, plotly = TRUE)
+                fig <- empty_plot(text = txt, plotly = TRUE)
             } else {
-                fig <- generate_linePlot() |>
-                    layout(
-                        margin = list(
-                            t = input$margin.t,
-                            b = input$margin.b,
-                            l = input$margin.l,
-                            r = input$margin.r,
-                            autoexpand = TRUE
-                        )
-                    )
+                fig <- .apply_render_margins(generate_linePlot(), input)
             }
 
             return(fig)
         })
 
-        # Download handler for interactive plot
-        output$download.interactive <- .create_plot_download_handler(
-            plot_reactive = generate_linePlot,
-            filename_base = "linePlot"
+        # Download handler for source (plot + data)
+        # Capture all UI inputs for the source download
+        AllInputs <- reactive({
+            x <- reactiveValuesToList(input)
+            return(x)
+        })
+    
+        plot_source_reactive <- reactive({
+            collect_source_data(
+                plot_reactive = generate_linePlot,
+                inputs_reactive = AllInputs()
+            )
+        })
+
+        output$download.source <- create_source_download_handler(
+            data_list = plot_source_reactive,
+            filename_base = "linePlot_source"
         )
+
+        return(plot_source_reactive)
     })
 }

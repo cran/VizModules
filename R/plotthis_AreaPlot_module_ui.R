@@ -31,8 +31,17 @@
 #'   \item \code{byrow} - Only applies if `split_by` is used
 #'   \item \code{nrow} - Only applies if `split_by` is used
 #'   \item \code{ncol} - Only applies if `split_by` is used
+#'   \item \code{x_sep} - Separator for multiple x columns (not yet implemented)
+#'   \item \code{group_by_sep} - Separator for multiple group_by columns (not yet implemented)
+#'   \item \code{group_name} - Group/fill legend name (not yet implemented)
 #'   \item \code{palette} - Managed internally via the palette selection UI
-#'   \item \code{legend_direction} - Managed position of legend however this can be handled via plotly
+#'   \item \code{palreverse} - Reverse the color palette (not yet implemented)
+#'   \item \code{x_text_angle} - X-axis text angle (handled by axis.tickangle.x)
+#'   \item \code{keep_empty} - Keep empty factor levels (not yet implemented)
+#'   \item \code{keep_na} - Keep NA values (not yet implemented)
+#'   \item \code{seed} - Random seed (not applicable)
+#'   \item \code{combine} - Combine multiple plots (not applicable for plotly)
+#'   \item \code{legend.direction} - Managed position of legend however this can be handled via plotly
 #' }
 #'
 #' @section Plot parameters and defaults:
@@ -43,8 +52,8 @@
 #'   \item \code{group_by} - Grouping variable for area fill (UI: "Group by", default: 3rd categorical variable or "")
 #'   \item \code{facet_by} - Faceting variable (UI: "Facet by", default: "")
 #'   \item \code{facet_scales} - Facet scale behavior (UI: "Facet scale", default: "fixed")
-#'   \item \code{facet_ncol} - Number of facet columns (UI: "Facet number of columns", default: NULL)
-#'   \item \code{facet_nrow} - Number of facet rows (UI: "Facet number of rows", default: NULL)
+#'   \item \code{facet_ncol} - Number of facet columns (UI: "Columns", default: NULL)
+#'   \item \code{facet_nrow} - Number of facet rows (UI: "Rows", default: NULL)
 #'   \item \code{facet_byrow} - Facet ordering direction (UI: "Facet by row", default: TRUE)
 #'   \item \code{palcolor} - Custom color values (UI: palette picker, derived from palette)
 #'   \item \code{alpha} - Area fill transparency (UI: "Alpha", default: 1)
@@ -146,21 +155,21 @@ plotthis_AreaPlotInputsUI <- function(id, data, defaults = NULL, title = NULL, c
                     defaults, "x.data", cat.choices[2],
                     function(x) x %in% cat.choices
                 ),
-                choices = cat.choices
+                choices = cat.choices, selectize = FALSE
             ), documentParameters$x, placement = "top", options = list(container = "body")),
             tipify(selectInput(ns("y.data"), "Y Values",
                 selected = .get_default(
                     defaults, "y.data", num.choices[2],
                     function(x) x %in% num.choices
                 ),
-                choices = num.choices
+                choices = num.choices, selectize = FALSE
             ), documentParameters$y, placement = "top", options = list(container = "body")),
             tipify(selectInput(ns("group.by"), "Group By",
                 selected = .get_default(
                     defaults, "group.by", cat.choices[3],
                     function(x) x %in% c("", group_facet_choices)
                 ),
-                choices = c("", group_facet_choices)
+                choices = c("", group_facet_choices), selectize = FALSE
             ), documentParameters$group_by, placement = "top", options = list(container = "body")),
             tipify(materialSwitch(ns("scale.y"), "Scale Y-Axis by Total",
                 value = .get_default(defaults, "scale.y", FALSE, is.logical),
@@ -173,27 +182,28 @@ plotthis_AreaPlotInputsUI <- function(id, data, defaults = NULL, title = NULL, c
                     defaults, "facet.by", "",
                     function(x) x %in% c(group_facet_choices, "")
                 ),
-                choices = c(group_facet_choices, "")
+                choices = c(group_facet_choices, ""), selectize = FALSE
             ), documentParameters$facet_by, placement = "top", options = list(container = "body")),
             tipify(selectInput(ns("facet.scale"), "Facet Scale",
                 selected = .get_default(
                     defaults, "facet.scale", "fixed",
                     function(x) x %in% c("fixed", "free", "free_x", "free_y")
                 ),
-                choices = c("fixed", "free", "free_x", "free_y")
+                choices = c("fixed", "free", "free_x", "free_y"), selectize = FALSE
             ), documentParameters$facet_scales, placement = "top", options = list(container = "body")),
-            tipify(numericInput(ns("facet.ncol"), "Number of Columns",
+            tipify(numericInput(ns("facet.ncol"), "Columns",
                 value = .get_default(defaults, "facet.ncol", NA, is.numeric),
                 min = 0, max = 20
             ), documentParameters$facet_ncol, placement = "top", options = list(container = "body")),
-            tipify(numericInput(ns("facet.nrow"), "Number of Rows",
+            tipify(numericInput(ns("facet.nrow"), "Rows",
                 value = .get_default(defaults, "facet.nrow", NA, is.numeric),
                 min = 0, max = 20
             ), documentParameters$facet_nrow, placement = "top", options = list(container = "body")),
             tipify(materialSwitch(ns("facet.by.row"), "Facet By Row",
                 value = .get_default(defaults, "facet.by.row", TRUE, is.logical),
                 status = "success"
-            ), documentParameters$facet_byrow, placement = "top", options = list(container = "body"))
+            ), documentParameters$facet_byrow, placement = "top", options = list(container = "body")),
+            .uniform_subplot_spacing_inputs_ui(ns, defaults)
         ),
         "Aesthetics" = tagList(
             uiOutput(ns("palette.selection")),
@@ -202,6 +212,7 @@ plotthis_AreaPlotInputsUI <- function(id, data, defaults = NULL, title = NULL, c
                 min = 0, max = 1
             ), documentParameters$alpha, placement = "top", options = list(container = "body"))
         ),
+        "Legend" = .uniform_legend_inputs_ui(ns, defaults),
         "Plotly" = .uniform_plotly_inputs_ui(ns, defaults),
         "Axes" = .uniform_axes_inputs_ui(ns, defaults),
         "Lines" = .uniform_lines_inputs_ui(ns, defaults)
@@ -221,6 +232,10 @@ plotthis_AreaPlotInputsUI <- function(id, data, defaults = NULL, title = NULL, c
 #' This should be placed in the UI where the plot should be shown.
 #'
 #' @param id The ID for the Shiny module.
+#' @param resizable Logical; when \code{TRUE} (the default) the plot output
+#'   is wrapped in \code{\link[shinyjqui]{jqui_resizable}} so it can be resized
+#'   by dragging. Set to \code{FALSE} when embedding the output in a container
+#'   that already provides resizing.
 #'
 #' @return A Shiny plotlyOutput for the AreaPlot
 #'
@@ -230,9 +245,11 @@ plotthis_AreaPlotInputsUI <- function(id, data, defaults = NULL, title = NULL, c
 #'
 #' @export
 #' @author Jacob Martin
-plotthis_AreaPlotOutputUI <- function(id) {
+plotthis_AreaPlotOutputUI <- function(id, resizable = TRUE) {
     ns <- NS(id)
-    jqui_resizable(
-        plotlyOutput(ns("AreaPlot"))
-    )
+    plot_output <- plotlyOutput(ns("AreaPlot"))
+    if (isTRUE(resizable)) {
+        plot_output <- jqui_resizable(plot_output)
+    }
+    plot_output
 }

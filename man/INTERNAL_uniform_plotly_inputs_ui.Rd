@@ -17,7 +17,9 @@ A \code{tagList} containing the Plotly input UI elements.
 \description{
 Creates a standardized tagList of Plotly-specific inputs used across all plot
 modules. Includes interactive download controls, plot margin adjustments,
-subplot spacing, and user-drawn shape styling for Plotly's drawing tools.
+and user-drawn shape styling for Plotly's drawing tools. (Subplot spacing
+controls live in each module's "Facet" tab via
+\code{\link[=.uniform_subplot_spacing_inputs_ui]{.uniform_subplot_spacing_inputs_ui()}}.)
 }
 \author{
 Jared Andrews

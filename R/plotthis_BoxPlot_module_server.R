@@ -91,19 +91,9 @@ plotthis_BoxPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs = NUL
         # Update stat comparison pairs when x or group.by changes
         observeEvent(c(input$x.data, input$group.by), {
             req(input$x.data)
-            pair_strings <- .generate_pair_strings(data(), input$x.data, input$group.by)
+            pair_strings <- generate_pair_strings(data(), input$x.data, input$group.by)
             updateSelectInput(session, "stat.pairs", choices = c("", pair_strings), selected = "")
         })
-
-        # Show/hide Save Stats button based on stats.enabled
-        observeEvent(input$stats.enabled, {
-            if (isTRUE(input$stats.enabled)) {
-                show("download.stats.col")
-            } else {
-                hide("download.stats.col")
-            }
-        })
-
 
         # Reset functionality
         observeEvent(input$reset, {
@@ -170,6 +160,7 @@ plotthis_BoxPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs = NUL
 
             # Action Button
             .reset_plotly_inputs(session, defaults)
+            .reset_legend_inputs(session, defaults)
 
             # Lines
             .reset_lines_inputs(session, defaults = defaults)
@@ -190,7 +181,13 @@ plotthis_BoxPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs = NUL
             }
         })
 
-        observeEvent(input$facet.by, {
+        observeEvent(c(input$facet.by, input$x.data), {
+            if (input$facet.by == input$x.data){
+                updateSelectInput(session, "facet.scale", selected = "free_x")
+            }
+        }, ignoreInit = FALSE)
+
+        observeEvent(input$facet.by,  {
             if (!input$facet.by == ""){
               show("facet.title.font.size")
               show("facet.title.font.color")
@@ -238,7 +235,6 @@ plotthis_BoxPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs = NUL
             }
 
             theme_args <- .create_ggplot_axis_style(input, isolate_fn = isolate_fn)
-            theme_args$panel.spacing <- unit(isolate_fn(input$subplot.margin), "npc")
 
             # Fill By colour grading
             char.choices <- c("", names(data())[vapply(data(), function(x) !is.numeric(x), logical(1))])
@@ -280,28 +276,29 @@ plotthis_BoxPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs = NUL
 
             fig <- ggplotly(p) |>
                 layout(
-                    title = list(
-                        font = list(
-                            size = isolate_fn(input$title.font.size),
-                            family = isolate_fn(input$title.font.family),
-                            color = isolate_fn(input$title.font.color)
-                        ),
-                        x = 0.5, xanchor = "center", y = 0.98, yanchor = "top"
-                    ),
                     boxmode = ifelse(!is.null(group.by), "group", "overlay"),
                     boxgap = 0.1,
                     boxgroupgap = 1 - isolate_fn(input$boxplot.width)
                 )
-
             # Fix boxplot positioning across faceted subplots
             if (!is.null(facet.by) && nzchar(facet.by)) {
                 fig <- .fix_boxplot_facet_positions(fig)
+                fig <- .apply_facet_subplot_spacing(
+                    fig,
+                    spacing = c(isolate_fn(input$subplot.margin.x), isolate_fn(input$subplot.margin.y)),
+                    ncol = facet.ncol,
+                    nrow = facet.nrow
+                )
             }
+            
+            
+            
+            fig <- .apply_title_layout(fig, input, isolate_fn, title_y = 0.95, title_x = isolate_fn(input$axis.title.horizontal.position))
 
             # Statistical annotations
             if (isolate_fn(input$stats.enabled)) {
-                stat_pairs <- .parse_pair_strings(isolate_fn(input$stat.pairs))
-                stats_df <- .compute_pairwise_stats(
+                stat_pairs <- parse_pair_strings(isolate_fn(input$stat.pairs))
+                stats_df <- compute_pairwise_stats(
                     df = data(), x = isolate_fn(input$x.data),
                     y = isolate_fn(input$y.data), pairs = stat_pairs,
                     test = isolate_fn(input$stat.test),
@@ -312,7 +309,7 @@ plotthis_BoxPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs = NUL
                     sig.threshold = isolate_fn(input$stat.sig.threshold)
                 )
                 last_stats_df(stats_df)
-                stat_result <- .create_stat_annotations(
+                stat_result <- create_stat_annotations(
                     stats_df = stats_df, fig = fig, df = data(),
                     x = isolate_fn(input$x.data), y = isolate_fn(input$y.data),
                     display = isolate_fn(input$stat.display),
@@ -326,7 +323,7 @@ plotthis_BoxPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs = NUL
                     text.bump = isolate_fn(input$stat.text.bump),
                     bracket.inset = isolate_fn(input$stat.bracket.inset)
                 )
-                fig <- .apply_stat_annotations(fig, stat_result,
+                fig <- apply_stat_annotations(fig, stat_result,
                     y.min = isolate_fn(input$y.min)
                 )
             }
@@ -377,45 +374,46 @@ plotthis_BoxPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs = NUL
             fig <- do.call(config, c(list(p = fig), config_list))
             fig <- .apply_plotly_newshape(fig, input, isolate_fn)
 
+            # Apply uniform legend title/label font sizes
+            fig <- .apply_legend_styling(
+                fig,
+                title.size = isolate_fn(input$legend.title.size),
+                text.size = isolate_fn(input$legend.text.size)
+            )
+
+            # Make single-panel x/y axis titles draggable (matches faceted behaviour)
+            fig <- .axis_titles_as_annotations(fig)
+
             return(fig)
         })
-
+        #Returning all UI inputs: 
+        AllInputs <- reactive({
+            x <- reactiveValuesToList(input)
+            return(x)
+        })
         # Render the plot output
         output$BoxPlot <- renderPlotly({
             req(input$x.data, input$y.data)
+            fig <- .apply_render_margins(generate_BoxPlot(), input)
 
-            fig <- generate_BoxPlot() |>
-                layout(
-                    margin = list(
-                        t = input$margin.t,
-                        b = input$margin.b,
-                        l = input$margin.l,
-                        r = input$margin.r,
-                        autoexpand = TRUE
-                    )
-                )
 
             return(fig)
         })
 
-        # Download handler for interactive plot
-        output$download.interactive <- .create_plot_download_handler(
-            plot_reactive = generate_BoxPlot,
-            filename_base = "BoxPlot"
+        # Download handler for source (plot + data + stats)
+        plot_source_reactive <- reactive({
+            collect_source_data(
+                plot_reactive = generate_BoxPlot,
+                stats_reactive = last_stats_df,
+                inputs_reactive = AllInputs()
+            )
+        })
+
+        output$download.source <- create_source_download_handler(
+            data_list = plot_source_reactive,
+            filename_base = "BoxPlot_source"
         )
 
-        # Download handler for stats table
-        output$download.stats <- downloadHandler(
-            filename = function() {
-                paste0("stats_table_", Sys.Date(), ".csv")
-            },
-            content = function(file) {
-                .write_stats_csv(
-                    stats_df = last_stats_df(), file = file,
-                    p.adjust.method = input$stat.p.adjust,
-                    sig.threshold = input$stat.sig.threshold
-                )
-            }
-        )
+        return(plot_source_reactive)
     })
 }

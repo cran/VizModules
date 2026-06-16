@@ -582,9 +582,6 @@ pattern:</p>
 <li><label><input type="checkbox"></input>Add a <code>&quot;Stats&quot;</code> tab to
 the module’s <code>tabsetPanel</code> containing
 <code>.uniform_stats_inputs_ui(ns, defaults)</code>.</label></li>
-<li><label><input type="checkbox"></input>Pass <code>has.stats = TRUE</code>
-to <code>module_tack_ui()</code> so the conditionally visible “Save
-Stats” button is included.</label></li>
 </ul>
 </div>
 <div id="server" class="section level3">
@@ -595,22 +592,15 @@ store the last computed stats table:
 <code>last_stats_df &lt;- reactiveVal(NULL)</code>.</label></li>
 <li><label><input type="checkbox"></input>When
 <code>input$stats.enabled</code> is TRUE in the plot rendering block,
-call <code>.compute_pairwise_stats()</code> to run tests, then
-<code>.create_stat_annotations()</code> to build bracket
-shapes/annotations, then <code>.apply_stat_annotations()</code> to
-append them to the plotly figure.</label></li>
+call <code>compute_pairwise_stats()</code> to run tests, then
+<code>create_stat_annotations()</code> to build bracket
+shapes/annotations, then <code>apply_stat_annotations()</code> to append
+them to the plotly figure.</label></li>
 <li><label><input type="checkbox"></input>Store the result:
 <code>last_stats_df(stats_df)</code>.</label></li>
 <li><label><input type="checkbox"></input>Add an <code>observeEvent</code> to
 update <code>stat.pairs</code> choices when the x or grouping column
-changes, using <code>.generate_pair_strings()</code>.</label></li>
-<li><label><input type="checkbox"></input>Add an
-<code>observeEvent(input$stats.enabled)</code> to show/hide the “Save
-Stats” button via <code>shinyjs::show(&quot;download.stats.col&quot;)</code> /
-<code>shinyjs::hide(&quot;download.stats.col&quot;)</code>.</label></li>
-<li><label><input type="checkbox"></input>Add a <code>downloadHandler</code>
-for <code>output$download.stats</code> that calls
-<code>.write_stats_csv()</code>.</label></li>
+changes, using <code>generate_pair_strings()</code>.</label></li>
 <li><label><input type="checkbox"></input>Call
 <code>.reset_stats_inputs(session)</code> in the reset
 observer.</label></li>
@@ -631,29 +621,25 @@ observer.</label></li>
 </thead>
 <tbody>
 <tr class="odd">
-<td><code>.compute_pairwise_stats()</code></td>
+<td><code>compute_pairwise_stats()</code></td>
 <td>Run pairwise or omnibus tests with p-value adjustment</td>
 </tr>
 <tr class="even">
-<td><code>.create_stat_annotations()</code></td>
+<td><code>create_stat_annotations()</code></td>
 <td>Convert stats to plotly shapes/annotations with bracket packing</td>
 </tr>
 <tr class="odd">
-<td><code>.apply_stat_annotations()</code></td>
+<td><code>apply_stat_annotations()</code></td>
 <td>Append shapes/annotations to the plotly figure and adjust
 y-axes</td>
 </tr>
 <tr class="even">
-<td><code>.generate_pair_strings()</code></td>
+<td><code>generate_pair_strings()</code></td>
 <td>Build <code>&quot;A vs B&quot;</code> strings for the comparison selector</td>
 </tr>
 <tr class="odd">
-<td><code>.parse_pair_strings()</code></td>
+<td><code>parse_pair_strings()</code></td>
 <td>Convert selected pair strings back to list of length-2 vectors</td>
-</tr>
-<tr class="even">
-<td><code>.write_stats_csv()</code></td>
-<td>Write stats CSV with metadata comment header</td>
 </tr>
 </tbody>
 </table>

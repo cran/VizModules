@@ -32,12 +32,12 @@ The inputs will automatically be organized into a grid layout via the \code{orga
 with \code{columns} controlling the number of columns in the grid.
 
 Defaults can be set for each input by providing a named list of values to the \code{defaults} argument.
-Nearly all parameters for \code{\link[plotthis:boxviolinplot]{plotthis::BoxPlot()}} can be set via these inputs, so see the help
+Nearly all parameters for \code{\link[plotthis:BoxPlot]{plotthis::BoxPlot()}} can be set via these inputs, so see the help
 for that function for an exhaustive list.
 }
 \section{Plot parameters not implemented or with altered functionality}{
 
-The following \code{\link[plotthis:boxviolinplot]{plotthis::BoxPlot()}} parameters are not available via UI inputs:
+The following \code{\link[plotthis:BoxPlot]{plotthis::BoxPlot()}} parameters are not available via UI inputs:
 \itemize{
 \item \code{xlab} - X-axis label (plotly allows interactive editing)
 \item \code{ylab} - Y-axis label (plotly allows interactive editing)
@@ -49,20 +49,25 @@ The following \code{\link[plotthis:boxviolinplot]{plotthis::BoxPlot()}} paramete
 \item \code{in_form} - Data input format (not applicable - always long form)
 \item \code{split_by} - Split variable (returns a patchwork object, not supported in plotly), use \code{facet_by} instead
 \item \code{split_by_sep} - Only applies if \code{split_by} is used
-\item \code{symnum_args} - Significance symbol arguments (not implemented)
-\item \code{flip} - Flip axes (not implemented in current UI)
+\item \code{symnum_args} - Significance symbol arguments (the Stats tab manages symbol display)
 \item \code{keep_empty} - Keep empty values (not implemented)
 \item \code{keep_na} - Keep NA values (not implemented)
 \item \code{group_by_sep} - Separator for group columns (not applicable in UI context)
 \item \code{group_name} - Group legend name (handled by plotly)
-\item \code{paired_by} - Pairing variable for paired tests (not implemented)
+\item \code{paired_by} - Pairing variable for paired tests (use the Stats tab "Paired Test" input instead)
 \item \code{x_text_angle} - X-axis text angle (handled by plotly axis settings)
-\item \code{step_increase} - Step increase for significance brackets (not implemented)
+\item \code{step_increase} - Step increase for significance brackets (set via the Stats tab "Bracket Spacing")
+\item \code{base} - Base plot type box/violin/bar (fixed to "box" in this module)
 \item \code{fill_mode} - Fill mode for grouped data (handled automatically)
-\item \code{fill_reverse} - Reverse fill order (not implemented)
+\item \code{position_dodge_preserve} - Preserve dodge width (not implemented)
+\item \code{add_errorbar} - Add error bars (only for base = "bar"; not implemented)
+\item \code{errorbar_color} - Error bar color (not implemented)
+\item \code{errorbar_width} - Error bar cap width (not implemented)
+\item \code{errorbar_linewidth} - Error bar line width (not implemented)
 \item \code{theme} - ggplot2 theme (not applicable in plotly)
 \item \code{theme_args} - Theme arguments (not applicable in plotly)
 \item \code{palette} - Managed internally via the palette selection UI
+\item \code{palreverse} - Reverse the color palette (not implemented)
 \item \code{alpha} - Alpha transparency (not implemented in UI)
 \item \code{stack} - Stack boxplots (not implemented)
 \item \code{add_beeswarm} - Add beeswarm points (not implemented in UI)
@@ -88,14 +93,15 @@ The following \code{\link[plotthis:boxviolinplot]{plotthis::BoxPlot()}} paramete
 \item \code{line_color} - Line color (not implemented)
 \item \code{line_width} - Line width (not implemented)
 \item \code{line_type} - Line type (not implemented)
-\item \code{comparisons} - Group comparisons for significance tests (not implemented)
-\item \code{ref_group} - Reference group for comparisons (not implemented)
-\item \code{pairwise_method} - Pairwise test method (not implemented)
-\item \code{multiplegroup_comparisons} - Multiple group comparison flag (not implemented)
-\item \code{multiple_method} - Multiple group test method (not implemented)
-\item \code{sig_label} - Significance label format (not implemented)
-\item \code{sig_labelsize} - Significance label size (not implemented)
-\item \code{hide_ns} - Hide non-significant comparisons (not implemented)
+\item \code{comparisons} - plotthis pairwise comparisons are not passed; equivalent pairwise
+significance testing is provided via the module's Stats tab (see "Statistical annotation parameters")
+\item \code{ref_group} - Reference group for comparisons (use the Stats tab instead)
+\item \code{pairwise_method} - Pairwise test method (set via the Stats tab "Test" input instead)
+\item \code{multiplegroup_comparisons} - Multiple-group comparison flag (use the Stats tab instead)
+\item \code{multiple_method} - Multiple-group test method (set via the Stats tab "Test" input instead)
+\item \code{sig_label} - Significance label format (set via the Stats tab "Display" input instead)
+\item \code{sig_labelsize} - Significance label size (handled by the Stats tab)
+\item \code{hide_ns} - Hide non-significant comparisons (use the Stats tab "Hide Non-Significant" input)
 \item \code{seed} - Random seed (not applicable)
 \item \code{combine} - Only applies if \code{split_by} is used
 \item \code{nrow} - Only applies if \code{split_by} is used
@@ -104,17 +110,18 @@ The following \code{\link[plotthis:boxviolinplot]{plotthis::BoxPlot()}} paramete
 \item \code{axes} - Only applies if \code{split_by} is used
 \item \code{axis_titles} - Only applies if \code{split_by} is used
 \item \code{guides} - Only applies if \code{split_by} is used
-\item \code{legend_direction} - Managed position of legend however this can be handled via plotly
+\item \code{legend.direction} - Managed position of legend however this can be handled via plotly
 }
 }
 
 \section{Plot parameters and defaults}{
 
-The following \code{\link[plotthis:boxviolinplot]{plotthis::BoxPlot()}} parameters can be accessed via UI inputs and/or the \code{defaults} argument:
+The following \code{\link[plotthis:BoxPlot]{plotthis::BoxPlot()}} parameters can be accessed via UI inputs and/or the \code{defaults} argument:
 \itemize{
 \item \code{x} - X-axis variable (UI: "X data", default: 2nd categorical variable)
 \item \code{y} - Y-axis variable (UI: "Y data", default: 2nd numeric variable)
 \item \code{group_by} - Grouping variable (UI: "Group by", default: "")
+\item \code{flip} - Flip/swap the x and y axes (UI: "Rotate (swap X/Y)", default: FALSE)
 \item \code{sort_x} - Sort X-axis by statistic (UI: "Sort X by", default: "")
 \item \code{y_max} - Maximum Y-axis value (UI: "Max Value of Y Axis", default: calculated)
 \item \code{y_min} - Minimum Y-axis value (UI: "Min Value of Y Axis", default: calculated)
@@ -133,6 +140,29 @@ The following \code{\link[plotthis:boxviolinplot]{plotthis::BoxPlot()}} paramete
 \item \code{facet_nrow} - Number of facet rows (UI: "Rows", default: NULL)
 \item \code{facet_byrow} - Facet ordering direction (UI: "Facet by Row", default: TRUE)
 \item \code{palcolor} - Custom color values (UI: palette picker, derived from palette)
+}
+}
+
+\section{Statistical annotation parameters}{
+
+The module provides plotly-based significance testing via the Stats tab (a reimplementation of
+the plotthis significance-testing features). The following inputs are available:
+\itemize{
+\item \code{stats.enabled} - Enable statistical annotations (UI: "Enable Stats", default: FALSE)
+\item \code{stat.test} - Test to apply: Wilcoxon, t-test, Kruskal-Wallis, or ANOVA (UI: "Test")
+\item \code{stat.p.adjust} - P-value adjustment method (UI: "P-value Adjustment", default: "holm")
+\item \code{stat.display} - Value to display: adjusted p-value, p-value, or symbols (UI: "Display")
+\item \code{stat.sig.threshold} - Significance threshold for symbols/hiding (UI: "Significance Threshold")
+\item \code{stat.hide.ns} - Hide non-significant comparisons (UI: "Hide Non-Significant", default: FALSE)
+\item \code{stat.paired} - Use a paired test (UI: "Paired Test", default: FALSE)
+\item \code{stat.pairs} - Group comparisons to test (UI: "Comparisons", multiple selection)
+\item \code{stat.line.color} - Bracket line color (UI: "Line Color", default: "#000000")
+\item \code{stat.line.width} - Bracket line width (UI: "Line Width")
+\item \code{stat.bracket.style} - Bracket style, capped or flat (UI: "Bracket Style")
+\item \code{stat.step.increase} - Vertical spacing between stacked brackets (UI: "Bracket Spacing")
+\item \code{stat.text.bump} - Offset of the significance text above the bracket (UI: "Text Offset")
+\item \code{stat.bracket.inset} - Horizontal inset of the brackets (UI: "Bracket Inset")
+\item \code{stat.per.facet} - Compute statistics independently per facet panel (UI: "Per Facet Panel")
 }
 }
 
@@ -189,7 +219,7 @@ data(mtcars)
 plotthis_BoxPlotInputsUI("BoxPlot", mtcars)
 }
 \seealso{
-\code{\link[plotthis:boxviolinplot]{plotthis::BoxPlot()}}, \code{\link[=organize_inputs]{organize_inputs()}},
+\code{\link[plotthis:BoxPlot]{plotthis::BoxPlot()}}, \code{\link[=organize_inputs]{organize_inputs()}},
 \code{\link[=plotthis_BoxPlotOutputUI]{plotthis_BoxPlotOutputUI()}}, \code{\link[=plotthis_BoxPlotServer]{plotthis_BoxPlotServer()}},
 \code{\link[=plotthis_BoxPlotApp]{plotthis_BoxPlotApp()}}
 }

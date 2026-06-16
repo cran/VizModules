@@ -266,27 +266,33 @@ radarPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs = NULL, defa
             }
 
             if (return_empty) {
-                fig <- .empty_plot(text = txt, plotly = TRUE)
+                fig <- empty_plot(text = txt, plotly = TRUE)
             } else {
-                fig <- generate_radarPlot() |>
-                    layout(
-                        margin = list(
-                            t = input$margin.t,
-                            b = input$margin.b,
-                            l = input$margin.l,
-                            r = input$margin.r,
-                            autoexpand = TRUE
-                        )
-                    )
+                fig <- .apply_render_margins(generate_radarPlot(), input)
             }
 
             return(fig)
         })
 
-        # Download handler for interactive plot
-        output$download.interactive <- .create_plot_download_handler(
-            plot_reactive = generate_radarPlot,
-            filename_base = "radarPlot"
+        # Download handler for source (plot + data)
+        # Capture all UI inputs for the source download
+        AllInputs <- reactive({
+            x <- reactiveValuesToList(input)
+            return(x)
+        })
+
+        plot_source_reactive <- reactive({
+            collect_source_data(
+                plot_reactive = generate_radarPlot,
+                inputs_reactive = AllInputs()
+            )
+        })
+
+        output$download.source <- create_source_download_handler(
+            data_list = plot_source_reactive,
+            filename_base = "radarPlot_source"
         )
+
+        return(plot_source_reactive)
     })
 }

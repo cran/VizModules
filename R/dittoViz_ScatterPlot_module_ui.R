@@ -20,12 +20,16 @@
 #' @section Plot parameters not implemented or with altered functionality:
 #' The following [dittoViz::scatterPlot()] parameters are not available via UI inputs or have been superseded:
 #' \itemize{
-#'   \item \code{xlab} - X-axis label (plotly allows interactive editing)
-#'   \item \code{ylab} - Y-axis label (plotly allows interactive editing)
+#'   \item \code{xlab} - X-axis label (auto-generated to reflect any applied X adjustment,
+#'     e.g. \code{"log2(z-score(units))"}; plotly allows interactive editing)
+#'   \item \code{ylab} - Y-axis label (auto-generated to reflect any applied Y adjustment,
+#'     e.g. \code{"log2(z-score(units))"}; plotly allows interactive editing)
 #'   \item \code{main} - Plot title (plotly allows interactive editing)
 #'   \item \code{sub} - Plot subtitle (not supported in plotly)
 #'   \item \code{theme} - ggplot2 theme (not applicable to plotly)
 #'   \item \code{legend.title} - Legend title (managed by plotly interactively)
+#'   \item \code{legend.color.size} - Legend color size (not supported in plotly)
+#'   \item \code{legend.shape.size} - Legend shape size (not supported in plotly)
 #'   \item \code{add.xline} - Use \code{vline.intercepts} instead for vertical lines with full styling options
 #'   \item \code{add.yline} - Use \code{hline.intercepts} instead for horizontal lines with full styling options
 #'   \item \code{xline.linetype} - Use \code{vline.linetypes} instead
@@ -34,6 +38,17 @@
 #'   \item \code{yline.color} - Use \code{hline.colors} instead
 #'   \item \code{do.letter} - Lettering subplots (not implemented for plotly)
 #'   \item \code{do.label} - Labeling points interactively (not compatible with plotly hover)
+#'   \item \code{labels.size}, \code{labels.highlight}, \code{labels.use.numbers},
+#'     \code{labels.numbers.spacer}, \code{labels.repel}, \code{labels.repel.adjust},
+#'     \code{labels.split.by} - Point-label styling (tied to \code{do.label}, not implemented)
+#'   \item \code{rename.color.groups} - Rename color groups (not implemented)
+#'   \item \code{rename.shape.groups} - Rename shape groups (not implemented)
+#'   \item \code{add.trajectory.curves} - Add trajectory curves from coordinate matrices
+#'     (not implemented; use \code{add.trajectory.by.groups} instead)
+#'   \item \code{do.raster} - Rasterize the point layer (not implemented; use \code{webgl} for performance instead)
+#'   \item \code{raster.dpi} - Rasterization DPI (not applicable without \code{do.raster})
+#'   \item \code{show.grid.lines} - Toggle grid lines (managed via the Axes tab gridline controls)
+#'   \item \code{legend.color.breaks.labels} - Labels for color-scale breaks (not implemented)
 #' }
 #' The new Lines tab provides enhanced functionality including multiple lines per type,
 #' individual line widths, opacities, and diagonal/ablines with slope control.
@@ -54,6 +69,8 @@
 #'   \item \code{y.adj.fxn} - Y adjustment function (UI: "Y Adjustment Function", default: "")
 #'   \item \code{color.adj.fxn} - Color adjustment function (UI: "Color Adjustment Function", default: "")
 #'   \item \code{size} - Point size (UI: "Point Size", default: 1)
+#'   \item \code{size.by} - Numeric column mapped to point size (UI: "Size By", default: ""); when set,
+#'     a custom circle size legend is drawn since plotly cannot render a native size legend
 #'   \item \code{opacity} - Point opacity (UI: "Point Opacity", default: 1)
 #'   \item \code{show.others} - Show others (UI: "Show Others", default: TRUE)
 #'   \item \code{split.show.all.others} - Show split others (UI: "Show Split Others", default: TRUE)
@@ -64,8 +81,8 @@
 #'   \item \code{contour.color} - Contour color (UI: "Contour Color", default: "black")
 #'   \item \code{contour.linetype} - Contour linetype (UI: "Contour Linetype", default: "solid")
 #'   \item \code{color.panel} - Custom color values (UI: color.panel.ui, derived from palette)
-#'   \item \code{split.nrow} - Number of split rows (UI: "Split Rows", default: NA)
-#'   \item \code{split.ncol} - Number of split columns (UI: "Split Columns", default: NA)
+#'   \item \code{split.nrow} - Number of split rows (UI: "Rows", default: NA)
+#'   \item \code{split.ncol} - Number of split columns (UI: "Columns", default: NA)
 #'   \item \code{multivar.split.dir} - Multivar split direction (UI: "Multivar Split Dir", default: "col")
 #'   \item \code{split.adjust.scales} - Facet scales (UI: "Facet Scales", default: "fixed")
 #'   \item \code{annotate.by} - Annotate by column (UI: "Annotate By", default: "")
@@ -83,11 +100,11 @@
 #'   \item \code{annotation.arrowcolor} - Arrow color (UI: "Arrow Color", default: "black")
 #'   \item \code{annotation.arrowhead} - Arrowhead style (UI: "Arrowhead Style", default: 2)
 #'   \item \code{annotation.arrowwidth} - Arrow linewidth (UI: "Arrow Linewidth", default: 1.5)
-#'   \item \code{legend.show} - Show legend (UI: "Show Legend", default: TRUE)
-#'   \item \code{legend.color.title} - Legend title (UI: "Legend Title", default: "make")
-#'   \item \code{legend.color.size} - Legend color size (UI: "Legend Color Size", default: 5)
-#'   \item \code{legend.shape.size} - Legend shape size (UI: "Legend Shape Size", default: 5)
 #'   \item \code{legend.color.breaks} - Legend tick breaks (UI: "Legend Tick Breaks", default: "")
+#'   \item \code{size.legend.x} - Custom size-legend x position (UI: "Size Legend X Position",
+#'     default: 1.02); nudges the manual size legend (drawn when \code{size.by} is set) along the x-axis.
+#'   \item \code{size.legend.y} - Custom size-legend y position (UI: "Size Legend Y Position",
+#'     default: 0.95); nudges the manual size legend (drawn when \code{size.by} is set) along the y-axis.
 #'   \item \code{min.value} - Minimum value (UI: "Min Value", default: NA)
 #'   \item \code{max.value} - Maximum value (UI: "Max Value", default: NA)
 #'   \item \code{trajectory.group.by} - Trajectory group by (UI: "Trajectory Group By", default: "")
@@ -172,6 +189,8 @@
 dittoViz_scatterPlotInputsUI <- function(id, data, defaults = NULL, title = NULL, columns = 2) {
     ns <- NS(id)
 
+    if (is.null(defaults)) defaults <- list()
+
     # Get variables of data.
     choices <- c("", names(data))
 
@@ -196,7 +215,6 @@ dittoViz_scatterPlotInputsUI <- function(id, data, defaults = NULL, title = NULL
         "do.ellipse", "do.contour",
         "hover.data", "hover.round.digits",
         "legend.show", c("legend.color.title", "legend.shape.title"),
-        c("legend.color.size", "legend.shape.size"),
         "legend.color.breaks",
         c("min.value", "max.value"),
         "trajectory.group.by", "add.trajectory.by.groups",
@@ -217,28 +235,35 @@ dittoViz_scatterPlotInputsUI <- function(id, data, defaults = NULL, title = NULL
                 selected = .get_default(
                     defaults, "x.by", choices[2],
                     function(x) x %in% choices
-                )
+                ), selectize = FALSE
             ), documentParameters$x.by, placement = "top", options = list(container = "body")),
             tipify(selectInput(ns("y.by"), "Y Data",
                 choices = choices,
                 selected = .get_default(
                     defaults, "y.by", choices[3],
                     function(x) x %in% choices
-                )
+                ), selectize = FALSE
             ), documentParameters$y.by, placement = "top", options = list(container = "body")),
             tipify(selectInput(ns("color.by"), "Color By",
                 choices = choices,
                 selected = .get_default(
                     defaults, "color.by", "",
                     function(x) x %in% choices
-                )
+                ), selectize = FALSE
             ), documentParameters$color.by, placement = "top", options = list(container = "body")),
+            tipify(selectInput(ns("size.by"), "Size By",
+                choices = num.choices,
+                selected = .get_default(
+                    defaults, "size.by", "",
+                    function(x) x == "" || x %in% num.choices
+                ), selectize = FALSE
+            ), documentParameters$size, placement = "top", options = list(container = "body")),
             tipify(selectInput(ns("shape.by"), "Shape By",
                 choices = cat.choices,
                 selected = .get_default(
                     defaults, "shape.by", "",
                     function(x) x %in% cat.choices
-                )
+                ), selectize = FALSE
             ), documentParameters$shape.by, placement = "top", options = list(container = "body")),
             tipify(selectizeInput(ns("split.by"), "Split By",
                 choices = cat.choices,
@@ -256,42 +281,42 @@ dittoViz_scatterPlotInputsUI <- function(id, data, defaults = NULL, title = NULL
                 selected = .get_default(
                     defaults, "x.adjustment", "",
                     function(x) x %in% adj.choices
-                )
+                ), selectize = FALSE
             ), documentParameters$x.adjustment, placement = "top", options = list(container = "body")),
             tipify(selectInput(ns("y.adjustment"), "Y Adjustment",
                 choices = adj.choices,
                 selected = .get_default(
                     defaults, "y.adjustment", "",
                     function(x) x %in% adj.choices
-                )
+                ), selectize = FALSE
             ), documentParameters$y.adjustment, placement = "top", options = list(container = "body")),
             tipify(selectInput(ns("color.adjustment"), "Color Adjustment",
                 choices = adj.choices,
                 selected = .get_default(
                     defaults, "color.adjustment", "",
                     function(x) x %in% adj.choices
-                )
+                ), selectize = FALSE
             ), documentParameters$color.adjustment, placement = "top", options = list(container = "body")),
             tipify(selectInput(ns("x.adj.fxn"), "X Adjustment Function",
                 choices = adj.fxn.choices,
                 selected = .get_default(
                     defaults, "x.adj.fxn", "",
                     function(x) x %in% adj.fxn.choices
-                )
+                ), selectize = FALSE
             ), documentParameters$x.adj.fxn, placement = "top", options = list(container = "body")),
             tipify(selectInput(ns("y.adj.fxn"), "Y Adjustment Function",
                 choices = adj.fxn.choices,
                 selected = .get_default(
                     defaults, "y.adj.fxn", "",
                     function(x) x %in% adj.fxn.choices
-                )
+                ), selectize = FALSE
             ), documentParameters$y.adj.fxn, placement = "top", options = list(container = "body")),
             tipify(selectInput(ns("color.adj.fxn"), "Color Adjustment Function",
                 choices = adj.fxn.choices,
                 selected = .get_default(
                     defaults, "color.adj.fxn", "",
                     function(x) x %in% adj.fxn.choices
-                )
+                ), selectize = FALSE
             ), documentParameters$color.adj.fxn, placement = "top", options = list(container = "body"))
         ),
         "Points" = tagList(
@@ -317,7 +342,7 @@ dittoViz_scatterPlotInputsUI <- function(id, data, defaults = NULL, title = NULL
                 selected = .get_default(
                     defaults, "plot.order", "unordered",
                     function(x) x %in% c("unordered", "increasing", "decreasing", "randomize")
-                )
+                ), selectize = FALSE
             ), documentParameters$plot.order, placement = "top", options = list(container = "body")),
             tipify(textInput(ns("shape.panel"), "Shape Panel",
                 value = .get_default(defaults, "shape.panel", "16, 15, 17, 23, 25, 8")
@@ -346,16 +371,16 @@ dittoViz_scatterPlotInputsUI <- function(id, data, defaults = NULL, title = NULL
                             "longdash", "twodash"
                         )
                     }
-                )
+                ), selectize = FALSE
             ), documentParameters$contour.linetype, placement = "top", options = list(container = "body")),
             uiOutput(ns("color.panel.ui"))
         ),
         "Facet" = tagList(
-            tipify(numericInput(ns("split.nrow"), "Split Rows",
+            tipify(numericInput(ns("split.nrow"), "Rows",
                 step = 1, min = 0,
                 value = .get_default(defaults, "split.nrow", NA, is.numeric)
             ), documentParameters$split.nrow, placement = "top", options = list(container = "body")),
-            tipify(numericInput(ns("split.ncol"), "Split Columns",
+            tipify(numericInput(ns("split.ncol"), "Columns",
                 step = 1, min = 0,
                 value = .get_default(defaults, "split.ncol", NA, is.numeric)
             ), documentParameters$split.ncol, placement = "top", options = list(container = "body")),
@@ -364,7 +389,7 @@ dittoViz_scatterPlotInputsUI <- function(id, data, defaults = NULL, title = NULL
                 selected = .get_default(
                     defaults, "multivar.split.dir", "col",
                     function(x) x %in% c("col", "row")
-                )
+                ), selectize = FALSE
             ), documentParameters$multivar.split.dir, placement = "top", options = list(container = "body")),
             tipify(
                 selectInput(ns("split.adjust.scales"), "Facet Scales",
@@ -372,10 +397,11 @@ dittoViz_scatterPlotInputsUI <- function(id, data, defaults = NULL, title = NULL
                     selected = .get_default(
                         defaults, "split.adjust.scales", "fixed",
                         function(x) x %in% c("fixed", "free", "free_x", "free_y")
-                    )
+                    ), selectize = FALSE
                 ), "Control whether facet panels share the same axis scales or allow them to vary independently",
                 placement = "top", options = list(container = "body")
-            )
+            ),
+            .uniform_subplot_spacing_inputs_ui(ns, defaults)
         ),
         "Annotations" = tagList(
             tipify(
@@ -384,7 +410,7 @@ dittoViz_scatterPlotInputsUI <- function(id, data, defaults = NULL, title = NULL
                     selected = .get_default(
                         defaults, "annotate.by", "",
                         function(x) x %in% choices
-                    )
+                    ), selectize = FALSE
                 ), "Select a column whose values will be used to identify points for highlighting and annotation",
                 placement = "top", options = list(container = "body")
             ),
@@ -487,29 +513,39 @@ dittoViz_scatterPlotInputsUI <- function(id, data, defaults = NULL, title = NULL
                 placement = "top", options = list(container = "body")
             )
         ),
-        "Legend/Scale" = tagList(
+        "Legend" = tagList(
             tipify(checkboxInput(ns("legend.show"), "Show Legend",
                 value = .get_default(defaults, "legend.show", TRUE, is.logical)
             ), documentParameters$legend.show, placement = "top", options = list(container = "body")),
             tipify(textInput(ns("legend.color.title"), "Legend Title",
                 value = .get_default(defaults, "legend.color.title", "make")
             ), documentParameters$legend.color.title, placement = "top", options = list(container = "body")),
-            tipify(numericInput(ns("legend.color.size"), "Legend Color Size",
-                min = 1,
-                value = .get_default(defaults, "legend.color.size", 5, is.numeric)
-            ), documentParameters$legend.color.size, placement = "top", options = list(container = "body")),
-            tipify(numericInput(ns("legend.shape.size"), "Legend Shape Size",
-                min = 1,
-                value = .get_default(defaults, "legend.shape.size", 5, is.numeric)
-            ), documentParameters$legend.shape.size, placement = "top", options = list(container = "body")),
-            tipify(textInput(ns("legend.color.breaks"), "Legend Tick Breaks",
+            .uniform_legend_inputs_ui(ns, defaults),
+            tipify(textInput(ns("legend.color.breaks"), "Color Tick Breaks",
                 placeholder = "e.g. -3, 0, 3",
                 value = .get_default(defaults, "legend.color.breaks", "", is.character)
             ), documentParameters$legend.color.breaks, placement = "top", options = list(container = "body")),
-            tipify(numericInput(ns("min.value"), "Min Value",
+            tipify(numericInput(ns("size.legend.x"), "Size Legend X Position",
+                value = .get_default(defaults, "size.legend.x", 1.03, is.numeric),
+                step = 0.02
+            ), paste(
+                "Horizontal position (paper coordinates) of the custom size",
+                "legend drawn when 'Size By' is set. Values just above 1 sit to",
+                "the right of the plot; lower it to pull the legend inward on",
+                "narrow plots or raise it to push it further out."
+            ), placement = "top", options = list(container = "body")),
+            tipify(numericInput(ns("size.legend.y"), "Size Legend Y Position",
+                value = .get_default(defaults, "size.legend.y", 0.35, is.numeric),
+                step = 0.05
+            ), paste(
+                "Vertical position (paper coordinates) of the custom size",
+                "legend drawn when 'Size By' is set. Lower it to offset the",
+                "size legend from an overlapping color or shape legend."
+            ), placement = "top", options = list(container = "body")),
+            tipify(numericInput(ns("min.value"), "Color Min",
                 value = .get_default(defaults, "min.value", NA, is.numeric)
             ), documentParameters$min.value, placement = "top", options = list(container = "body")),
-            tipify(numericInput(ns("max.value"), "Max Value",
+            tipify(numericInput(ns("max.value"), "Color Max",
                 value = .get_default(defaults, "max.value", NA, is.numeric)
             ), documentParameters$max.value, placement = "top", options = list(container = "body"))
         ),
@@ -519,7 +555,7 @@ dittoViz_scatterPlotInputsUI <- function(id, data, defaults = NULL, title = NULL
                 selected = .get_default(
                     defaults, "trajectory.group.by", "",
                     function(x) x %in% cat.choices
-                )
+                ), selectize = FALSE
             ), documentParameters$trajectory.group.by, placement = "top", options = list(container = "body")),
             tipify(textInput(ns("add.trajectory.by.groups"), "Add Trajectory By Groups",
                 placeholder = "e.g. [A,B],[C,D,E]",
@@ -576,6 +612,10 @@ dittoViz_scatterPlotInputsUI <- function(id, data, defaults = NULL, title = NULL
 #' This should be placed in the UI where the plot should be shown.
 #'
 #' @param id The ID for the Shiny module.
+#' @param resizable Logical; when \code{TRUE} (the default) the plot output
+#'   is wrapped in \code{\link[shinyjqui]{jqui_resizable}} so it can be resized
+#'   by dragging. Set to \code{FALSE} when embedding the output in a container
+#'   that already provides resizing.
 #'
 #' @return A Shiny plotlyOutput for the scatterplot
 #'
@@ -585,9 +625,11 @@ dittoViz_scatterPlotInputsUI <- function(id, data, defaults = NULL, title = NULL
 #'
 #' @export
 #' @author Jared Andrews
-dittoViz_scatterPlotOutputUI <- function(id) {
+dittoViz_scatterPlotOutputUI <- function(id, resizable = TRUE) {
     ns <- NS(id)
-    jqui_resizable(
-        plotlyOutput(ns("scatterPlot"))
-    )
+    plot_output <- plotlyOutput(ns("scatterPlot"))
+    if (isTRUE(resizable)) {
+        plot_output <- jqui_resizable(plot_output)
+    }
+    plot_output
 }

@@ -17,7 +17,8 @@
 #' The following [dittoViz::yPlot()] parameters are not available via UI inputs:
 #' \itemize{
 #'   \item \code{xlab} - X-axis label (plotly allows interactive editing)
-#'   \item \code{ylab} - Y-axis label (plotly allows interactive editing)
+#'   \item \code{ylab} - Y-axis label (auto-generated to reflect any applied Y adjustment,
+#'     e.g. \code{"log2(z-score(units))"}; plotly allows interactive editing)
 #'   \item \code{main} - Plot title (plotly allows interactive editing)
 #'   \item \code{sub} - Plot subtitle (not supported in plotly)
 #'   \item \code{theme} - ggplot2 theme (not applicable to plotly)
@@ -25,6 +26,23 @@
 #'   \item \code{add.line} - Use \code{hline.intercepts} instead for horizontal lines with full styling options
 #'   \item \code{line.linetype} - Use \code{hline.linetypes} instead
 #'   \item \code{line.color} - Use \code{hline.colors} instead
+#'   \item \code{line.linewidth} - Use \code{hline.widths} instead
+#'   \item \code{line.opacity} - Use \code{hline.opacities} instead
+#'   \item \code{multivar.aes} - Aesthetic used for multiple \code{var} columns (not implemented; one var at a time)
+#'   \item \code{multivar.split.dir} - Facet direction for multiple \code{var} columns (not implemented)
+#'   \item \code{rows.use} - Row subset to plot (not implemented)
+#'   \item \code{colors} - Integer index/order into \code{color.panel} (managed via the palette UI)
+#'   \item \code{shape.panel} - Shapes used with \code{shape.by} (not implemented)
+#'   \item \code{y.breaks} - Custom continuous-axis breaks (not implemented)
+#'   \item \code{x.labels} - Override group labels (not implemented)
+#'   \item \code{x.labels.rotate} - Rotate group labels (handled by the Axes tab tick-angle controls)
+#'   \item \code{x.reorder} - Reorder x-axis groups (not implemented)
+#'   \item \code{boxplot.width} - Boxplot width (controlled via \code{boxgap} and \code{boxgroupgap})
+#'   \item \code{boxplot.outlier.size} - Outlier point size (not implemented)
+#'   \item \code{boxplot.position.dodge} - Boxplot dodge (controlled via \code{boxgap})
+#'   \item \code{hover.data} - Columns shown on hover (not implemented; a default set is used)
+#'   \item \code{hover.round.digits} - Hover value rounding (not implemented)
+#'   \item \code{vlnplot.quantiles} - Violin quantiles (doesn't translate to plotly)
 #' }
 #'
 #' @section Plot parameters and defaults:
@@ -39,8 +57,10 @@
 #'   \item \code{color.panel} - Custom color values (UI: palette picker, derived from palette)
 #'   \item \code{min} - Y-axis minimum (UI: "Y Axis Min", auto-calculated)
 #'   \item \code{max} - Y-axis maximum (UI: "Y Axis Max", auto-calculated)
-#'   \item \code{split.nrow} - Number of facet rows (UI: "Number of Rows", default: 4)
-#'   \item \code{split.ncol} - Number of facet columns (UI: "Number of Columns", default: 4)
+#'   \item \code{var.adjustment} - Y-axis data adjustment (UI: "Y Adjustment", default: "")
+#'   \item \code{var.adj.fxn} - Y-axis adjustment function (UI: "Y Adjustment Function", default: "")
+#'   \item \code{split.nrow} - Number of facet rows (UI: "Rows", default: 4)
+#'   \item \code{split.ncol} - Number of facet columns (UI: "Columns", default: 4)
 #'   \item \code{split.adjust} - Facet scale behavior (UI: "Facet Scaling", default: "free")
 #'   \item \code{do.raster} - Rasterize jitter points (UI: "Rasterize Jitter", default: FALSE)
 #'   \item \code{raster.dpi} - DPI for rasterization (UI: "Raster DPI", default: 600)
@@ -56,7 +76,6 @@
 #'   \item \code{boxplot.lineweight} - Boxplot line weight (UI: "Boxplot Line Weight", default: 0.5)
 #'   \item \code{vlnplot.lineweight} - Violin line weight (UI: "Violin Line Weight", default: 0.5)
 #'   \item \code{vlnplot.scaling} - Violin scaling method (UI: "Violin Scaling", default: "area")
-#'   \item \code{vlnplot.quantiles} - Violin quantiles (UI: "Violin Quantiles (0-1)", default: "")
 #'   \item \code{vlnplot.width} - Violin width (derived from \code{boxgap}; not directly settable)
 #'   \item \code{ridgeplot.lineweight} - Ridge line weight (UI: "Ridge Line Weight", default: 0.5)
 #'   \item \code{ridgeplot.scale} - Ridge overlap scale (UI: "Ridge Scale (overlap)", default: 1.25)
@@ -73,7 +92,7 @@
 #'   \item \code{boxmode} - Boxplot mode grouping (calculated: "group" or "overlay" based on color.by)
 #'   \item \code{boxgap} - Boxplot position dodge (UI: "Boxplot Position Dodge", default: 0.3)
 #'   \item \code{boxgroupgap} - Boxplot group dodge (UI: "Boxplot Group Dodge", default: 0.2)
-#'  \item \code{title.font.size} - Plot title font size (UI: "Title Size", default: 26)
+#'   \item \code{title.font.size} - Plot title font size (UI: "Title Size", default: 26)
 #'   \item \code{title.font.family} - Font family for title text (UI: "Title Font", default: "Arial")
 #'   \item \code{title.font.color} - Color for plot title (UI: "Title Color", default: "#000000")
 #'   \item \code{axis.title.font.size} - Axis title font size (UI: "Axis Title Size", default: 18)
@@ -143,6 +162,11 @@ dittoViz_yPlotInputsUI <- function(id, data, defaults = NULL, title = NULL, colu
     num.choices <- c("", names(data)[vapply(data, is.numeric, logical(1))])
     cat.choices <- c("", names(data)[vapply(data, function(x) !is.numeric(x), logical(1))])
     numeric.data <- data[, vapply(data, is.numeric, logical(1)), drop = FALSE]
+
+    # Recognized data adjustments for the (numeric) continuous variable.
+    adj.choices <- c("", "z-score", "relative.to.max")
+    adj.fxn.choices <- c("", "log2", "log", "log10", "neg_log10", "log1p", "as.factor", "abs", "sqrt")
+
     if (length(num.choices) >= 2) {
         max.y <- max(numeric.data[[num.choices[2]]], na.rm = TRUE) * .y_axis_scale_factor
         min.y <- min(numeric.data[[num.choices[2]]], na.rm = TRUE)
@@ -153,13 +177,14 @@ dittoViz_yPlotInputsUI <- function(id, data, defaults = NULL, title = NULL, colu
 
     selected <- list(
         "var", "group.by", "color.by", "shape.by",
-        "plots", c("min", "max"), "split.by", c("split.nrow", "split.ncol"),
+        "plots", c("min", "max"), "var.adjustment", "var.adj.fxn",
+        "split.by", c("split.nrow", "split.ncol"),
         "split.adjust", "do.raster", "raster.dpi",
         "jitter.size", "jitter.width", "jitter.color",
         "jitter.shape.legend.size", "jitter.shape.legend.show",
         "boxplot.show.outliers", "boxplot.color", "boxplot.fill",
         "boxplot.lineweight",
-        "vlnplot.lineweight", "vlnplot.scaling", "vlnplot.quantiles",
+        "vlnplot.lineweight", "vlnplot.scaling",
         "ridgeplot.lineweight", "ridgeplot.scale",
         "ridgeplot.ymax.expansion", "ridgeplot.shape",
         "ridgeplot.bins", "ridgeplot.binwidth"
@@ -178,7 +203,7 @@ dittoViz_yPlotInputsUI <- function(id, data, defaults = NULL, title = NULL, colu
                     selected = .get_default(
                         defaults, "var", num.choices[2],
                         function(x) x %in% num.choices
-                    )
+                    ), selectize = FALSE
                 ),
                 documentParameters$var,
                 placement = "top", options = list(container = "body")
@@ -189,7 +214,7 @@ dittoViz_yPlotInputsUI <- function(id, data, defaults = NULL, title = NULL, colu
                     selected = .get_default(
                         defaults, "group.by", cat.choices[2],
                         function(x) x %in% cat.choices
-                    )
+                    ), selectize = FALSE
                 ),
                 documentParameters$group.by,
                 placement = "top", options = list(container = "body")
@@ -200,7 +225,7 @@ dittoViz_yPlotInputsUI <- function(id, data, defaults = NULL, title = NULL, colu
                     selected = .get_default(
                         defaults, "color.by", "",
                         function(x) x %in% cat.choices
-                    )
+                    ), selectize = FALSE
                 ),
                 documentParameters$color.by,
                 placement = "top", options = list(container = "body")
@@ -211,7 +236,7 @@ dittoViz_yPlotInputsUI <- function(id, data, defaults = NULL, title = NULL, colu
                     selected = .get_default(
                         defaults, "shape.by", "",
                         function(x) x %in% cat.choices
-                    )
+                    ), selectize = FALSE
                 ),
                 documentParameters$shape.by,
                 placement = "top", options = list(container = "body")
@@ -227,11 +252,33 @@ dittoViz_yPlotInputsUI <- function(id, data, defaults = NULL, title = NULL, colu
                     defaults, "plots", c("boxplot", "jitter"),
                     function(x) all(x %in% c("vlnplot", "boxplot", "jitter", "ridgeplot"))
                 ),
-                multiple = TRUE
+                multiple = TRUE, selectize = TRUE
             ), documentParameters$plots, placement = "top", options = list(container = "body")),
             helpText("Order not currently respected")
         ),
         "Adjustments" = tagList(
+            tipify(
+                selectInput(ns("var.adjustment"), "Y Adjustment",
+                    choices = adj.choices,
+                    selected = .get_default(
+                        defaults, "var.adjustment", "",
+                        function(x) x %in% adj.choices
+                    ), selectize = FALSE
+                ),
+                documentParameters$var.adjustment,
+                placement = "top", options = list(container = "body")
+            ),
+            tipify(
+                selectInput(ns("var.adj.fxn"), "Y Adjustment Function",
+                    choices = adj.fxn.choices,
+                    selected = .get_default(
+                        defaults, "var.adj.fxn", "",
+                        function(x) x %in% adj.fxn.choices
+                    ), selectize = FALSE
+                ),
+                documentParameters$var.adj.fxn,
+                placement = "top", options = list(container = "body")
+            ),
             tipify(
                 numericInput(ns("y.max"), "Y Axis Max",
                     value = .get_default(defaults, "max", max.y, is.numeric),
@@ -370,17 +417,9 @@ dittoViz_yPlotInputsUI <- function(id, data, defaults = NULL, title = NULL, colu
                         defaults, "vlnplot.scaling", "area",
                         function(x) x %in% c("area", "count", "width")
                     ),
-                    choices = c("area", "count", "width")
+                    choices = c("area", "count", "width"), selectize = FALSE
                 ),
                 documentParameters$vlnplot.scaling,
-                placement = "top", options = list(container = "body")
-            ),
-            tipify(
-                textInput(ns("vlnplot.quantiles"), "Violin Quantiles (0-1)",
-                    value = .get_default(defaults, "vlnplot.quantiles", ""),
-                    placeholder = "e.g., 0.25, 0.5, 0.75"
-                ),
-                documentParameters$vlnplot.quantiles,
                 placement = "top", options = list(container = "body")
             )
         ),
@@ -418,7 +457,7 @@ dittoViz_yPlotInputsUI <- function(id, data, defaults = NULL, title = NULL, colu
                         defaults, "ridgeplot.shape", "smooth",
                         function(x) x %in% c("smooth", "hist")
                     ),
-                    choices = c("smooth", "hist")
+                    choices = c("smooth", "hist"), selectize = FALSE
                 ),
                 documentParameters$ridgeplot.shape,
                 placement = "top", options = list(container = "body")
@@ -451,7 +490,7 @@ dittoViz_yPlotInputsUI <- function(id, data, defaults = NULL, title = NULL, colu
                     selected = .get_default(
                         defaults, "split.by", "",
                         function(x) x %in% cat.choices
-                    )
+                    ), selectize = FALSE
                 ),
                 documentParameters$split.by,
                 placement = "top", options = list(container = "body")
@@ -462,20 +501,22 @@ dittoViz_yPlotInputsUI <- function(id, data, defaults = NULL, title = NULL, colu
                         defaults, "split.adjust", "free",
                         function(x) x %in% c("fixed", "free", "free_y", "free_x")
                     ),
-                    choices = c("fixed", "free", "free_y", "free_x")
+                    choices = c("fixed", "free", "free_y", "free_x"), selectize = FALSE
                 ),
                 documentParameters$split.adjust,
                 placement = "top", options = list(container = "body")
             ),
-            tipify(numericInput(ns("split.ncol"), "Split Columns",
+            tipify(numericInput(ns("split.ncol"), "Columns",
                 step = 1, min = 0,
                 value = .get_default(defaults, "split.ncol", NA, is.numeric)
             ), documentParameters$split.ncol, placement = "top", options = list(container = "body")),
-            tipify(numericInput(ns("split.nrow"), "Split Rows",
+            tipify(numericInput(ns("split.nrow"), "Rows",
                 step = 1, min = 0,
                 value = .get_default(defaults, "split.nrow", NA, is.numeric)
-            ), documentParameters$split.nrow, placement = "top", options = list(container = "body"))
+            ), documentParameters$split.nrow, placement = "top", options = list(container = "body")),
+            .uniform_subplot_spacing_inputs_ui(ns, defaults)
         ),
+        "Legend" = .uniform_legend_inputs_ui(ns, defaults),
         "Plotly" = .uniform_plotly_inputs_ui(ns, defaults),
         "Axes" = .uniform_axes_inputs_ui(ns, defaults),
         "Lines" = .uniform_lines_inputs_ui(ns, defaults)
@@ -485,7 +526,7 @@ dittoViz_yPlotInputsUI <- function(id, data, defaults = NULL, title = NULL, colu
         inputs,
         id = ns("yPlotTabsetPanel"),
         title = title,
-        tack = module_tack_ui(ns, defaults = defaults, has.stats = TRUE),
+        tack = module_tack_ui(ns, defaults = defaults),
         columns = columns
     )
 }
@@ -496,6 +537,10 @@ dittoViz_yPlotInputsUI <- function(id, data, defaults = NULL, title = NULL, colu
 #' This should be placed in the UI where the plot should be shown.
 #'
 #' @param id The ID for the Shiny module.
+#' @param resizable Logical; when \code{TRUE} (the default) the plot output
+#'   is wrapped in \code{\link[shinyjqui]{jqui_resizable}} so it can be resized
+#'   by dragging. Set to \code{FALSE} when embedding the output in a container
+#'   that already provides resizing.
 #'
 #' @return A Shiny plotlyOutput for the yPlot
 #'
@@ -505,9 +550,11 @@ dittoViz_yPlotInputsUI <- function(id, data, defaults = NULL, title = NULL, colu
 #'
 #' @export
 #' @author Jared Andrews
-dittoViz_yPlotOutputUI <- function(id) {
+dittoViz_yPlotOutputUI <- function(id, resizable = TRUE) {
     ns <- NS(id)
-    jqui_resizable(
-        plotlyOutput(ns("yPlot"))
-    )
+    plot_output <- plotlyOutput(ns("yPlot"))
+    if (isTRUE(resizable)) {
+        plot_output <- jqui_resizable(plot_output)
+    }
+    plot_output
 }

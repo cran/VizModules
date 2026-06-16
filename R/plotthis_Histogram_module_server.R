@@ -149,6 +149,9 @@ plotthis_HistogramServer <- function(id, data, hide.inputs = NULL, hide.tabs = N
 
 
             .reset_plotly_inputs(session, defaults)
+
+
+            .reset_legend_inputs(session, defaults)
             .reset_lines_inputs(session, defaults = defaults)
             .reset_axes_inputs(session, defaults)
         })
@@ -212,7 +215,8 @@ plotthis_HistogramServer <- function(id, data, hide.inputs = NULL, hide.tabs = N
             facet.nrow <- .na_to_null(isolate_fn(input$facet.nrow))
 
             theme_args <- .create_ggplot_axis_style(input, isolate_fn = isolate_fn)
-            theme_args$panel.spacing <- unit(isolate_fn(input$subplot.margin), "npc")
+            theme_args$panel.spacing.x <- unit(isolate_fn(input$subplot.margin.x), "pt")
+            theme_args$panel.spacing.y <- unit(isolate_fn(input$subplot.margin.y), "pt")
 
             p <- Histogram(
                 data = data(),
@@ -244,17 +248,17 @@ plotthis_HistogramServer <- function(id, data, hide.inputs = NULL, hide.tabs = N
             )
 
 
-            fig <- ggplotly(p) |>
-                layout(
-                    title = list(
-                        font = list(
-                            size = isolate_fn(input$title.font.size),
-                            family = isolate_fn(input$title.font.family),
-                            color = isolate_fn(input$title.font.color)
-                        ),
-                        x = 0.5, xanchor = "center", y = 0.98, yanchor = "top"
-                    )
+            fig <- ggplotly(p)
+
+            if (!is.null(facet.by) && nzchar(facet.by)) {
+                fig <- .apply_facet_subplot_spacing(
+                    fig,
+                    spacing = c(isolate_fn(input$subplot.margin.x), isolate_fn(input$subplot.margin.y)),
+                    ncol = facet.ncol,
+                    nrow = facet.nrow
                 )
+            }
+            fig <- .apply_title_layout(fig, input, isolate_fn, title_y = 0.98, title_x = isolate_fn(input$axis.title.horizontal.position))
 
             # Apply axis styling to all subplot axes (handles faceting/split_by)
             xaxis_style <- .create_axis_styles(input, axis_side = "x", isolate_fn = isolate_fn)
@@ -291,6 +295,16 @@ plotthis_HistogramServer <- function(id, data, hide.inputs = NULL, hide.tabs = N
             fig <- do.call(config, c(list(p = fig), config_list))
             fig <- .apply_plotly_newshape(fig, input, isolate_fn)
 
+            # Apply uniform legend title/label font sizes
+            fig <- .apply_legend_styling(
+                fig,
+                title.size = isolate_fn(input$legend.title.size),
+                text.size = isolate_fn(input$legend.text.size)
+            )
+
+            # Make single-panel x/y axis titles draggable (matches faceted behaviour)
+            fig <- .axis_titles_as_annotations(fig)
+
             return(fig)
         })
 
@@ -298,24 +312,30 @@ plotthis_HistogramServer <- function(id, data, hide.inputs = NULL, hide.tabs = N
         output$histogramPlot <- renderPlotly({
             req(input$x.data)
 
-            fig <- generate_Histogram() |>
-                layout(
-                    margin = list(
-                        t = input$margin.t,
-                        b = input$margin.b,
-                        l = input$margin.l,
-                        r = input$margin.r,
-                        autoexpand = TRUE
-                    )
-                )
+            fig <- .apply_render_margins(generate_Histogram(), input)
 
             return(fig)
         })
 
-        # Download handler for interactive plot
-        output$download.interactive <- .create_plot_download_handler(
-            plot_reactive = generate_Histogram,
-            filename_base = "Histogram"
+        # Download handler for source (plot + data)
+        # Capture all UI inputs for the source download
+        AllInputs <- reactive({
+            x <- reactiveValuesToList(input)
+            return(x)
+        })
+
+        plot_source_reactive <- reactive({
+            collect_source_data(
+                plot_reactive = generate_Histogram,
+                inputs_reactive = AllInputs()
+            )
+        })
+
+        output$download.source <- create_source_download_handler(
+            data_list = plot_source_reactive,
+            filename_base = "Histogram_source"
         )
+
+        return(plot_source_reactive)
     })
 }

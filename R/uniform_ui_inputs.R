@@ -278,7 +278,7 @@
             selected = .get_default(
                 defaults, "title.font.family", "Arial",
                 function(x) x %in% font_choices
-            )
+            ), selectize = FALSE
         ),
         colourInput(ns("title.font.color"), "Title Color",
             value = .get_default(defaults, "title.font.color", "#000000")
@@ -287,6 +287,10 @@
             value = .get_default(defaults, "title.font.size", 26, is.numeric),
             min = 1,
             step = 1
+        ),
+        numericInput(ns("axis.title.horizontal.position"), "Title position",
+            value = .get_default(defaults, "axis.title.horizontal.position", 0.5, is.numeric),
+            max = 1, min = 0, step = 0.1
         ),
         numericInput(ns("axis.title.font.size"), "Axis Title Size",
             value = .get_default(defaults, "axis.title.font.size", 18, is.numeric),
@@ -301,7 +305,7 @@
             selected = .get_default(
                 defaults, "axis.title.font.family", "Arial",
                 function(x) x %in% font_choices
-            )
+            ), selectize = FALSE
         ),
         checkboxInput(ns("axis.showline"), "Show Axis Borders",
             value = .get_default(defaults, "axis.showline", TRUE, is.logical)
@@ -339,7 +343,7 @@
             selected = .get_default(
                 defaults, "axis.tickfont.family", "Arial",
                 function(x) x %in% font_choices
-            )
+            ), selectize = FALSE
         ),
         numericInput(ns("axis.tickangle.x"), "X Tick Label Angle",
             value = .get_default(defaults, "axis.tickangle.x", 0, is.numeric),
@@ -358,7 +362,7 @@
             selected = .get_default(
                 defaults, "axis.ticks", "outside",
                 function(x) x %in% c("outside", "inside", "")
-            )
+            ), selectize = FALSE
         ),
         colourInput(ns("axis.tickcolor"), "Tick Mark Color",
             value = .get_default(defaults, "axis.tickcolor", "black")
@@ -386,7 +390,7 @@
             selected = .get_default(
                 defaults, "facet.title.font.family", "Arial",
                 function(x) x %in% font_choices
-            )
+            ), selectize = FALSE
         )
     )
 }
@@ -429,7 +433,7 @@
                     "Kruskal-Wallis" = "kruskal.test",
                     "ANOVA" = "anova"
                 ),
-                selected = .get_default(defaults, "stat.test", "wilcox.test")
+                selected = .get_default(defaults, "stat.test", "wilcox.test"), selectize = FALSE
             ),
             paste(
                 "Statistical test for comparisons.",
@@ -444,7 +448,7 @@
                     "holm", "hochberg", "hommel", "bonferroni",
                     "BH", "BY", "fdr", "none"
                 ),
-                selected = .get_default(defaults, "stat.p.adjust", "holm")
+                selected = .get_default(defaults, "stat.p.adjust", "holm"), selectize = FALSE
             ),
             "Method for multiple testing correction applied to all p-values",
             placement = "top", options = tip_opts
@@ -456,7 +460,7 @@
                     "P-value" = "p.value",
                     "Symbols" = "symbol"
                 ),
-                selected = .get_default(defaults, "stat.display", "p.adj")
+                selected = .get_default(defaults, "stat.display", "p.adj"), selectize = FALSE
             ),
             "What to display on brackets: adjusted p-values, raw p-values, or significance symbols (*, **, ***, ****)",
             placement = "top", options = tip_opts
@@ -491,7 +495,7 @@
         ),
         tipify(
             selectInput(ns("stat.pairs"), "Comparisons",
-                choices = c(), multiple = TRUE
+                choices = c(), multiple = TRUE, selectize = TRUE
             ),
             "Select specific pairwise comparisons to display. If empty, all possible pairs are tested.",
             placement = "top", options = tip_opts
@@ -514,7 +518,7 @@
         tipify(
             selectInput(ns("stat.bracket.style"), "Bracket Style",
                 choices = c("Capped" = "capped", "Flat" = "flat"),
-                selected = .get_default(defaults, "stat.bracket.style", "capped")
+                selected = .get_default(defaults, "stat.bracket.style", "capped"), selectize = FALSE
             ),
             "Capped brackets have vertical ticks at each end; flat brackets are a single horizontal line",
             placement = "top", options = tip_opts
@@ -559,7 +563,9 @@
 #'
 #' Creates a standardized tagList of Plotly-specific inputs used across all plot
 #' modules. Includes interactive download controls, plot margin adjustments,
-#' subplot spacing, and user-drawn shape styling for Plotly's drawing tools.
+#' and user-drawn shape styling for Plotly's drawing tools. (Subplot spacing
+#' controls live in each module's "Facet" tab via
+#' [.uniform_subplot_spacing_inputs_ui()].)
 #'
 #' @param ns A namespace function, typically created by `NS(id)`.
 #' @param defaults A named list of default values for the inputs.
@@ -576,13 +582,6 @@
 .uniform_plotly_inputs_ui <- function(ns, defaults = NULL) {
     tip_opts <- list(container = "body")
     tagList(
-        downloadButton(
-            ns("download.interactive"),
-            "Save Interactive",
-            class = "btn-secondary",
-            icon = icon("download"),
-            width = "100%"
-        ),
         selectInput(
             ns("download.format"),
             "Download Format",
@@ -591,7 +590,7 @@
                 function(x) x %in% c("svg", "png", "jpeg", "webp")
             ),
             choices = c("svg", "png", "jpeg", "webp"),
-            width = "100%"
+            width = "100%", selectize = FALSE
         ),
         tipify(
             numericInput(ns("margin.t"), "Margin Top",
@@ -619,21 +618,10 @@
         ),
         tipify(
             numericInput(ns("margin.r"), "Margin Right",
-                value = .get_default(defaults, "margin.r", 70, is.numeric),
+                value = .get_default(defaults, "margin.r", 90, is.numeric),
                 min = 0, step = 5
             ),
             "Right margin of the plot in pixels",
-            placement = "top", options = tip_opts
-        ),
-        tipify(
-            numericInput(ns("subplot.margin"), "Subplot Spacing",
-                value = .get_default(defaults, "subplot.margin", 0.04, is.numeric),
-                min = 0, max = 1, step = 0.01
-            ),
-            paste(
-                "Spacing between facet panels as a fraction of the plot area.",
-                "Only applies when faceting is active."
-            ),
             placement = "top", options = tip_opts
         ),
         tipify(
@@ -666,7 +654,7 @@
                 selected = .get_default(
                     defaults, "shape.linetype", "solid",
                     function(x) x %in% c("solid", "dot", "dash", "longdash", "dashdot", "longdashdot")
-                )
+                ), selectize = FALSE
             ),
             "Line dash style for shapes drawn on the plot using Plotly's drawing tools",
             placement = "top", options = tip_opts
@@ -677,6 +665,93 @@
                 min = 0, max = 1, step = 0.01
             ),
             "Opacity of shapes drawn on the plot, where 0 is fully transparent and 1 is fully opaque",
+            placement = "top", options = tip_opts
+        )
+    )
+}
+
+
+#' Generate uniform subplot spacing input UI
+#'
+#' Creates a standardized tagList of the horizontal/vertical subplot spacing
+#' inputs. These controls only have an effect when faceting is active, so they
+#' are rendered within each module's "Facet" tab.
+#'
+#' @param ns A namespace function, typically created by `NS(id)`.
+#' @param defaults A named list of default values for the inputs.
+#'
+#' @return A `tagList` containing the subplot spacing input UI elements.
+#'
+#' @importFrom shiny numericInput tagList
+#' @importFrom shinyBS tipify
+#'
+#' @author Jared Andrews
+#' @rdname INTERNAL_uniform_subplot_spacing_inputs_ui
+#' @keywords internal
+.uniform_subplot_spacing_inputs_ui <- function(ns, defaults = NULL) {
+    tip_opts <- list(container = "body")
+
+    tagList(
+        tipify(
+            numericInput(ns("subplot.margin.x"), "Subplot Spacing (Horizontal)",
+                value = .get_default(defaults, "subplot.margin.x", 0.03, is.numeric),
+                min = 0, max = 1, step = 0.01
+            ),
+            paste(
+                "Horizontal spacing between facet panel columns as a fraction of the plot area",
+                "(e.g. 0.03). Only applies when faceting is active."
+            ),
+            placement = "top", options = tip_opts
+        ),
+        tipify(
+            numericInput(ns("subplot.margin.y"), "Subplot Spacing (Vertical)",
+                value = .get_default(defaults, "subplot.margin.y", 0.1, is.numeric),
+                min = 0, max = 1, step = 0.01
+            ),
+            paste(
+                "Vertical spacing between facet panel rows as a fraction of the plot area",
+                "(e.g. 0.1). Only applies when faceting is active."
+            ),
+            placement = "top", options = tip_opts
+        )
+    )
+}
+
+
+#' Generate uniform Legend input UI
+#'
+#' Creates a standardized tagList of legend styling inputs used across plot
+#' modules. Currently exposes the legend title and entry label font sizes so
+#' they can be adjusted consistently regardless of plot type.
+#'
+#' @param ns A namespace function, typically created by `NS(id)`.
+#' @param defaults A named list of default values for the inputs.
+#'
+#' @return A `tagList` containing the legend input UI elements.
+#'
+#' @importFrom shiny numericInput tagList
+#' @importFrom shinyBS tipify
+#'
+#' @author Jared Andrews
+#' @rdname INTERNAL_uniform_legend_inputs_ui
+#' @keywords internal
+.uniform_legend_inputs_ui <- function(ns, defaults = NULL) {
+    tip_opts <- list(container = "body")
+    tagList(
+        tipify(
+            numericInput(ns("legend.title.size"), "Legend Title Size",
+                value = .get_default(defaults, "legend.title.size", 14, is.numeric),
+                min = 0, step = 1
+            ),
+            "Font size of the legend title.",
+            placement = "top", options = tip_opts
+        ),
+        tipify(
+            numericInput(ns("legend.text.size"), "Legend Text Size",
+                value = .get_default(defaults, "legend.text.size", 12, is.numeric),
+                min = 0, step = 1
+            ),
+            "Font size of the legend entry labels.",
             placement = "top", options = tip_opts
         )
     )

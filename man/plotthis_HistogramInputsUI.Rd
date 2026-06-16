@@ -38,12 +38,12 @@ The inputs will automatically be organized into a grid layout via the \code{orga
 with \code{columns} controlling the number of columns in the grid.
 
 Defaults can be set for each input by providing a named list of values to the \code{defaults} argument.
-Nearly all parameters for \code{\link[plotthis:densityhistoplot]{plotthis::Histogram()}} can be set via these inputs, so see the help
+Nearly all parameters for \code{\link[plotthis:Histogram]{plotthis::Histogram()}} can be set via these inputs, so see the help
 for that function for an exhaustive list.
 }
 \section{Plot parameters not implemented or with altered functionality}{
 
-The following \code{\link[plotthis:densityhistoplot]{plotthis::Histogram()}} parameters are not available via UI inputs:
+The following \code{\link[plotthis:Histogram]{plotthis::Histogram()}} parameters are not available via UI inputs:
 \itemize{
 \item \code{xlab} - X-axis label (plotly allows interactive editing)
 \item \code{ylab} - Y-axis label (plotly allows interactive editing)
@@ -56,7 +56,6 @@ The following \code{\link[plotthis:densityhistoplot]{plotthis::Histogram()}} par
 \item \code{ytrans} - Y-axis transformation (not implemented in UI)
 \item \code{split_by} - Split variable (returns a patchwork object, not supported in plotly), use \code{facet_by} instead
 \item \code{split_by_sep} - Only applies if \code{split_by} is used
-\item \code{flip} - Flip axes (not implemented in current UI)
 \item \code{theme} - ggplot2 theme (not applicable in plotly)
 \item \code{theme_args} - Theme arguments (not applicable in plotly)
 \item \code{palette} - Managed internally via the palette selection UI
@@ -70,16 +69,21 @@ The following \code{\link[plotthis:densityhistoplot]{plotthis::Histogram()}} par
 \item \code{axis_titles} - Only applies if \code{split_by} is used
 \item \code{guides} - Only applies if \code{split_by} is used
 \item \code{design} - Only applies if \code{split_by} is used
-\item \code{legend_direction} - Managed position of legend however this can be handled via plotly
+\item \code{palreverse} - Reverse the color palette (not implemented)
+\item \code{aspect.ratio} - Aspect ratio control (handled by plotly layout)
+\item \code{keep_empty} - Keep empty factor levels (not implemented)
+\item \code{keep_na} - Keep NA values (not implemented)
+\item \code{legend.direction} - Managed position of legend however this can be handled via plotly
 }
 }
 
 \section{Plot parameters and defaults}{
 
-The following \code{\link[plotthis:densityhistoplot]{plotthis::Histogram()}} parameters can be accessed via UI inputs and/or the \code{defaults} argument:
+The following \code{\link[plotthis:Histogram]{plotthis::Histogram()}} parameters can be accessed via UI inputs and/or the \code{defaults} argument:
 \itemize{
 \item \code{x} - X-axis variable (UI: "X Data", default: 2nd numeric variable)
 \item \code{group_by} - Grouping variable (UI: "Group By", default: "")
+\item \code{flip} - Flip/swap the x and y axes (UI: "Rotate (swap X/Y)", default: FALSE)
 \item \code{bins} - Number of bins (UI: "Number of Bins", default: NA)
 \item \code{binwidth} - Width of bins (UI: "Bin Width", default: NA)
 \item \code{use_trend} - Show only trend line (UI: "Trend Line Only", default: FALSE)
@@ -96,8 +100,8 @@ The following \code{\link[plotthis:densityhistoplot]{plotthis::Histogram()}} par
 \item \code{bar_width} - Rug bar width (UI: "Rug Bar Width", default: 1)
 \item \code{facet_by} - Faceting variable (UI: "Facet By", default: "")
 \item \code{facet_scales} - Facet scale behavior (UI: "Facet Scale", default: "fixed")
-\item \code{facet_ncol} - Number of facet columns (UI: "Number of Columns", default: NULL)
-\item \code{facet_nrow} - Number of facet rows (UI: "Number of Rows", default: NULL)
+\item \code{facet_ncol} - Number of facet columns (UI: "Columns", default: NULL)
+\item \code{facet_nrow} - Number of facet rows (UI: "Rows", default: NULL)
 \item \code{facet_byrow} - Facet ordering direction (UI: "Facet by Row", default: TRUE)
 \item \code{palcolor} - Custom color values (UI: palette picker, derived from palette)
 }
@@ -153,7 +157,7 @@ data(mtcars)
 plotthis_HistogramInputsUI("histogram", mtcars)
 }
 \seealso{
-\code{\link[plotthis:densityhistoplot]{plotthis::Histogram()}}, \code{\link[=organize_inputs]{organize_inputs()}},
+\code{\link[plotthis:Histogram]{plotthis::Histogram()}}, \code{\link[=organize_inputs]{organize_inputs()}},
 \code{\link[=plotthis_HistogramOutputUI]{plotthis_HistogramOutputUI()}}, \code{\link[=plotthis_HistogramServer]{plotthis_HistogramServer()}}, \code{\link[=plotthis_HistogramApp]{plotthis_HistogramApp()}}
 }
 \author{

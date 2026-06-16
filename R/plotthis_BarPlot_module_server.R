@@ -101,7 +101,7 @@ plotthis_BarPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs = NUL
                     ns("palette.name"),
                     "Color Palette",
                     choices = palette_names,
-                    selected = "viridis"
+                    selected = "viridis", selectize = FALSE
                 )
             } else {
                 groups <- palette_groups()
@@ -174,6 +174,7 @@ plotthis_BarPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs = NUL
             updateNumericInput(session, "alpha", value = .get_default(defaults, "alpha", 1, is.numeric))
             updateNumericInput(session, "width", value = .get_default(defaults, "width", NA, is.numeric))
             updateTextInput(session, "expand", value = .get_default(defaults, "expand", ""))
+            updateMaterialSwitch(session, "palreverse", value = .get_default(defaults, "palreverse", FALSE, is.logical))
 
             # Axes
             updateMaterialSwitch(session, "rotate", value = .get_default(defaults, "rotate", FALSE, is.logical))
@@ -189,6 +190,7 @@ plotthis_BarPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs = NUL
 
             # Plotly
             .reset_plotly_inputs(session, defaults)
+            .reset_legend_inputs(session, defaults)
 
             # Lines
             .reset_lines_inputs(session, defaults = defaults)
@@ -234,6 +236,12 @@ plotthis_BarPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs = NUL
                 hide("facet.title.font.family")
             }
         })
+
+        observeEvent(c(input$facet.by, input$x.data), {
+        if (input$facet.by == input$x.data){
+            updateSelectInput(session, "facet.scale", selected = "free_x")
+        }
+        }, ignoreInit = FALSE)
 
         generate_BarPlot <- reactive({
             isolate_fn <- setup_auto_update_logic(input)
@@ -290,7 +298,6 @@ plotthis_BarPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs = NUL
             facet.nrow <- .na_to_null(isolate_fn(input$facet.nrow))
 
             theme_args <- .create_ggplot_axis_style(input, isolate_fn = isolate_fn)
-            theme_args$panel.spacing <- unit(isolate_fn(input$subplot.margin), "npc")
 
             p <- BarPlot(
                 data(),
@@ -305,6 +312,7 @@ plotthis_BarPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs = NUL
                 facet_byrow = isolate_fn(input$facet.by.row),
                 palette = palette_arg,
                 palcolor = palcolor_arg,
+                palreverse = isolate_fn(input$palreverse),
                 y_min = isolate_fn(input$y.min),
                 y_max = isolate_fn(input$y.max),
                 theme = "theme_this",
@@ -315,18 +323,16 @@ plotthis_BarPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs = NUL
                 split_by = split.by,
                 fill_by = fill.by
             )
-
-            fig <- ggplotly(p) |>
-                layout(
-                    title = list(
-                        font = list(
-                            size = isolate_fn(input$title.font.size),
-                            family = isolate_fn(input$title.font.family),
-                            color = isolate_fn(input$title.font.color)
-                        ),
-                        x = 0.5, xanchor = "center", y = 0.95, yanchor = "top"
-                    )
+            fig <- ggplotly(p)
+            if (!is.null(facet.by) && nzchar(facet.by)) {
+                fig <- .apply_facet_subplot_spacing(
+                    fig,
+                    spacing = c(isolate_fn(input$subplot.margin.x), isolate_fn(input$subplot.margin.y)),
+                    ncol = facet.ncol,
+                    nrow = facet.nrow
                 )
+            }
+            fig <- .apply_title_layout(fig, input, isolate_fn, title_y = 0.95, title_x = isolate_fn(input$axis.title.horizontal.position))
 
             # Apply axis styling to all subplot axes (handles faceting/split_by)
             # Disable plotly borders since we're handling them through ggplot theme_args
@@ -364,6 +370,16 @@ plotthis_BarPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs = NUL
             fig <- do.call(config, c(list(p = fig), config_list))
             fig <- .apply_plotly_newshape(fig, input, isolate_fn)
 
+            # Apply uniform legend title/label font sizes
+            fig <- .apply_legend_styling(
+                fig,
+                title.size = isolate_fn(input$legend.title.size),
+                text.size = isolate_fn(input$legend.text.size)
+            )
+
+            # Make single-panel x/y axis titles draggable (matches faceted behaviour)
+            fig <- .axis_titles_as_annotations(fig)
+
             return(fig)
         })
 
@@ -380,27 +396,33 @@ plotthis_BarPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs = NUL
             }
 
             if (return_empty) {
-                fig <- .empty_plot(text = txt, plotly = TRUE)
+                fig <- empty_plot(text = txt, plotly = TRUE)
             } else {
-                fig <- generate_BarPlot() |>
-                    layout(
-                        margin = list(
-                            t = input$margin.t,
-                            b = input$margin.b,
-                            l = input$margin.l,
-                            r = input$margin.r,
-                            autoexpand = TRUE
-                        )
-                    )
+                fig <- .apply_render_margins(generate_BarPlot(), input)
             }
 
             return(fig)
         })
 
-        # Download handler for interactive plot
-        output$download.interactive <- .create_plot_download_handler(
-            plot_reactive = generate_BarPlot,
-            filename_base = "BarPlot"
+        # Download handler for source (plot + data)
+        # Capture all UI inputs for the source download
+        AllInputs <- reactive({
+            x <- reactiveValuesToList(input)
+            return(x)
+        })
+
+        plot_source_reactive <- reactive({
+            collect_source_data(
+                plot_reactive = generate_BarPlot,
+                inputs_reactive = AllInputs()
+            )
+        })
+
+        output$download.source <- create_source_download_handler(
+            data_list = plot_source_reactive,
+            filename_base = "BarPlot_source"
         )
+
+        return(plot_source_reactive)
     })
 }

@@ -21,7 +21,16 @@
 #'   Creates subplots for each unique value. Default: NULL.
 #' @param facet.scales Character, controls axis scaling across facets. Options: "fixed" (same for all), "free" (independent),
 #'   "free_x" (independent x-axis), "free_y" (independent y-axis). Default: "fixed".
-#' @param subplot.margin Numeric, spacing between facet panels as a fraction of the plot area. Default: 0.05.
+#' @param facet.nrow Optional integer, number of rows in the faceted subplot grid.
+#'   If \code{NULL} (default), a single row is used unless \code{facet.ncol} is supplied,
+#'   in which case the number of rows is derived from the number of facet levels.
+#' @param facet.ncol Optional integer, number of columns in the faceted subplot grid.
+#'   If \code{NULL} (default), columns are derived from \code{facet.nrow} and the number
+#'   of facet levels. Only one of \code{facet.nrow} / \code{facet.ncol} needs to be set;
+#'   if both are provided, \code{facet.nrow} takes precedence.
+#' @param subplot.margin Numeric, spacing between facet panels as a fraction of the plot area.
+#'   May be a single value (applied to both directions) or a length-2 vector
+#'   `c(horizontal, vertical)` to control the gap between columns and rows separately. Default: 0.05.
 #' @param order.by Optional character vector, column name(s) to order data by before plotting. Default: NULL.
 #' @param axis.showline Logical, whether to show axis border lines. Default: TRUE.
 #' @param axis.mirror Logical, whether to mirror axis lines on opposite side of plot. Default: TRUE.
@@ -42,7 +51,10 @@
 #' @param title.font.size Numeric, font size for plot title. Default: 14.
 #' @param title.font.family Character, font family for plot title. Default: "Arial".
 #' @param title.font.color Character, hex color for plot title text. Default: "black".
-#' @param y.title Optional character, label for y-axis. If NULL, auto-generated from column name. Default: NULL.
+#' @param title.x.position Numeric, horizontal position of the plot title in paper coordinates (0 = left, 1 = right). Default: 0.47.
+#' @param y.title Optional character, label for y-axis. If NULL, auto-generated from column name.
+#'   When `x` is a single categorical column, the plotted y-values are per-group means, so the
+#'   title is wrapped as `mean(<y.title>)` to accurately describe the summary displayed. Default: NULL.
 #' @param x.title Optional character, label for x-axis. If NULL, auto-generated from column name. Default: NULL.
 #' @param flip.x Logical, whether to reverse the x-axis direction. Default: FALSE.
 #' @param flip.y Logical, whether to reverse the y-axis direction. Default: FALSE.
@@ -81,12 +93,13 @@ linePlot <- function(data, x, y, palette.selection,
                      colour.group.by = NULL,
                      show.legend = TRUE, facet.by = NULL,
                      facet.scales = "fixed",
+                     facet.nrow = NULL, facet.ncol = NULL,
                      subplot.margin = 0.05,
                      axis.showline = TRUE, axis.mirror = TRUE, axis.linecolor = "black", axis.linewidth = 0.5, axis.tickfont.size = 12,
                      axis.tickfont.color = "black", axis.tickfont.family = "Arial", axis.tickangle.x = 0, axis.tickangle.y = 0, axis.ticks = "outside",
                      axis.tickcolor = "black", axis.ticklen = 5, axis.tickwidth = 1, show.grid.x = TRUE, show.grid.y = TRUE,
                      title.text = "", title.font.size = 14, title.font.family = "Arial",
-                     title.font.color = "black", y.title = NULL, x.title = NULL, flip.x = FALSE, flip.y = FALSE,
+                     title.font.color = "black", title.x.position = 0.47, y.title = NULL, x.title = NULL, flip.x = FALSE, flip.y = FALSE,
                      x.adjustment = NULL, y.adjustment = NULL, color.adjustment = NULL, order.by = NULL, error.colour = NULL, error.width = NULL, error.bar = FALSE) {
     # Unique x axis styling for linePlot:
     xaxis_style <- list(
@@ -97,6 +110,15 @@ linePlot <- function(data, x, y, palette.selection,
     )
 
     multi_axis <- xor(length(x) > 1, length(y) > 1)
+
+    # subplot.margin may be a single value (applied to all sides) or a length-2
+    # vector c(horizontal, vertical). plotly::subplot() expects a single value or
+    # c(left, right, top, bottom), so expand a length-2 vector accordingly.
+    subplot_margin_sides <- if (length(subplot.margin) >= 2L) {
+        c(subplot.margin[1], subplot.margin[1], subplot.margin[2], subplot.margin[2])
+    } else {
+        subplot.margin
+    }
 
     cat.choices <- c("", names(data)[vapply(data, function(x) !is.numeric(x), logical(1))])
 
@@ -134,6 +156,14 @@ linePlot <- function(data, x, y, palette.selection,
     }
 
     if (length(x) == 1 && x %in% cat.choices) {
+        # A categorical x-axis means each x position can have multiple y-values, so the
+        # per-group mean is what actually gets plotted. Reflect that summary in the
+        # y-axis title (e.g. "units" -> "mean(units)") so the axis is not misleading.
+        if (length(y) == 1 && is.numeric(data[[y[1]]])) {
+            y_label <- if (is.null(y.title) || !nzchar(y.title)) y[1] else y.title
+            y.title <- paste0("mean(", y_label, ")")
+        }
+
         # Compute per-group mean and SD for error bars
         group_vars <- x
         if (!is.null(facet.by) && nzchar(facet.by)) {
@@ -227,17 +257,44 @@ linePlot <- function(data, x, y, palette.selection,
         })
 
         sharing <- .resolve_facet_sharing(facet.scales)
+        nrows <- .resolve_facet_layout(length(facet_levels), facet.nrow, facet.ncol)
         fig <- subplot(
-            plots, nrows = 1, shareX = sharing$shareX, shareY = sharing$shareY,
-            titleX = FALSE, titleY = FALSE, margin = subplot.margin
+            plots, nrows = nrows, shareX = sharing$shareX, shareY = sharing$shareY,
+            titleX = FALSE, titleY = FALSE, margin = subplot_margin_sides
         )
 
-        annotations <- .build_facet_annotations(facet_levels, x.title = x.title, y.title = y.title)
+        ncols <- max(1L, as.integer(ceiling(length(facet_levels) / nrows)))
+        fig <- .apply_facet_subplot_spacing(
+                    fig,
+                    spacing = subplot.margin,
+                    ncol = ncols,
+                    nrow = nrows
+                )    
+      
+        annotations <- .build_facet_annotations(
+            facet_levels, x.title = x.title, y.title = y.title,
+            nrows = nrows, fig = fig
+        )
+
+        borders <- .build_facet_panel_borders(
+            fig, length(facet_levels),
+            showline = axis.showline, mirror = axis.mirror,
+            linecolor = axis.linecolor, linewidth = axis.linewidth,
+            ncol = ncols, nrow = nrows
+        )
+
         fig <- fig |> layout(annotations = annotations)
+        if (length(borders) > 0) {
+            fig$x$layout$shapes <- c(fig$x$layout$shapes, borders)
+        }
+        
+  
+      
     } else if (!is.null(facet.by) && facet.by != "" && multi_axis) {
         # Faceting with multi-axis: create subplots where each subplot contains all traces
         facet_levels <- unique(plot_data[[facet.by]])
         sharing <- .resolve_facet_sharing(facet.scales)
+        nrows <- .resolve_facet_layout(length(facet_levels), facet.nrow, facet.ncol)
 
         plots <- list()
         first_facet <- TRUE
@@ -254,12 +311,36 @@ linePlot <- function(data, x, y, palette.selection,
         }
 
         fig <- subplot(
-            plots, nrows = 1, shareX = sharing$shareX, shareY = sharing$shareY,
-            titleX = FALSE, titleY = FALSE, margin = subplot.margin
+            plots, nrows = nrows, shareX = sharing$shareX, shareY = sharing$shareY,
+            titleX = FALSE, titleY = FALSE
+        )
+      
+        ncols <- max(1L, as.integer(ceiling(length(facet_levels) / nrows)))
+        fig <- .apply_facet_subplot_spacing(
+                    fig,
+                    spacing = subplot.margin,
+                    ncol = ncols,
+                    nrow = nrows
+                ) 
+      
+        annotations <- .build_facet_annotations(
+            facet_levels, x.title = x.title, y.title = y.title,
+            nrows = nrows, fig = fig
+        )
+      
+        borders <- .build_facet_panel_borders(
+            fig, length(facet_levels),
+            showline = axis.showline, mirror = axis.mirror,
+            linecolor = axis.linecolor, linewidth = axis.linewidth,
+            ncol = ncols, nrow = nrows
         )
 
-        annotations <- .build_facet_annotations(facet_levels, x.title = x.title, y.title = y.title)
         fig <- fig |> layout(annotations = annotations)
+        if (length(borders) > 0) {
+            fig$x$layout$shapes <- c(fig$x$layout$shapes, borders)
+        }
+      
+
     } else if (multi_axis) {
         # Initialize empty plot for multi-axis to avoid creating initial trace
         fig <- plot_ly(data = plot_data, type = "scatter")
@@ -299,7 +380,7 @@ linePlot <- function(data, x, y, palette.selection,
         title = list(
             text = title.text,
             font = list(size = title.font.size, family = title.font.family, color = title.font.color),
-            x = 0.47, xanchor = "center", y = 0.95, yanchor = "top", pad = list(t = 20)
+            x = title.x.position, xanchor = "center", y = 0.95, yanchor = "top", pad = list(t = 20)
         ),
         margin = list(t = 70),
         showlegend = TRUE,

@@ -226,6 +226,7 @@ dittoViz_scatterPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs =
             updateSelectInput(session, "color.adj.fxn", selected = .get_default(defaults, "color.adj.fxn", ""))
 
             # Points
+            updateSelectInput(session, "size.by", selected = .get_default(defaults, "size.by", ""))
             updateNumericInput(session, "size", value = .get_default(defaults, "size", 1, is.numeric))
             updateNumericInput(session, "opacity", value = .get_default(defaults, "opacity", 1, is.numeric))
             updateCheckboxInput(session, "show.others",
@@ -316,18 +317,12 @@ dittoViz_scatterPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs =
                 value = .get_default(defaults, "annotation.arrowwidth", 1.5, is.numeric)
             )
 
-            # Legend/Scale
+            # Legend
             updateCheckboxInput(session, "legend.show",
                 value = .get_default(defaults, "legend.show", TRUE, is.logical)
             )
             updateTextInput(session, "legend.color.title",
                 value = .get_default(defaults, "legend.color.title", "make")
-            )
-            updateNumericInput(session, "legend.color.size",
-                value = .get_default(defaults, "legend.color.size", 5, is.numeric)
-            )
-            updateNumericInput(session, "legend.shape.size",
-                value = .get_default(defaults, "legend.shape.size", 5, is.numeric)
             )
             updateTextInput(session, "legend.color.breaks",
                 value = .get_default(defaults, "legend.color.breaks", "")
@@ -349,6 +344,13 @@ dittoViz_scatterPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs =
             # Plotly/Extras
             updateCheckboxInput(session, "webgl", value = .get_default(defaults, "webgl", TRUE, is.logical))
             .reset_plotly_inputs(session, defaults)
+            .reset_legend_inputs(session, defaults)
+            updateNumericInput(session, "size.legend.x",
+                value = .get_default(defaults, "size.legend.x", 1.04, is.numeric)
+            )
+            updateNumericInput(session, "size.legend.y",
+                value = .get_default(defaults, "size.legend.y", 0.35, is.numeric)
+            )
             updateCheckboxInput(session, "do.ellipse",
                 value = .get_default(defaults, "do.ellipse", FALSE, is.logical)
             )
@@ -389,6 +391,7 @@ dittoViz_scatterPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs =
                 "add.trajectory.by.groups" = .na_to_null(isolate_fn(input$add.trajectory.by.groups)),
                 "color.by" = .na_to_null(isolate_fn(input$color.by)),
                 "shape.by" = .na_to_null(isolate_fn(input$shape.by)),
+                "size.by" = .na_to_null(isolate_fn(input$size.by)),
                 "split.by" = .na_to_null(isolate_fn(input$split.by)),
                 "annotate.by" = .na_to_null(isolate_fn(input$annotate.by)),
                 "x.adjustment" = .na_to_null(isolate_fn(input$x.adjustment)),
@@ -428,7 +431,8 @@ dittoViz_scatterPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs =
                     isolate_fn(input$y.by),
                     paste0(isolate_fn(input$y.by), ".y.adj"),
                     null.na.inputs$shape.by,
-                    null.na.inputs$split.by
+                    null.na.inputs$split.by,
+                    null.na.inputs$size.by
                 ))
             } else {
                 hover.data <- unique(c(null.na.inputs$hover.data, null.na.inputs$annotate.by))
@@ -442,17 +446,45 @@ dittoViz_scatterPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs =
                 panel.border = additional_theme$panel.border,
                 axis.line = additional_theme$axis.line,
                 axis.ticks = additional_theme$axis.ticks,
-                panel.spacing = unit(isolate_fn(input$subplot.margin), "lines")
+                strip.background = element_blank()
             )
+              
+            # Reflect any applied data adjustments in the axis titles so they
+            # accurately describe the values displayed (e.g. "log2(z-score(units))").
+            x_axis_label <- .adjusted_axis_label(
+                isolate_fn(input$x.by), null.na.inputs$x.adjustment, isolate_fn(input$x.adj.fxn)
+            )
+            y_axis_label <- .adjusted_axis_label(
+                isolate_fn(input$y.by), null.na.inputs$y.adjustment, isolate_fn(input$y.adj.fxn)
+            )
+
+            # Reflect any applied color data adjustments in the color.by legend title so it
+            # accurately describes the values displayed (e.g. "log2(z-score(units))"). Only
+            # the auto-generated title ("make") is rewritten so user-supplied titles are kept.
+            legend_color_title <- isolate_fn(input$legend.color.title)
+            color_adjustment_active <- !is.null(null.na.inputs$color.adjustment) ||
+                !is.null(null.na.inputs$color.adj.fxn)
+            if (identical(legend_color_title, "make") &&
+                !is.null(null.na.inputs$color.by) && color_adjustment_active) {
+                legend_color_title <- .adjusted_axis_label(
+                    null.na.inputs$color.by, null.na.inputs$color.adjustment, null.na.inputs$color.adj.fxn
+                )
+            }
 
             p <- scatterPlot(
                 data(),
                 x.by = isolate_fn(input$x.by),
                 y.by = isolate_fn(input$y.by),
+                xlab = x_axis_label,
+                ylab = y_axis_label,
                 color.by = null.na.inputs$color.by,
                 shape.by = null.na.inputs$shape.by,
                 split.by = null.na.inputs$split.by,
-                size = isolate_fn(input$size),
+                size = if (!is.null(null.na.inputs$size.by)) {
+                    null.na.inputs$size.by
+                } else {
+                    isolate_fn(input$size)
+                },
                 show.others = isolate_fn(input$show.others),
                 x.adjustment = null.na.inputs$x.adjustment,
                 y.adjustment = null.na.inputs$y.adjustment,
@@ -488,17 +520,14 @@ dittoViz_scatterPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs =
                 trajectory.arrow.size = isolate_fn(input$trajectory.arrow.size),
                 do.ellipse = isolate_fn(input$do.ellipse),
                 legend.show = isolate_fn(input$legend.show),
-                legend.color.title = isolate_fn(input$legend.color.title),
-                legend.color.size = isolate_fn(input$legend.color.size),
+                legend.color.title = legend_color_title,
                 legend.color.breaks = waiver.inputs$legend.color.breaks,
                 legend.color.breaks.labels = waiver(),
                 legend.shape.title = null.na.inputs$shape.by,
-                legend.shape.size = isolate_fn(input$legend.shape.size),
                 data.out = TRUE
             )
-
+            
             plot_data <- p$Target_data
-
             # Colour mapping for fit lines — palette_values from color.panel() is already
             # fully resolved (match → fallback → rep_len → setNames), so reuse it directly.
             color_mapping <- if (!is.null(null.na.inputs$color.by) && length(current_color_levels) > 0) {
@@ -513,6 +542,15 @@ dittoViz_scatterPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs =
                 config_list <- .add_plot_config(download.format = isolate_fn(input$download.format), include.modebar.buttons = TRUE)
             }
             fig <- do.call(config, c(list(p = p$plot), config_list))
+
+            if (!is.null(null.na.inputs$split.by) && nzchar(null.na.inputs$split.by)) {
+                fig <- .apply_facet_subplot_spacing(
+                    fig,
+                    spacing = c(isolate_fn(input$subplot.margin.x), isolate_fn(input$subplot.margin.y)),
+                    ncol = null.na.inputs$split.ncol,
+                    nrow = null.na.inputs$split.nrow
+                )
+            }
 
             # Apply single point color when color.by is not set
             if (is.null(null.na.inputs$color.by) && !is.null(fig$x$data)) {
@@ -552,6 +590,7 @@ dittoViz_scatterPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs =
                 abline.linetypes = isolate_fn(input$abline.linetypes),
                 abline.opacities = isolate_fn(input$abline.opacities)
             )
+
 
             # Apply highlight styling to specified points
             highlight_points_raw <- isolate_fn(input$highlight.points)
@@ -746,21 +785,12 @@ dittoViz_scatterPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs =
             }
 
             fig <- .apply_plotly_newshape(fig, input, isolate_fn)
-            fig <- fig |> layout(
-                annotations = annos,
-                title = list(
-                    font = list(
-                        size = isolate_fn(input$title.font.size),
-                        family = isolate_fn(input$title.font.family),
-                        color = isolate_fn(input$title.font.color)
-                    ),
-                    x = 0.5, xanchor = "center", y = 0.98, yanchor = "top"
-                )
-            )
+            fig <- fig |> layout(annotations = annos)
+            fig <- .apply_title_layout(fig, input, isolate_fn, title_y = 0.98, title_x = isolate_fn(input$axis.title.horizontal.position))
 
             # Apply axis styling to all subplot axes (handles faceting/split.by)
-            xaxis_style <- .create_axis_styles(input, axis_side = "x", isolate_fn = isolate_fn)
-            yaxis_style <- .create_axis_styles(input, axis_side = "y", isolate_fn = isolate_fn)
+            xaxis_style <- .create_axis_styles(input, axis_side = "x", isolate_fn = isolate_fn, ggplot.axis.styling = TRUE)
+            yaxis_style <- .create_axis_styles(input, axis_side = "y", isolate_fn = isolate_fn, ggplot.axis.styling =  TRUE)
 
             fig <- .apply_subplot_axis_styling(fig, xaxis_style, yaxis_style)
 
@@ -823,6 +853,31 @@ dittoViz_scatterPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs =
                 )
             }
 
+            # Custom size legend:
+            # plotly drops the size legend when point size encodes a numeric
+            # column (see plotly.R#705), so draw a manual circle legend that
+            # mirrors the plotted marker sizes when `size.by` is set.
+            fig <- .custom_legend(
+                fig,
+                data = data(),
+                size_by = null.na.inputs$size.by,
+                gap = 0.04,
+                title.size = isolate_fn(input$legend.title.size),
+                text.size = isolate_fn(input$legend.text.size),
+                start_y = isolate_fn(input$size.legend.y),
+                start_x = isolate_fn(input$size.legend.x)
+            )
+
+            # Apply uniform legend title/label font sizes
+            fig <- .apply_legend_styling(
+                fig,
+                title.size = isolate_fn(input$legend.title.size),
+                text.size = isolate_fn(input$legend.text.size)
+            )
+
+            # Make single-panel x/y axis titles draggable (matches faceted behaviour)
+            fig <- .axis_titles_as_annotations(fig)
+
             fig
         })
 
@@ -830,24 +885,30 @@ dittoViz_scatterPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs =
         output$scatterPlot <- renderPlotly({
             req(input$x.by, input$y.by, data())
 
-            fig <- generate_scatterPlot() |>
-                layout(
-                    margin = list(
-                        t = input$margin.t,
-                        b = input$margin.b,
-                        l = input$margin.l,
-                        r = input$margin.r,
-                        autoexpand = TRUE
-                    )
-                )
+            fig <- .apply_render_margins(generate_scatterPlot(), input)
             fig$x$source <- plot_source
             fig
         })
 
-        # Download handler for interactive plot
-        output$download.interactive <- .create_plot_download_handler(
-            plot_reactive = generate_scatterPlot,
-            filename_base = "scatterPlot"
+        # Download handler for source (plot + data)
+        # Capture all UI inputs for the source download
+        AllInputs <- reactive({
+            x <- reactiveValuesToList(input)
+            return(x)
+        })
+
+        plot_source_reactive <- reactive({
+            collect_source_data(
+                plot_reactive = generate_scatterPlot,
+                inputs_reactive = AllInputs()
+            )
+        })
+
+        output$download.source <- create_source_download_handler(
+            data_list = plot_source_reactive,
+            filename_base = "scatterPlot_source"
         )
+
+        return(plot_source_reactive)
     })
 }

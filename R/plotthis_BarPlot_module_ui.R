@@ -27,8 +27,7 @@
 #'   \item \code{x_sep} - Separator for multiple x columns (not yet implemented)
 #'   \item \code{group_by_sep} - Separator for multiple group_by columns (not yet implemented)
 #'   \item \code{split_by_sep} - Separator for multiple split_by columns (not yet implemented)
-#'   \item \code{flip} - Flip axes (not yet implemented)
-#'   \item \code{fill_by_x_if_no_group} - Fill bars by x values (not yet implemented)
+#'   \item \code{fill_name} - Name of the fill legend (not yet implemented)
 #'   \item \code{line_name} - Name of line (not yet implemented)
 #'   \item \code{label} - Bar labels on top (not yet implemented)
 #'   \item \code{label_nudge} - Label nudge distance (not yet implemented)
@@ -74,6 +73,8 @@
 #'   \item \code{x} - X-axis variable (UI: "X values", default: 2nd categorical variable)
 #'   \item \code{y} - Y-axis variable (UI: "Y values", default: 2nd numeric variable)
 #'   \item \code{group_by} - Grouping variable for bar fill (UI: "Group by", default: 2nd categorical variable)
+#'   \item \code{fill_by} - Variable used to fill the bars (UI: "Fill by", default: "")
+#'   \item \code{flip} - Flip/swap the x and y axes (UI: "Rotate (swap X/Y)", default: FALSE)
 #'   \item \code{split_by} - Split variable for separate plots (UI: "Split by", default: "")
 #'   \item \code{facet_by} - Faceting variable (UI: "Facet by", default: "")
 #'   \item \code{facet_scales} - Facet scale behavior (UI: "Facet scale", default: "fixed")
@@ -81,6 +82,7 @@
 #'   \item \code{facet_nrow} - Number of facet rows (UI: "Facet number of rows", default: NULL)
 #'   \item \code{facet_byrow} - Facet ordering direction (UI: "Facet by row", default: TRUE)
 #'   \item \code{palcolor} - Custom color values (UI: palette picker, derived from palette)
+#'   \item \code{palreverse} - Reverse the color palette (UI: "Reverse palette", default: FALSE)
 #'   \item \code{alpha} - Bar fill transparency (UI: "Alpha", default: 1)
 #'   \item \code{width} - Bar width (UI: "Width", default: NA)
 #'   \item \code{expand} - Axis expansion values (UI: "Expand", default: "")
@@ -171,7 +173,7 @@ plotthis_BarPlotInputsUI <- function(id, data, defaults = NULL, title = NULL, co
     selected <- list(
         "x", "y", "group_by", "fill_by",
         "facet_by", "facet_scales", "facet_ncol", "facet_nrow", "facet_byrow",
-        "split_by", "alpha", "width", "expand", "y_min", "y_max"
+        "split_by", "alpha", "width", "expand", "y_min", "y_max", "palreverse"
     )
 
     documentParameters <- get_documentation(
@@ -184,35 +186,35 @@ plotthis_BarPlotInputsUI <- function(id, data, defaults = NULL, title = NULL, co
         tipify(selectInput(ns("x.data"), "X Values",
         selected = .get_default(defaults, "x.data", char.choices[2],
             function(x) x %in% char.choices),
-        choices = char.choices
+        choices = char.choices, selectize = FALSE
         ), documentParameters$x, placement = "top", options = list(container = "body")),
         tipify(selectInput(ns("y.data"), "Y Values",
         selected = .get_default(defaults, "y.data", num.choices[2],
             function(x) x %in% num.choices),
-        choices = num.choices
+        choices = num.choices, selectize = FALSE
         ), documentParameters$y, placement = "top", options = list(container = "body")),
         tipify(selectInput(ns("group.by"), "Group By",
         selected = .get_default(defaults, "group.by", char.choices[2],
             function(x) x %in% c("", names(data))),
-        choices = c("", names(data))
+        choices = c("", names(data)), selectize = FALSE
         ), documentParameters$group_by, placement = "top", options = list(container = "body")),
         tipify(selectInput(ns("fill.by"), "Fill By",
         selected = .get_default(defaults, "fill.by", "", function(x) x == "" || x %in% names(data)),
-            choices = c("", names(data))),
+            choices = c("", names(data)), selectize = FALSE),
             documentParameters$fill_by, placement = "top", options = list(container = "body"))
     ),
 
     "Facet" = tagList(
         tipify(selectInput(ns("facet.by"), "Facet By",
         selected = .get_default(defaults, "facet.by", "", function(x) x == "" || x %in% char.choices),
-        choices = c(char.choices, "")
+        choices = c(char.choices, ""), selectize = FALSE
         ), documentParameters$facet_by, placement = "top", options = list(container = "body")),
         tipify(selectInput(ns("facet.scale"), "Facet Scale",
         selected = .get_default(
             defaults, "facet.scale", "fixed",
             function(x) x %in% c("fixed", "free", "free_x", "free_y")
         ),
-        choices = c("fixed", "free", "free_x", "free_y")
+        choices = c("fixed", "free", "free_x", "free_y"), selectize = FALSE
         ), documentParameters$facet_scales, placement = "top", options = list(container = "body")),
         tipify(numericInput(ns("facet.ncol"), "Columns",
         value = .get_default(defaults, "facet.ncol", NULL, is.numeric), min = 0, max = 20
@@ -225,8 +227,9 @@ plotthis_BarPlotInputsUI <- function(id, data, defaults = NULL, title = NULL, co
             documentParameters$facet_byrow, placement = "top", options = list(container = "body")),
         tipify(selectInput(ns("split.by"), "Split By",
         selected = .get_default(defaults, "split.by", "", function(x) x == "" || x %in% char.choices),
-        choices = c(char.choices, "")
-        ), documentParameters$split_by, placement = "top", options = list(container = "body"))
+        choices = c(char.choices, ""), selectize = FALSE
+        ), documentParameters$split_by, placement = "top", options = list(container = "body")),
+        .uniform_subplot_spacing_inputs_ui(ns, defaults)
     ),
 
     "Aesthetics" = tagList(
@@ -234,6 +237,9 @@ plotthis_BarPlotInputsUI <- function(id, data, defaults = NULL, title = NULL, co
         tipify(numericInput(ns("alpha"), "Alpha",
             value = .get_default(defaults, "alpha", 1, is.numeric), min = 0, max = 1),
             documentParameters$alpha, placement = "top", options = list(container = "body")),
+        tipify(materialSwitch(ns("palreverse"), "Reverse Palette",
+        value = .get_default(defaults, "palreverse", FALSE, is.logical), status = "success"),
+            documentParameters$palreverse, placement = "top", options = list(container = "body")),
         tipify(numericInput(ns("width"), "Width",
             value = .get_default(defaults, "width", NA, is.numeric)),
             documentParameters$width, placement = "top", options = list(container = "body")),
@@ -251,6 +257,8 @@ plotthis_BarPlotInputsUI <- function(id, data, defaults = NULL, title = NULL, co
             value = .get_default(defaults, "y.max", max.y, is.numeric)
         ), documentParameters$y_max, placement = "top", options = list(container = "body"))
     ),
+
+    "Legend" = .uniform_legend_inputs_ui(ns, defaults),
 
     "Plotly" = .uniform_plotly_inputs_ui(ns, defaults),
     "Axes" = .uniform_axes_inputs_ui(ns, defaults, include.rotate = TRUE),
@@ -273,6 +281,10 @@ plotthis_BarPlotInputsUI <- function(id, data, defaults = NULL, title = NULL, co
 #' This should be placed in the UI where the plot should be shown.
 #'
 #' @param id The ID for the Shiny module.
+#' @param resizable Logical; when \code{TRUE} (the default) the plot output
+#'   is wrapped in \code{\link[shinyjqui]{jqui_resizable}} so it can be resized
+#'   by dragging. Set to \code{FALSE} when embedding the output in a container
+#'   that already provides resizing.
 #'
 #' @return A Shiny plotlyOutput for the BarPlot
 #'
@@ -282,9 +294,11 @@ plotthis_BarPlotInputsUI <- function(id, data, defaults = NULL, title = NULL, co
 #'
 #' @export
 #' @author Jacob Martin, Jared Andrews
-plotthis_BarPlotOutputUI <- function(id) {
+plotthis_BarPlotOutputUI <- function(id, resizable = TRUE) {
     ns <- NS(id)
-    jqui_resizable(
-        plotlyOutput(ns("BarPlot"))
-    )
+    plot_output <- plotlyOutput(ns("BarPlot"))
+    if (isTRUE(resizable)) {
+        plot_output <- jqui_resizable(plot_output)
+    }
+    plot_output
 }

@@ -42,6 +42,14 @@ Defaults can be set for each input by providing a named list of values to the \c
 Nearly all parameters for \code{\link[=parallelCoordinatesPlot]{parallelCoordinatesPlot()}} can be set via these inputs,
 so see the help for that function for an exhaustive list.
 }
+\section{Plot parameters not implemented or with altered functionality}{
+
+The following \code{\link[=parallelCoordinatesPlot]{parallelCoordinatesPlot()}} parameters are not exposed as UI inputs:
+\itemize{
+\item \code{title.text} - Plot title text (plotly allows interactive editing; use \code{defaults} to set)
+}
+}
+
 \section{Plot parameters and defaults}{
 
 The following \code{\link[=parallelCoordinatesPlot]{parallelCoordinatesPlot()}} parameters can be accessed via UI inputs
@@ -52,7 +60,8 @@ and/or the \code{defaults} argument:
 \item \code{title.font.color} - Color for plot title (UI: "Title Color", default: "#000000")
 \item \code{dimensions} - Columns to use as axes (UI: "Select dimensions", multiple: TRUE)
 \item \code{color.by} - Column to color lines by (UI: "Color by", default: "")
-\item \code{color.scale} - Colorscale for lines (UI: "Color scale", default: "Viridis")
+\item \code{color.scale} - Colorscale for lines when \code{color.by} is numeric (UI: "Color Scale", default: "Viridis")
+\item \code{palette.selection} - Discrete color palette used when \code{color.by} is categorical (UI: palette picker)
 \item \code{line.opacity} - Line opacity (UI: "Line opacity", default: 0.5)
 \item \code{line.width} - Line width (UI: "Line width", default: 1)
 \item \code{show.colorbar} - Show colorbar (UI: "Show colorbar", default: TRUE)

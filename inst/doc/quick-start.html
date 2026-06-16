@@ -390,7 +390,7 @@ server call to remove controls while still initializing their values.
 This is useful when your app sets certain parameters itself.</li>
 <li><strong>Hide tabs</strong>: Use <code>hide.tabs</code> to remove
 whole groups of controls (e.g., <code>&quot;Plotly&quot;</code> or
-<code>&quot;Legend/Scale&quot;</code> in <code>scatterPlot</code>).</li>
+<code>&quot;Legend&quot;</code> in <code>scatterPlot</code>).</li>
 </ul>
 <div class="sourceCode" id="cb3"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" tabindex="-1"></a><span class="fu">dittoViz_scatterPlotServer</span>(</span>
 <span id="cb3-2"><a href="#cb3-2" tabindex="-1"></a>    <span class="st">&quot;cars&quot;</span>,</span>
@@ -423,6 +423,66 @@ filterable data table, and dataset switching for any module -
 are thin wrappers around <code>createModuleApp()</code> with sensible
 default data. You can also pass custom wrapper module functions to
 <code>createModuleApp()</code> for rapid prototyping.</p>
+</div>
+<div id="export-summary-data" class="section level2">
+<h2>Export Summary Data:</h2>
+<p>We provide <code>collect_source_data()</code> to assemble a compact
+record of the plotted data, stats, UI inputs, and the rendered plot, and
+<code>create_source_download_handler()</code> to turn that record into a
+downloadable <code>.zip</code>. <code>collect_source_data()</code>
+requires a reactive plotly plot; the output summary can be optionally
+enriched by both a stats reactive and a UI inputs reactive.
+<code>create_source_download_handler()</code> also accepts a named list
+of summaries (one per plot), which is how the Panel Builder bundles
+every plot on its canvas into a single download.</p>
+<div class="sourceCode" id="cb5"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" tabindex="-1"></a></span>
+<span id="cb5-2"><a href="#cb5-2" tabindex="-1"></a><span class="cf">if</span> (<span class="fu">interactive</span>()) {</span>
+<span id="cb5-3"><a href="#cb5-3" tabindex="-1"></a>    <span class="fu">library</span>(shiny)</span>
+<span id="cb5-4"><a href="#cb5-4" tabindex="-1"></a>    <span class="fu">library</span>(plotly)</span>
+<span id="cb5-5"><a href="#cb5-5" tabindex="-1"></a></span>
+<span id="cb5-6"><a href="#cb5-6" tabindex="-1"></a>    ui <span class="ot">&lt;-</span> <span class="fu">fluidPage</span>(</span>
+<span id="cb5-7"><a href="#cb5-7" tabindex="-1"></a>        <span class="fu">plotlyOutput</span>(<span class="st">&quot;plot&quot;</span>),</span>
+<span id="cb5-8"><a href="#cb5-8" tabindex="-1"></a>        <span class="fu">downloadButton</span>(<span class="st">&quot;download_summary&quot;</span>, <span class="st">&quot;Download Summary&quot;</span>)</span>
+<span id="cb5-9"><a href="#cb5-9" tabindex="-1"></a>    )</span>
+<span id="cb5-10"><a href="#cb5-10" tabindex="-1"></a></span>
+<span id="cb5-11"><a href="#cb5-11" tabindex="-1"></a>    server <span class="ot">&lt;-</span> <span class="cf">function</span>(input, output, session) {</span>
+<span id="cb5-12"><a href="#cb5-12" tabindex="-1"></a>        <span class="co"># A reactive plotly plot</span></span>
+<span id="cb5-13"><a href="#cb5-13" tabindex="-1"></a>        plot_reactive <span class="ot">&lt;-</span> <span class="fu">reactive</span>({</span>
+<span id="cb5-14"><a href="#cb5-14" tabindex="-1"></a>            <span class="fu">plot_ly</span>(mtcars, <span class="at">x =</span> <span class="sc">~</span>wt, <span class="at">y =</span> <span class="sc">~</span>mpg, <span class="at">type =</span> <span class="st">&quot;scatter&quot;</span>, <span class="at">mode =</span> <span class="st">&quot;markers&quot;</span>)</span>
+<span id="cb5-15"><a href="#cb5-15" tabindex="-1"></a>        })</span>
+<span id="cb5-16"><a href="#cb5-16" tabindex="-1"></a></span>
+<span id="cb5-17"><a href="#cb5-17" tabindex="-1"></a>        <span class="co"># Optional: a reactive returning a stats data.frame</span></span>
+<span id="cb5-18"><a href="#cb5-18" tabindex="-1"></a>        stats_reactive <span class="ot">&lt;-</span> <span class="fu">reactive</span>({</span>
+<span id="cb5-19"><a href="#cb5-19" tabindex="-1"></a>            <span class="fu">data.frame</span>(</span>
+<span id="cb5-20"><a href="#cb5-20" tabindex="-1"></a>                <span class="at">metric =</span> <span class="fu">c</span>(<span class="st">&quot;mean_mpg&quot;</span>, <span class="st">&quot;sd_mpg&quot;</span>),</span>
+<span id="cb5-21"><a href="#cb5-21" tabindex="-1"></a>                <span class="at">value  =</span> <span class="fu">c</span>(<span class="fu">mean</span>(mtcars<span class="sc">$</span>mpg), <span class="fu">sd</span>(mtcars<span class="sc">$</span>mpg))</span>
+<span id="cb5-22"><a href="#cb5-22" tabindex="-1"></a>            )</span>
+<span id="cb5-23"><a href="#cb5-23" tabindex="-1"></a>        })</span>
+<span id="cb5-24"><a href="#cb5-24" tabindex="-1"></a></span>
+<span id="cb5-25"><a href="#cb5-25" tabindex="-1"></a>        <span class="co"># Optional: capture all UI inputs as a named list</span></span>
+<span id="cb5-26"><a href="#cb5-26" tabindex="-1"></a>        AllInputs <span class="ot">&lt;-</span> <span class="fu">reactive</span>({</span>
+<span id="cb5-27"><a href="#cb5-27" tabindex="-1"></a>            <span class="fu">reactiveValuesToList</span>(input)</span>
+<span id="cb5-28"><a href="#cb5-28" tabindex="-1"></a>        })</span>
+<span id="cb5-29"><a href="#cb5-29" tabindex="-1"></a></span>
+<span id="cb5-30"><a href="#cb5-30" tabindex="-1"></a>        output<span class="sc">$</span>plot <span class="ot">&lt;-</span> <span class="fu">renderPlotly</span>(<span class="fu">plot_reactive</span>())</span>
+<span id="cb5-31"><a href="#cb5-31" tabindex="-1"></a></span>
+<span id="cb5-32"><a href="#cb5-32" tabindex="-1"></a>        <span class="co"># Assemble the summary, then wire up the download handler.</span></span>
+<span id="cb5-33"><a href="#cb5-33" tabindex="-1"></a>        plot_summary_reactive <span class="ot">&lt;-</span> <span class="fu">reactive</span>({</span>
+<span id="cb5-34"><a href="#cb5-34" tabindex="-1"></a>            <span class="fu">collect_source_data</span>(</span>
+<span id="cb5-35"><a href="#cb5-35" tabindex="-1"></a>                <span class="at">plot_reactive   =</span> plot_reactive,</span>
+<span id="cb5-36"><a href="#cb5-36" tabindex="-1"></a>                <span class="at">stats_reactive  =</span> stats_reactive,</span>
+<span id="cb5-37"><a href="#cb5-37" tabindex="-1"></a>                <span class="at">inputs_reactive =</span> <span class="fu">AllInputs</span>()</span>
+<span id="cb5-38"><a href="#cb5-38" tabindex="-1"></a>            )</span>
+<span id="cb5-39"><a href="#cb5-39" tabindex="-1"></a>        })</span>
+<span id="cb5-40"><a href="#cb5-40" tabindex="-1"></a></span>
+<span id="cb5-41"><a href="#cb5-41" tabindex="-1"></a>        output<span class="sc">$</span>download_summary <span class="ot">&lt;-</span> <span class="fu">create_source_download_handler</span>(</span>
+<span id="cb5-42"><a href="#cb5-42" tabindex="-1"></a>            <span class="at">data_list     =</span> plot_summary_reactive,</span>
+<span id="cb5-43"><a href="#cb5-43" tabindex="-1"></a>            <span class="at">filename_base =</span> <span class="st">&quot;my_plot_summary&quot;</span></span>
+<span id="cb5-44"><a href="#cb5-44" tabindex="-1"></a>        )</span>
+<span id="cb5-45"><a href="#cb5-45" tabindex="-1"></a>    }</span>
+<span id="cb5-46"><a href="#cb5-46" tabindex="-1"></a></span>
+<span id="cb5-47"><a href="#cb5-47" tabindex="-1"></a>    <span class="fu">shinyApp</span>(ui, server)</span>
+<span id="cb5-48"><a href="#cb5-48" tabindex="-1"></a>}</span></code></pre></div>
 </div>
 <div id="which-plot-parameters-are-exposed" class="section level2">
 <h2>Which plot parameters are exposed?</h2>

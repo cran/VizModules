@@ -14,6 +14,15 @@
 #' Nearly all parameters for [VizModules::piePlot()] can be set via these inputs, so see the help
 #' for that function for an exhaustive list.
 #'
+#' @section Plot parameters not implemented or with altered functionality:
+#' The following [VizModules::piePlot()] parameters are not exposed as UI inputs:
+#' \itemize{
+#'   \item \code{palette} - Color palette name; use \code{colors} via the color picker UI instead
+#'   \item \code{legend.x} - Legend horizontal position offset (use \code{defaults} to set)
+#'   \item \code{legend.y} - Legend vertical position offset (use \code{defaults} to set)
+#'   \item \code{title.text} - Plot title text (plotly allows interactive editing; use \code{defaults} to set)
+#' }
+#'
 #' @section Plot parameters and defaults:
 #' The following [VizModules::piePlot()] parameters can be accessed via UI inputs and/or the \code{defaults} argument:
 #' \itemize{
@@ -99,7 +108,7 @@ piePlotInputsUI <- function(id, data, defaults = NULL, title = NULL, columns = 2
                         defaults, "labels", cat.choices[2],
                         function(x) x %in% cat.choices
                     ),
-                    choices = cat.choices
+                    choices = cat.choices, selectize = FALSE
                 ),
                 documentParameters$labels,
                 placement = "top", options = list(container = "body")
@@ -110,7 +119,7 @@ piePlotInputsUI <- function(id, data, defaults = NULL, title = NULL, columns = 2
                         defaults, "values", num.choices[2],
                         function(x) x %in% num.choices
                     ),
-                    choices = num.choices
+                    choices = num.choices, selectize = FALSE
                 ),
                 documentParameters$values,
                 placement = "top", options = list(container = "body")
@@ -120,20 +129,15 @@ piePlotInputsUI <- function(id, data, defaults = NULL, title = NULL, columns = 2
             ), documentParameters$sort, placement = "top", options = list(container = "body")),
             tipify(selectInput(ns("direction"), "Slice Direction",
                 choices = c("Counterclockwise" = "counterclockwise", "Clockwise" = "clockwise"),
-                selected = .get_default(defaults, "direction", "counterclockwise")
+                selected = .get_default(defaults, "direction", "counterclockwise"), selectize = FALSE
             ), documentParameters$direction, placement = "top", options = list(container = "body")),
             tipify(sliderInput(ns("rotation"), "Start Angle (Degrees)",
                 min = 0, max = 360,
                 value = .get_default(defaults, "rotation", 0),
                 step = 5
-            ), documentParameters$rotation, placement = "top", options = list(container = "body")),
-            tipify(sliderInput(ns("hole"), "Center Hole Size",
-                min = 0, max = 0.9,
-                value = .get_default(defaults, "hole", 0),
-                step = 0.01
-            ), documentParameters$hole, placement = "top", options = list(container = "body"))
+            ), documentParameters$rotation, placement = "top", options = list(container = "body"))
         ),
-        "Colors" = tagList(
+        "Aesthetics" = tagList(
             uiOutput(ns("color.picker")),
             tipify(colourInput(ns("slice.line.color"), "Slice Border Color",
                 value = .get_default(defaults, "slice.line.color", "#FFFFFF")
@@ -142,21 +146,26 @@ piePlotInputsUI <- function(id, data, defaults = NULL, title = NULL, columns = 2
                 value = .get_default(defaults, "slice.line.width", 0, is.numeric),
                 min = 0,
                 step = 0.5
-            ), documentParameters$slice.line.width, placement = "top", options = list(container = "body"))
+            ), documentParameters$slice.line.width, placement = "top", options = list(container = "body")),
+            tipify(sliderInput(ns("hole"), "Center Hole Size",
+                min = 0, max = 0.9,
+                value = .get_default(defaults, "hole", 0),
+                step = 0.01
+            ), documentParameters$hole, placement = "top", options = list(container = "body"))
         ),
-        "Labels & Text" = tagList(
+        "Labels" = tagList(
             tipify(selectInput(ns("textinfo"), "Slice Label",
                 selected = .get_default(defaults, "textinfo", c("label", "value", "percent")),
                 choices = c("label", "value", "percent", "none"),
-                multiple = TRUE
+                multiple = TRUE, selectize = TRUE
             ), documentParameters$textinfo, placement = "top", options = list(container = "body")),
             tipify(selectInput(ns("textposition"), "Text Position",
                 choices = c("Auto" = "auto", "Inside" = "inside", "Outside" = "outside", "Hide text" = "none"),
-                selected = .get_default(defaults, "textposition", "auto")
+                selected = .get_default(defaults, "textposition", "auto"), selectize = FALSE
             ), documentParameters$textposition, placement = "top", options = list(container = "body")),
             tipify(selectInput(ns("insidetextorientation"), "Inside Text Orientation",
                 choices = c("auto", "horizontal", "radial", "tangential"),
-                selected = .get_default(defaults, "insidetextorientation", "auto")
+                selected = .get_default(defaults, "insidetextorientation", "auto"), selectize = FALSE
             ), documentParameters$insidetextorientation, placement = "top", options = list(container = "body")),
             tipify(numericInput(ns("text.font.size"), "Slice Text Size",
                 value = .get_default(defaults, "text.font.size", 12, is.numeric),
@@ -168,7 +177,7 @@ piePlotInputsUI <- function(id, data, defaults = NULL, title = NULL, columns = 2
                 selected = .get_default(
                     defaults, "text.font.family", "Arial",
                     function(x) x %in% font.choices
-                )
+                ), selectize = FALSE
             ), documentParameters$text.font.family, placement = "top", options = list(container = "body")),
             tipify(colourInput(ns("text.font.color"), "Slice Text Color",
                 value = .get_default(defaults, "text.font.color", "#000000")
@@ -189,7 +198,7 @@ piePlotInputsUI <- function(id, data, defaults = NULL, title = NULL, columns = 2
                 selected = .get_default(
                     defaults, "title.font.family", "Arial",
                     function(x) x %in% font.choices
-                )
+                ), selectize = FALSE
             ), documentParameters$title.font.family, placement = "top", options = list(container = "body")),
             tipify(colourInput(ns("title.font.color"), "Title Color",
                 value = .get_default(defaults, "title.font.color", "#000000")
@@ -199,14 +208,14 @@ piePlotInputsUI <- function(id, data, defaults = NULL, title = NULL, columns = 2
             ), documentParameters$show.legend, placement = "top", options = list(container = "body")),
             tipify(selectInput(ns("legend.orientation"), "Legend Orientation",
                 choices = c("Horizontal" = "h", "Vertical" = "v"),
-                selected = .get_default(defaults, "legend.orientation", "h")
+                selected = .get_default(defaults, "legend.orientation", "h"), selectize = FALSE
             ), documentParameters$legend.orientation, placement = "top", options = list(container = "body")),
             tipify(selectInput(ns("legend.font.family"), "Legend Font",
                 choices = font.choices,
                 selected = .get_default(
                     defaults, "legend.font.family", "Arial",
                     function(x) x %in% font.choices
-                )
+                ), selectize = FALSE
             ), documentParameters$legend.font.family, placement = "top", options = list(container = "body")),
             tipify(numericInput(ns("legend.font.size"), "Legend Font Size",
                 value = .get_default(defaults, "legend.font.size", 12, is.numeric),
@@ -235,6 +244,10 @@ piePlotInputsUI <- function(id, data, defaults = NULL, title = NULL, columns = 2
 #' This should be placed in the UI where the plot should be shown.
 #'
 #' @param id The ID for the Shiny module.
+#' @param resizable Logical; when \code{TRUE} (the default) the plot output
+#'   is wrapped in \code{\link[shinyjqui]{jqui_resizable}} so it can be resized
+#'   by dragging. Set to \code{FALSE} when embedding the output in a container
+#'   that already provides resizing.
 #'
 #' @return A Shiny plotlyOutput for the piePlot
 #'
@@ -244,9 +257,11 @@ piePlotInputsUI <- function(id, data, defaults = NULL, title = NULL, columns = 2
 #'
 #' @export
 #' @author Jacob Martin, Jared Andrews
-piePlotOutputUI <- function(id) {
+piePlotOutputUI <- function(id, resizable = TRUE) {
     ns <- NS(id)
-    jqui_resizable(
-        plotlyOutput(ns("piePlot"))
-    )
+    plot_output <- plotlyOutput(ns("piePlot"))
+    if (isTRUE(resizable)) {
+        plot_output <- jqui_resizable(plot_output)
+    }
+    plot_output
 }

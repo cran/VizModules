@@ -14,6 +14,12 @@
 #' Nearly all parameters for [VizModules::parallelCoordinatesPlot()] can be set via these inputs,
 #' so see the help for that function for an exhaustive list.
 #'
+#' @section Plot parameters not implemented or with altered functionality:
+#' The following [VizModules::parallelCoordinatesPlot()] parameters are not exposed as UI inputs:
+#' \itemize{
+#'   \item \code{title.text} - Plot title text (plotly allows interactive editing; use \code{defaults} to set)
+#' }
+#'
 #' @section Plot parameters and defaults:
 #' The following [VizModules::parallelCoordinatesPlot()] parameters can be accessed via UI inputs
 #' and/or the \code{defaults} argument:
@@ -23,7 +29,8 @@
 #'   \item \code{title.font.color} - Color for plot title (UI: "Title Color", default: "#000000")
 #'   \item \code{dimensions} - Columns to use as axes (UI: "Select dimensions", multiple: TRUE)
 #'   \item \code{color.by} - Column to color lines by (UI: "Color by", default: "")
-#'   \item \code{color.scale} - Colorscale for lines (UI: "Color scale", default: "Viridis")
+#'   \item \code{color.scale} - Colorscale for lines when \code{color.by} is numeric (UI: "Color Scale", default: "Viridis")
+#'   \item \code{palette.selection} - Discrete color palette used when \code{color.by} is categorical (UI: palette picker)
 #'   \item \code{line.opacity} - Line opacity (UI: "Line opacity", default: 0.5)
 #'   \item \code{line.width} - Line width (UI: "Line width", default: 1)
 #'   \item \code{show.colorbar} - Show colorbar (UI: "Show colorbar", default: TRUE)
@@ -83,7 +90,7 @@ parallelCoordinatesPlotInputsUI <- function(id, data, defaults = NULL, title = N
     }
 
     selected <- list(
-        "dimensions", "color.by", "color.scale",
+        "dimensions", "color.by", "color.scale", "palette.selection",
         "line.opacity", "line.width", "show.colorbar",
         "label.font.size", "label.font.color", "label.font.family",
         "tick.font.size", "tick.font.color", "tick.font.family",
@@ -100,11 +107,11 @@ parallelCoordinatesPlotInputsUI <- function(id, data, defaults = NULL, title = N
             tipify(selectInput(ns("dimensions"), "Dimensions",
                 choices = all.choices,
                 selected = default_dims,
-                multiple = TRUE
+                multiple = TRUE, selectize = TRUE
             ), documentParameters$dimensions, placement = "top", options = list(container = "body")),
             tipify(selectInput(ns("color.by"), "Color By",
                 choices = all.with.empty,
-                selected = .get_default(defaults, "color.by", "")
+                selected = .get_default(defaults, "color.by", ""), selectize = FALSE
             ), documentParameters$color.by, placement = "top", options = list(container = "body"))
         ),
         "Aesthetics" = tagList(
@@ -113,8 +120,9 @@ parallelCoordinatesPlotInputsUI <- function(id, data, defaults = NULL, title = N
                 selected = .get_default(
                     defaults, "color.scale", "Viridis",
                     function(x) x %in% colorscale.choices
-                )
+                ), selectize = FALSE
             ), documentParameters$color.scale, placement = "top", options = list(container = "body")),
+            uiOutput(ns("palette.selection")),
             tipify(sliderInput(ns("line.opacity"), "Line Opacity",
                 min = 0, max = 1,
                 value = .get_default(defaults, "line.opacity", 0.5, is.numeric),
@@ -127,7 +135,10 @@ parallelCoordinatesPlotInputsUI <- function(id, data, defaults = NULL, title = N
             ), documentParameters$line.width, placement = "top", options = list(container = "body")),
             tipify(checkboxInput(ns("show.colorbar"), "Show Colorbar",
                 value = .get_default(defaults, "show.colorbar", TRUE, is.logical)
-            ), documentParameters$show.colorbar, placement = "top", options = list(container = "body"))
+            ), documentParameters$show.colorbar, placement = "top", options = list(container = "body")),
+            tipify(colourInput(ns("bgcolor"), "Background Color",
+                value = .get_default(defaults, "bgcolor", "#FFFFFF")
+            ), documentParameters$bgcolor, placement = "top", options = list(container = "body"))
         ),
         "Labels" = tagList(
             tipify(numericInput(ns("label.font.size"), "Label Size",
@@ -142,7 +153,7 @@ parallelCoordinatesPlotInputsUI <- function(id, data, defaults = NULL, title = N
                 selected = .get_default(
                     defaults, "label.font.family", "Arial",
                     function(x) x %in% font.choices
-                )
+                ), selectize = FALSE
             ), documentParameters$label.font.family, placement = "top", options = list(container = "body")),
             tipify(numericInput(ns("tick.font.size"), "Tick Font Size",
                 value = .get_default(defaults, "tick.font.size", 10, is.numeric),
@@ -156,10 +167,10 @@ parallelCoordinatesPlotInputsUI <- function(id, data, defaults = NULL, title = N
                 selected = .get_default(
                     defaults, "tick.font.family", "Arial",
                     function(x) x %in% font.choices
-                )
+                ), selectize = FALSE
             ), documentParameters$tick.font.family, placement = "top", options = list(container = "body"))
         ),
-        "Title & Background" = tagList(
+        "Title" = tagList(
             tipify(numericInput(ns("title.font.size"), "Title Size",
                 value = .get_default(defaults, "title.font.size", 26, is.numeric),
                 min = 1, step = 1
@@ -169,14 +180,11 @@ parallelCoordinatesPlotInputsUI <- function(id, data, defaults = NULL, title = N
                 selected = .get_default(
                     defaults, "title.font.family", "Arial",
                     function(x) x %in% font.choices
-                )
+                ), selectize = FALSE
             ), documentParameters$title.font.family, placement = "top", options = list(container = "body")),
             tipify(colourInput(ns("title.font.color"), "Title Color",
                 value = .get_default(defaults, "title.font.color", "black")
-            ), documentParameters$title.font.color, placement = "top", options = list(container = "body")),
-            tipify(colourInput(ns("bgcolor"), "Background Color",
-                value = .get_default(defaults, "bgcolor", "#FFFFFF")
-            ), documentParameters$bgcolor, placement = "top", options = list(container = "body"))
+            ), documentParameters$title.font.color, placement = "top", options = list(container = "body"))
         ),
         "Plotly" = .uniform_plotly_inputs_ui(ns, defaults)
     )
@@ -196,6 +204,10 @@ parallelCoordinatesPlotInputsUI <- function(id, data, defaults = NULL, title = N
 #' This should be placed in the UI where the plot should be shown.
 #'
 #' @param id The ID for the Shiny module.
+#' @param resizable Logical; when \code{TRUE} (the default) the plot output
+#'   is wrapped in \code{\link[shinyjqui]{jqui_resizable}} so it can be resized
+#'   by dragging. Set to \code{FALSE} when embedding the output in a container
+#'   that already provides resizing.
 #'
 #' @return A Shiny plotlyOutput for the parallelCoordinatesPlot
 #'
@@ -205,9 +217,11 @@ parallelCoordinatesPlotInputsUI <- function(id, data, defaults = NULL, title = N
 #'
 #' @export
 #' @author Jacob Martin, Jared Andrews
-parallelCoordinatesPlotOutputUI <- function(id) {
+parallelCoordinatesPlotOutputUI <- function(id, resizable = TRUE) {
     ns <- NS(id)
-    jqui_resizable(
-        plotlyOutput(ns("parallelCoordinatesPlot"))
-    )
+    plot_output <- plotlyOutput(ns("parallelCoordinatesPlot"))
+    if (isTRUE(resizable)) {
+        plot_output <- jqui_resizable(plot_output)
+    }
+    plot_output
 }

@@ -38,12 +38,12 @@ The inputs will automatically be organized into a grid layout via the \code{orga
 with \code{columns} controlling the number of columns in the grid.
 
 Defaults can be set for each input by providing a named list of values to the \code{defaults} argument.
-Nearly all parameters for \code{\link[plotthis:barplot]{plotthis::SplitBarPlot()}} can be set via these inputs, so see the help
+Nearly all parameters for \code{\link[plotthis:SplitBarPlot]{plotthis::SplitBarPlot()}} can be set via these inputs, so see the help
 for that function for an exhaustive list.
 }
 \section{Plot parameters not implemented or with altered functionality}{
 
-The following \code{\link[plotthis:barplot]{plotthis::SplitBarPlot()}} parameters are not available via UI inputs:
+The following \code{\link[plotthis:SplitBarPlot]{plotthis::SplitBarPlot()}} parameters are not available via UI inputs:
 \itemize{
 \item \code{xlab} - X-axis label (plotly allows interactive editing)
 \item \code{ylab} - Y-axis label (plotly allows interactive editing)
@@ -52,13 +52,13 @@ The following \code{\link[plotthis:barplot]{plotthis::SplitBarPlot()}} parameter
 \item \code{aspect.ratio} - Aspect ratio control (handled by plotly layout)
 \item \code{legend.position} - Legend positioning (plotly allows interactive repositioning)
 \item \code{y_sep} - Separator for y columns (not applicable in UI context)
-\item \code{flip} - Flip axes (not implemented in current UI)
 \item \code{split_by_sep} - Separator for split columns (not applicable in UI context)
 \item \code{order_y} - Y-axis ordering rules (handled by default logic)
 \item \code{lineheight} - Text line height (not applicable in plotly)
 \item \code{max_charwidth} - Maximum character width (not applicable in plotly)
 \item \code{fill_by_sep} - Separator for fill columns (not applicable in UI context)
 \item \code{fill_name} - Fill legend name (handled by plotly)
+\item \code{direction_name} - Direction legend name (not implemented)
 \item \code{direction_pos_name} - Positive direction name (not implemented)
 \item \code{direction_neg_name} - Negative direction name (not implemented)
 \item \code{theme} - ggplot2 theme (not applicable in plotly)
@@ -75,17 +75,18 @@ The following \code{\link[plotthis:barplot]{plotthis::SplitBarPlot()}} parameter
 \item \code{axis_titles} - Only applies if \code{split_by} is used
 \item \code{guides} - Only applies if \code{split_by} is used
 \item \code{design} - Only applies if \code{split_by} is used
-\item \code{legend_direction} - Managed position of legend however this can be handled via plotly
+\item \code{legend.direction} - Managed position of legend however this can be handled via plotly
 }
 }
 
 \section{Plot parameters and defaults}{
 
-The following \code{\link[plotthis:barplot]{plotthis::SplitBarPlot()}} parameters can be accessed via UI inputs and/or the \code{defaults} argument:
+The following \code{\link[plotthis:SplitBarPlot]{plotthis::SplitBarPlot()}} parameters can be accessed via UI inputs and/or the \code{defaults} argument:
 \itemize{
 \item \code{x} - X-axis variable (UI: "X values", defaults key: \code{x.data}, default: 2nd numeric variable)
 \item \code{y} - Y-axis grouping variable (UI: "Y values", defaults key: \code{y.data}, default: 2nd categorical variable)
 \item \code{fill_by} - Fill color variable (UI: "Fill by", default: 2nd variable)
+\item \code{flip} - Flip/swap the x and y axes (UI: "Rotate (swap X/Y)", default: FALSE)
 \item \code{alpha_by} - Variable for alpha transparency (UI: "Alpha by", default: "")
 \item \code{alpha_reverse} - Reverse alpha order (UI: "Alpha reverse", default: FALSE)
 \item \code{alpha_name} - Alpha legend name (UI: "Alpha name", default: "")
@@ -99,6 +100,7 @@ The following \code{\link[plotthis:barplot]{plotthis::SplitBarPlot()}} parameter
 \item \code{x_min} - Minimum X-axis value (UI: "X-axis min", default: calculated from data)
 \item \code{x_max} - Maximum X-axis value (UI: "X-axis max", default: calculated from data)
 \item \code{palcolor} - Custom color values (UI: palette picker, derived from palette)
+\item \code{palreverse} - Reverse the color palette (UI: "Reverse palette", default: FALSE)
 }
 }
 
@@ -156,7 +158,7 @@ mtcars$cyl <- as.factor(mtcars$cyl)
 plotthis_SplitBarPlotInputsUI("splitBarPlot", mtcars)
 }
 \seealso{
-\code{\link[plotthis:barplot]{plotthis::SplitBarPlot()}}, \code{\link[=organize_inputs]{organize_inputs()}},
+\code{\link[plotthis:SplitBarPlot]{plotthis::SplitBarPlot()}}, \code{\link[=organize_inputs]{organize_inputs()}},
 \code{\link[=plotthis_SplitBarPlotOutputUI]{plotthis_SplitBarPlotOutputUI()}}, \code{\link[=plotthis_SplitBarPlotServer]{plotthis_SplitBarPlotServer()}}, \code{\link[=plotthis_SplitBarPlotApp]{plotthis_SplitBarPlotApp()}}
 }
 \author{

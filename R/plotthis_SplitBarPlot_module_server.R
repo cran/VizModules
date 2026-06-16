@@ -121,7 +121,7 @@ plotthis_SplitBarPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs 
                     ns("gradient.palette"),
                     "Color palette",
                     choices = palette_choices,
-                    selected = default_gradient_palette
+                    selected = default_gradient_palette, selectize = FALSE
                 )
             } else {
                 # Categorical fill_by: show multi-color picker
@@ -236,6 +236,7 @@ plotthis_SplitBarPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs 
             updateSelectInput(session, "split.by",
                 selected = .get_default(defaults, "split.by", "", function(x) x == "" || x %in% char.choices)
             )
+
             # Aesthetics
             updateSelectInput(session, "theme", selected = .get_default(defaults, "theme", "theme_this"))
             updateSelectInput(session, "alpha.by",
@@ -245,6 +246,7 @@ plotthis_SplitBarPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs 
                 value = .get_default(defaults, "alpha.reverse", FALSE, is.logical)
             )
             updateTextInput(session, "alpha.name", value = .get_default(defaults, "alpha.name", ""))
+            updateMaterialSwitch(session, "palreverse", value = .get_default(defaults, "palreverse", FALSE, is.logical))
             updateNumericInput(session, "bar.height", value = .get_default(defaults, "bar.height", 0.9, is.numeric))
             updateNumericInput(session, "line.height", value = .get_default(defaults, "line.height", 0.5, is.numeric))
             updateMaterialSwitch(session, "label.on.y.axis",
@@ -256,6 +258,7 @@ plotthis_SplitBarPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs 
             updateSliderInput(session, "text.position",
                 value = .get_default(defaults, "text.position", 0, is.numeric)
             )
+
             # Axes
             updateMaterialSwitch(session, "rotate", value = .get_default(defaults, "rotate", FALSE, is.logical))
             updateNumericInput(session, "x.max", value = .get_default(defaults, "x.max", max.x, is.numeric))
@@ -269,6 +272,7 @@ plotthis_SplitBarPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs 
 
             .reset_axes_inputs(session, defaults)
             .reset_plotly_inputs(session, defaults)
+            .reset_legend_inputs(session, defaults)
             .reset_lines_inputs(session, defaults = defaults)
         })
 
@@ -352,7 +356,8 @@ plotthis_SplitBarPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs 
 
 
             theme_args <- .create_ggplot_axis_style(input, isolate_fn = isolate_fn)
-            theme_args$panel.spacing <- unit(isolate_fn(input$subplot.margin), "npc")
+            theme_args$panel.spacing.x <- unit(isolate_fn(input$subplot.margin.x), "pt")
+            theme_args$panel.spacing.y <- unit(isolate_fn(input$subplot.margin.y), "pt")
 
             # bar Plot
             p <- SplitBarPlot(
@@ -368,6 +373,7 @@ plotthis_SplitBarPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs 
                 facet_byrow = isolate_fn(input$facet.by.row),
                 palcolor = palcolor_arg,
                 palette = palette_arg,
+                palreverse = isolate_fn(input$palreverse),
                 x_min = isolate_fn(input$x.min),
                 x_max = isolate_fn(input$x.max),
                 theme = "theme_this",
@@ -387,7 +393,7 @@ plotthis_SplitBarPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs 
             # plotthis::SplitBarPlot() adds a non-customizable geom_text layer for
             # category labels at x=0 that cannot be controlled through its parameters.
 
-
+            
             if (!isolate_fn(input$rotate)) {
                 p$layers <- p$layers[!vapply(p$layers, function(l) inherits(l$geom, "GeomText"), logical(1))]
 
@@ -446,17 +452,16 @@ plotthis_SplitBarPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs 
                         theme(axis.text.y = element_blank(), axis.ticks.y = element_blank())
                 }
             }
-            fig <- ggplotly(p) |>
-                layout(
-                    title = list(
-                        font = list(
-                            size = isolate_fn(input$title.font.size),
-                            family = isolate_fn(input$title.font.family),
-                            color = isolate_fn(input$title.font.color)
-                        ),
-                        x = 0.5, xanchor = "center", y = 0.98, yanchor = "top"
-                    )
+            fig <- ggplotly(p)
+            if (!is.null(facet.by) && nzchar(facet.by)) {
+                fig <- .apply_facet_subplot_spacing(
+                    fig,
+                    spacing = c(isolate_fn(input$subplot.margin.x), isolate_fn(input$subplot.margin.y)),
+                    ncol = facet.ncol,
+                    nrow = facet.nrow
                 )
+            }
+            fig <- .apply_title_layout(fig, input, isolate_fn, title_y = 0.98, title_x = isolate_fn(input$axis.title.horizontal.position))
 
             # Apply axis styling to all subplot axes (handles faceting/split_by)
             xaxis_style <- .create_axis_styles(input, axis_side = "x", isolate_fn = isolate_fn)
@@ -493,6 +498,15 @@ plotthis_SplitBarPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs 
             fig <- do.call(config, c(list(p = fig), config_list))
             fig <- .apply_plotly_newshape(fig, input, isolate_fn)
 
+            # Apply uniform legend title/label font sizes
+            fig <- .apply_legend_styling(
+                fig,
+                title.size = isolate_fn(input$legend.title.size),
+                text.size = isolate_fn(input$legend.text.size)
+            )
+
+            # Make single-panel x/y axis titles draggable (matches faceted behaviour)
+            fig <- .axis_titles_as_annotations(fig)
             return(fig)
         })
 
@@ -500,24 +514,30 @@ plotthis_SplitBarPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs 
         output$SplitBarPlot <- renderPlotly({
             req(input$x.data, input$y.data)
 
-            fig <- generate_SplitBarPlot() |>
-                layout(
-                    margin = list(
-                        t = input$margin.t,
-                        b = input$margin.b,
-                        l = input$margin.l,
-                        r = input$margin.r,
-                        autoexpand = TRUE
-                    )
-                )
+            fig <- .apply_render_margins(generate_SplitBarPlot(), input)
 
             return(fig)
         })
 
-        # Download handler for interactive plot
-        output$download.interactive <- .create_plot_download_handler(
-            plot_reactive = generate_SplitBarPlot,
-            filename_base = "SplitBarPlot"
+        # Download handler for source (plot + data)
+        # Capture all UI inputs for the source download
+        AllInputs <- reactive({
+            x <- reactiveValuesToList(input)
+            return(x)
+        })
+
+        plot_source_reactive <- reactive({
+            collect_source_data(
+                plot_reactive = generate_SplitBarPlot,
+                inputs_reactive = AllInputs()
+            )
+        })
+
+        output$download.source <- create_source_download_handler(
+            data_list = plot_source_reactive,
+            filename_base = "SplitBarPlot_source"
         )
+
+        return(plot_source_reactive)
     })
 }

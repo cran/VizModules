@@ -15,6 +15,15 @@
 #' Nearly all parameters for [VizModules::radarPlot()] can be set via these inputs, so see the help
 #' for that function for an exhaustive list.
 #'
+#' @section Plot parameters not implemented or with altered functionality:
+#' The following [VizModules::radarPlot()] parameters are not exposed as UI inputs:
+#' \itemize{
+#'   \item \code{palette} - Color palette name; use \code{colors} via the color picker UI instead
+#'   \item \code{legend.x} - Legend horizontal position offset (use \code{defaults} to set)
+#'   \item \code{legend.y} - Legend vertical position offset (use \code{defaults} to set)
+#'   \item \code{title.text} - Plot title text (plotly allows interactive editing; use \code{defaults} to set)
+#' }
+#'
 #' @section Plot parameters and defaults:
 #' The following [VizModules::radarPlot()] parameters can be accessed via UI inputs
 #' and/or the \code{defaults} argument:
@@ -110,27 +119,27 @@ radarPlotInputsUI <- function(id, data, defaults = NULL, title = NULL, columns =
                     defaults, "theta", cat.choices[2],
                     function(x) x %in% all.choices
                 ),
-                choices = all.choices
+                choices = all.choices, selectize = FALSE
             ), documentParameters$theta, placement = "top", options = list(container = "body")),
             tipify(selectInput(ns("r"), "Values (r)",
                 selected = .get_default(
                     defaults, "r", num.choices[2],
                     function(x) x %in% num.choices
                 ),
-                choices = num.choices
+                choices = num.choices, selectize = FALSE
             ), documentParameters$r, placement = "top", options = list(container = "body")),
             tipify(selectInput(ns("group"), "Group",
                 selected = .get_default(defaults, "group", ""),
-                choices = all.choices
+                choices = all.choices, selectize = FALSE
             ), documentParameters$group, placement = "top", options = list(container = "body"))
         ),
-        "Trace Style" = tagList(
+        "Aesthetics" = tagList(
             tipify(selectInput(ns("fill"), "Fill Area",
                 choices = c(
                     "Fill" = "toself",
                     "No fill" = "none"
                 ),
-                selected = .get_default(defaults, "fill", "toself")
+                selected = .get_default(defaults, "fill", "toself"), selectize = FALSE
             ), documentParameters$fill, placement = "top", options = list(container = "body")),
             tipify(numericInput(ns("line.width"), "Line Width",
                 value = .get_default(defaults, "line.width", 2, is.numeric),
@@ -146,7 +155,7 @@ radarPlotInputsUI <- function(id, data, defaults = NULL, title = NULL, columns =
                     "Dash-dot" = "dashdot",
                     "Long dash-dot" = "longdashdot"
                 ),
-                selected = .get_default(defaults, "line.dash", "solid")
+                selected = .get_default(defaults, "line.dash", "solid"), selectize = FALSE
             ), documentParameters$line.dash, placement = "top", options = list(container = "body")),
             tipify(numericInput(ns("marker.size"), "Marker Size",
                 value = .get_default(defaults, "marker.size", 5, is.numeric),
@@ -163,16 +172,22 @@ radarPlotInputsUI <- function(id, data, defaults = NULL, title = NULL, columns =
                     "Triangle up" = "triangle-up",
                     "Triangle down" = "triangle-down"
                 ),
-                selected = .get_default(defaults, "marker.symbol", "circle")
+                selected = .get_default(defaults, "marker.symbol", "circle"), selectize = FALSE
             ), documentParameters$marker.symbol, placement = "top", options = list(container = "body")),
             tipify(sliderInput(ns("opacity"), "Opacity",
                 min = 0, max = 1,
                 value = .get_default(defaults, "opacity", 0.6),
                 step = 0.05
             ), documentParameters$opacity, placement = "top", options = list(container = "body")),
-            uiOutput(ns("color.picker"))
+            uiOutput(ns("color.picker")),
+            tipify(colourInput(ns("bgcolor"), "Plot Background Color",
+                value = .get_default(defaults, "bgcolor", "#FFFFFF")
+            ), documentParameters$bgcolor, placement = "top", options = list(container = "body")),
+            tipify(colourInput(ns("polar.bgcolor"), "Polar Area Background Color",
+                value = .get_default(defaults, "polar.bgcolor", "#FFFFFF")
+            ), documentParameters$polar.bgcolor, placement = "top", options = list(container = "body"))
         ),
-        "Radial Axis" = tagList(
+        "Axes" = tagList(
             tipify(checkboxInput(ns("radial.visible"), "Show Radial Axis",
                 value = .get_default(defaults, "radial.visible", TRUE, is.logical)
             ), documentParameters$radial.visible, placement = "top", options = list(container = "body")),
@@ -194,12 +209,10 @@ radarPlotInputsUI <- function(id, data, defaults = NULL, title = NULL, columns =
             ), documentParameters$radial.linecolor, placement = "top", options = list(container = "body")),
             tipify(colourInput(ns("radial.gridcolor"), "Radial Grid Color",
                 value = .get_default(defaults, "radial.gridcolor", "#EEEEEE")
-            ), documentParameters$radial.gridcolor, placement = "top", options = list(container = "body"))
-        ),
-        "Angular Axis" = tagList(
+            ), documentParameters$radial.gridcolor, placement = "top", options = list(container = "body")),
             tipify(selectInput(ns("angular.direction"), "Angular Direction",
                 choices = c("Clockwise" = "clockwise", "Counterclockwise" = "counterclockwise"),
-                selected = .get_default(defaults, "angular.direction", "clockwise")
+                selected = .get_default(defaults, "angular.direction", "clockwise"), selectize = FALSE
             ), documentParameters$angular.direction, placement = "top", options = list(container = "body")),
             tipify(sliderInput(ns("angular.rotation"), "Angular Rotation (degrees)",
                 min = 0, max = 360,
@@ -207,7 +220,6 @@ radarPlotInputsUI <- function(id, data, defaults = NULL, title = NULL, columns =
                 step = 5
             ), documentParameters$angular.rotation, placement = "top", options = list(container = "body")),
             tipify(colourInput(ns("angular.gridcolor"), "Angular Grid Color",
-
                 value = .get_default(defaults, "angular.gridcolor", "#EEEEEE")
             ), documentParameters$angular.gridcolor, placement = "top", options = list(container = "body"))
         ),
@@ -226,7 +238,7 @@ radarPlotInputsUI <- function(id, data, defaults = NULL, title = NULL, columns =
                 selected = .get_default(
                     defaults, "title.font.family", "Arial",
                     function(x) x %in% font.choices
-                )
+                ), selectize = FALSE
             ), documentParameters$title.font.family, placement = "top", options = list(container = "body")),
             tipify(colourInput(ns("title.font.color"), "Title Color",
                 value = .get_default(defaults, "title.font.color", "#000000")
@@ -236,14 +248,14 @@ radarPlotInputsUI <- function(id, data, defaults = NULL, title = NULL, columns =
             ), documentParameters$show.legend, placement = "top", options = list(container = "body")),
             tipify(selectInput(ns("legend.orientation"), "Legend Orientation",
                 choices = c("Horizontal" = "h", "Vertical" = "v"),
-                selected = .get_default(defaults, "legend.orientation", "h")
+                selected = .get_default(defaults, "legend.orientation", "h"), selectize = FALSE
             ), documentParameters$legend.orientation, placement = "top", options = list(container = "body")),
             tipify(selectInput(ns("legend.font.family"), "Legend Font",
                 choices = font.choices,
                 selected = .get_default(
                     defaults, "legend.font.family", "Arial",
                     function(x) x %in% font.choices
-                )
+                ), selectize = FALSE
             ), documentParameters$legend.font.family, placement = "top", options = list(container = "body")),
             tipify(numericInput(ns("legend.font.size"), "Legend Font Size",
                 value = .get_default(defaults, "legend.font.size", 12, is.numeric),
@@ -253,15 +265,6 @@ radarPlotInputsUI <- function(id, data, defaults = NULL, title = NULL, columns =
             tipify(colourInput(ns("legend.font.color"), "Legend Font Color",
                 value = .get_default(defaults, "legend.font.color", "#000000")
             ), documentParameters$legend.font.color, placement = "top", options = list(container = "body"))
-        ),
-        "Background" = tagList(
-            tipify(colourInput(ns("bgcolor"), "Plot Background Color",
-
-                value = .get_default(defaults, "bgcolor", "#FFFFFF")
-            ), documentParameters$bgcolor, placement = "top", options = list(container = "body")),
-            tipify(colourInput(ns("polar.bgcolor"), "Polar Area Background Color",
-                value = .get_default(defaults, "polar.bgcolor", "#FFFFFF")
-            ), documentParameters$polar.bgcolor, placement = "top", options = list(container = "body"))
         ),
         "Plotly" = .uniform_plotly_inputs_ui(ns, defaults)
     )
@@ -281,6 +284,10 @@ radarPlotInputsUI <- function(id, data, defaults = NULL, title = NULL, columns =
 #' This should be placed in the UI where the plot should be shown.
 #'
 #' @param id The ID for the Shiny module.
+#' @param resizable Logical; when \code{TRUE} (the default) the plot output
+#'   is wrapped in \code{\link[shinyjqui]{jqui_resizable}} so it can be resized
+#'   by dragging. Set to \code{FALSE} when embedding the output in a container
+#'   that already provides resizing.
 #'
 #' @return A Shiny plotlyOutput for the radarPlot
 #'
@@ -290,9 +297,11 @@ radarPlotInputsUI <- function(id, data, defaults = NULL, title = NULL, columns =
 #'
 #' @export
 #' @author Jared Andrews
-radarPlotOutputUI <- function(id) {
+radarPlotOutputUI <- function(id, resizable = TRUE) {
     ns <- NS(id)
-    jqui_resizable(
-        plotlyOutput(ns("radarPlot"))
-    )
+    plot_output <- plotlyOutput(ns("radarPlot"))
+    if (isTRUE(resizable)) {
+        plot_output <- jqui_resizable(plot_output)
+    }
+    plot_output
 }

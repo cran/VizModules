@@ -153,6 +153,9 @@ plotthis_ViolinPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs = 
 
 
             .reset_plotly_inputs(session, defaults)
+
+
+            .reset_legend_inputs(session, defaults)
             .reset_lines_inputs(session, defaults = defaults)
             .reset_axes_inputs(session, defaults)
             .reset_stats_inputs(session, defaults)
@@ -161,17 +164,8 @@ plotthis_ViolinPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs = 
         # Update stat comparison pairs when x or group.by changes
         observeEvent(c(input$x.data, input$group.by), {
             req(input$x.data)
-            pair_strings <- .generate_pair_strings(data(), input$x.data, input$group.by)
+            pair_strings <- generate_pair_strings(data(), input$x.data, input$group.by)
             updateSelectInput(session, "stat.pairs", choices = c("", pair_strings), selected = "")
-        })
-
-        # Show/hide Save Stats button based on stats.enabled
-        observeEvent(input$stats.enabled, {
-            if (isTRUE(input$stats.enabled)) {
-                show("download.stats.col")
-            } else {
-                hide("download.stats.col")
-            }
         })
 
         # Update y-axis range when y data column is changed
@@ -194,6 +188,12 @@ plotthis_ViolinPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs = 
                 hide("facet.title.font.family")
             }
         })
+
+        observeEvent(c(input$facet.by, input$x.data), {
+            if (input$facet.by == input$x.data){
+                updateSelectInput(session, "facet.scale", selected = "free_x")
+            }
+        }, ignoreInit = FALSE)
 
         generate_ViolinPlot <- reactive({
             isolate_fn <- setup_auto_update_logic(input)
@@ -228,7 +228,8 @@ plotthis_ViolinPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs = 
                 sort.x <- isolate_fn(input$sort_x)
             }
             theme_args <- .create_ggplot_axis_style(input, isolate_fn = isolate_fn)
-            theme_args$panel.spacing <- unit(isolate_fn(input$subplot.margin), "npc")
+            theme_args$panel.spacing.x <- unit(isolate_fn(input$subplot.margin.x), "pt")
+            theme_args$panel.spacing.y <- unit(isolate_fn(input$subplot.margin.y), "pt")
 
             p <- ViolinPlot(
                 data = data(),
@@ -250,10 +251,6 @@ plotthis_ViolinPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs = 
                 box_width = isolate_fn(input$box.width),
                 box_ptsize = isolate_fn(input$box.ptsize),
                 palcolor = palcolor_arg,
-                add_line = isolate_fn(input$add.line),
-                line_color = isolate_fn(input$line.colour),
-                line_width = isolate_fn(input$line.width),
-                line_type = isolate_fn(input$line.type),
                 facet_by = facet.by,
                 facet_scales = isolate_fn(input$facet.scale),
                 facet_ncol = facet.ncol,
@@ -268,16 +265,18 @@ plotthis_ViolinPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs = 
             )
 
 
-            fig <- ggplotly(p) |>
-                layout(
-                    title = list(
-                        font = list(size = isolate_fn(input$title.font.size), 
-                        family = isolate_fn(input$title.font.family),
-                        color = isolate_fn(input$title.font.color)
-                        ),
-                        x = 0.5, xanchor = "center", y = 0.98, yanchor = "top"
-                    )
+            fig <- ggplotly(p)
+
+            if (!is.null(facet.by) && nzchar(facet.by)) {
+                fig <- .apply_facet_subplot_spacing(
+                    fig,
+                    spacing = c(isolate_fn(input$subplot.margin.x), isolate_fn(input$subplot.margin.y)),
+                    ncol = facet.ncol,
+                    nrow = facet.nrow
                 )
+            }
+            
+            fig <- .apply_title_layout(fig, input, isolate_fn, title_y = 0.98, title_x = isolate_fn(input$axis.title.horizontal.position))
 
             # Apply axis styling to all subplot axes (handles faceting/split_by)
             # Axis Styling:
@@ -319,8 +318,8 @@ plotthis_ViolinPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs = 
 
             # Statistical annotations
             if (isolate_fn(input$stats.enabled)) {
-                stat_pairs <- .parse_pair_strings(isolate_fn(input$stat.pairs))
-                stats_df <- .compute_pairwise_stats(
+                stat_pairs <- parse_pair_strings(isolate_fn(input$stat.pairs))
+                stats_df <- compute_pairwise_stats(
                     df = data(), x = isolate_fn(input$x.data),
                     y = isolate_fn(input$y.data), pairs = stat_pairs,
                     test = isolate_fn(input$stat.test),
@@ -331,7 +330,7 @@ plotthis_ViolinPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs = 
                     sig.threshold = isolate_fn(input$stat.sig.threshold)
                 )
                 last_stats_df(stats_df)
-                stat_result <- .create_stat_annotations(
+                stat_result <- create_stat_annotations(
                     stats_df = stats_df, fig = fig, df = data(),
                     x = isolate_fn(input$x.data), y = isolate_fn(input$y.data),
                     display = isolate_fn(input$stat.display),
@@ -345,7 +344,7 @@ plotthis_ViolinPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs = 
                     text.bump = isolate_fn(input$stat.text.bump),
                     bracket.inset = isolate_fn(input$stat.bracket.inset)
                 )
-                fig <- .apply_stat_annotations(fig, stat_result,
+                fig <- apply_stat_annotations(fig, stat_result,
                     y.min = isolate_fn(input$y.min)
                 )
             }
@@ -354,6 +353,16 @@ plotthis_ViolinPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs = 
             fig <- do.call(config, c(list(p = fig), config_list))
             fig <- .apply_plotly_newshape(fig, input, isolate_fn)
 
+            # Apply uniform legend title/label font sizes
+            fig <- .apply_legend_styling(
+                fig,
+                title.size = isolate_fn(input$legend.title.size),
+                text.size = isolate_fn(input$legend.text.size)
+            )
+
+            # Make single-panel x/y axis titles draggable (matches faceted behaviour)
+            fig <- .axis_titles_as_annotations(fig)
+
             return(fig)
         })
 
@@ -361,38 +370,31 @@ plotthis_ViolinPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs = 
         output$ViolinPlot <- renderPlotly({
             req(input$x.data, input$y.data)
 
-            fig <- generate_ViolinPlot() |>
-                layout(
-                    margin = list(
-                        t = input$margin.t,
-                        b = input$margin.b,
-                        l = input$margin.l,
-                        r = input$margin.r,
-                        autoexpand = TRUE
-                    )
-                )
+            fig <- .apply_render_margins(generate_ViolinPlot(), input)
 
             return(fig)
         })
 
-        # Download handler for interactive plot
-        output$download.interactive <- .create_plot_download_handler(
-            plot_reactive = generate_ViolinPlot,
-            filename_base = "ViolinPlot"
+        # Download handler for source (plot + data + stats)
+        # Capture all UI inputs for the source download
+        AllInputs <- reactive({
+            x <- reactiveValuesToList(input)
+            return(x)
+        })
+
+        plot_source_reactive <- reactive({
+            collect_source_data(
+                plot_reactive = generate_ViolinPlot,
+                stats_reactive = last_stats_df,
+                inputs_reactive = AllInputs()
+            )
+        })
+
+        output$download.source <- create_source_download_handler(
+            data_list = plot_source_reactive,
+            filename_base = "ViolinPlot_source"
         )
 
-        # Download handler for stats table
-        output$download.stats <- downloadHandler(
-            filename = function() {
-                paste0("stats_table_", Sys.Date(), ".csv")
-            },
-            content = function(file) {
-                .write_stats_csv(
-                    stats_df = last_stats_df(), file = file,
-                    p.adjust.method = input$stat.p.adjust,
-                    sig.threshold = input$stat.sig.threshold
-                )
-            }
-        )
-    })
+        return(plot_source_reactive)
+        })
 }

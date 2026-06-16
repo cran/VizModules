@@ -15,6 +15,8 @@ linePlot(
   show.legend = TRUE,
   facet.by = NULL,
   facet.scales = "fixed",
+  facet.nrow = NULL,
+  facet.ncol = NULL,
   subplot.margin = 0.05,
   axis.showline = TRUE,
   axis.mirror = TRUE,
@@ -35,6 +37,7 @@ linePlot(
   title.font.size = 14,
   title.font.family = "Arial",
   title.font.color = "black",
+  title.x.position = 0.47,
   y.title = NULL,
   x.title = NULL,
   flip.x = FALSE,
@@ -78,7 +81,18 @@ Creates subplots for each unique value. Default: NULL.}
 \item{facet.scales}{Character, controls axis scaling across facets. Options: "fixed" (same for all), "free" (independent),
 "free_x" (independent x-axis), "free_y" (independent y-axis). Default: "fixed".}
 
-\item{subplot.margin}{Numeric, spacing between facet panels as a fraction of the plot area. Default: 0.05.}
+\item{facet.nrow}{Optional integer, number of rows in the faceted subplot grid.
+If \code{NULL} (default), a single row is used unless \code{facet.ncol} is supplied,
+in which case the number of rows is derived from the number of facet levels.}
+
+\item{facet.ncol}{Optional integer, number of columns in the faceted subplot grid.
+If \code{NULL} (default), columns are derived from \code{facet.nrow} and the number
+of facet levels. Only one of \code{facet.nrow} / \code{facet.ncol} needs to be set;
+if both are provided, \code{facet.nrow} takes precedence.}
+
+\item{subplot.margin}{Numeric, spacing between facet panels as a fraction of the plot area.
+May be a single value (applied to both directions) or a length-2 vector
+\code{c(horizontal, vertical)} to control the gap between columns and rows separately. Default: 0.05.}
 
 \item{axis.showline}{Logical, whether to show axis border lines. Default: TRUE.}
 
@@ -118,7 +132,11 @@ Creates subplots for each unique value. Default: NULL.}
 
 \item{title.font.color}{Character, hex color for plot title text. Default: "black".}
 
-\item{y.title}{Optional character, label for y-axis. If NULL, auto-generated from column name. Default: NULL.}
+\item{title.x.position}{Numeric, horizontal position of the plot title in paper coordinates (0 = left, 1 = right). Default: 0.47.}
+
+\item{y.title}{Optional character, label for y-axis. If NULL, auto-generated from column name.
+When \code{x} is a single categorical column, the plotted y-values are per-group means, so the
+title is wrapped as \verb{mean(<y.title>)} to accurately describe the summary displayed. Default: NULL.}
 
 \item{x.title}{Optional character, label for x-axis. If NULL, auto-generated from column name. Default: NULL.}
 
