@@ -1,0 +1,630 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+
+<meta charset="utf-8" />
+<meta name="generator" content="pandoc" />
+<meta http-equiv="X-UA-Compatible" content="IE=EDGE" />
+
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+
+
+
+<title>Defaults and Hiding Controls</title>
+
+<script>// Pandoc 2.9 adds attributes on both header and div. We remove the former (to
+// be compatible with the behavior of Pandoc < 2.8).
+document.addEventListener('DOMContentLoaded', function(e) {
+  var hs = document.querySelectorAll("div.section[class*='level'] > :first-child");
+  var i, h, a;
+  for (i = 0; i < hs.length; i++) {
+    h = hs[i];
+    if (!/^h[1-6]$/i.test(h.tagName)) continue;  // it should be a header h1-h6
+    a = h.attributes;
+    while (a.length > 0) h.removeAttribute(a[0].name);
+  }
+});
+</script>
+
+<style type="text/css">
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+span.underline{text-decoration: underline;}
+div.column{display: inline-block; vertical-align: top; width: 50%;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+</style>
+
+
+
+<style type="text/css">
+code {
+white-space: pre;
+}
+.sourceCode {
+overflow: visible;
+}
+</style>
+<style type="text/css" data-origin="pandoc">
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+{ counter-reset: source-line 0; }
+pre.numberSource code > span
+{ position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+{ content: counter(source-line);
+position: relative; left: -1em; text-align: right; vertical-align: baseline;
+border: none; display: inline-block;
+-webkit-touch-callout: none; -webkit-user-select: none;
+-khtml-user-select: none; -moz-user-select: none;
+-ms-user-select: none; user-select: none;
+padding: 0 4px; width: 4em;
+color: #aaaaaa;
+}
+pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa; padding-left: 4px; }
+div.sourceCode
+{ }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+code span.al { color: #ff0000; font-weight: bold; } 
+code span.an { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.at { color: #7d9029; } 
+code span.bn { color: #40a070; } 
+code span.bu { color: #008000; } 
+code span.cf { color: #007020; font-weight: bold; } 
+code span.ch { color: #4070a0; } 
+code span.cn { color: #880000; } 
+code span.co { color: #60a0b0; font-style: italic; } 
+code span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.do { color: #ba2121; font-style: italic; } 
+code span.dt { color: #902000; } 
+code span.dv { color: #40a070; } 
+code span.er { color: #ff0000; font-weight: bold; } 
+code span.ex { } 
+code span.fl { color: #40a070; } 
+code span.fu { color: #06287e; } 
+code span.im { color: #008000; font-weight: bold; } 
+code span.in { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.kw { color: #007020; font-weight: bold; } 
+code span.op { color: #666666; } 
+code span.ot { color: #007020; } 
+code span.pp { color: #bc7a00; } 
+code span.sc { color: #4070a0; } 
+code span.ss { color: #bb6688; } 
+code span.st { color: #4070a0; } 
+code span.va { color: #19177c; } 
+code span.vs { color: #4070a0; } 
+code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } 
+</style>
+<script>
+// apply pandoc div.sourceCode style to pre.sourceCode instead
+(function() {
+  var sheets = document.styleSheets;
+  for (var i = 0; i < sheets.length; i++) {
+    if (sheets[i].ownerNode.dataset["origin"] !== "pandoc") continue;
+    try { var rules = sheets[i].cssRules; } catch (e) { continue; }
+    var j = 0;
+    while (j < rules.length) {
+      var rule = rules[j];
+      // check if there is a div.sourceCode rule
+      if (rule.type !== rule.STYLE_RULE || rule.selectorText !== "div.sourceCode") {
+        j++;
+        continue;
+      }
+      var style = rule.style.cssText;
+      // check if color or background-color is set
+      if (rule.style.color === '' && rule.style.backgroundColor === '') {
+        j++;
+        continue;
+      }
+      // replace div.sourceCode by a pre.sourceCode rule
+      sheets[i].deleteRule(j);
+      sheets[i].insertRule('pre.sourceCode{' + style + '}', j);
+    }
+  }
+})();
+</script>
+
+
+
+
+<style type="text/css">body {
+background-color: #fff;
+margin: 1em auto;
+max-width: 700px;
+overflow: visible;
+padding-left: 2em;
+padding-right: 2em;
+font-family: "Open Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
+font-size: 14px;
+line-height: 1.35;
+}
+#TOC {
+clear: both;
+margin: 0 0 10px 10px;
+padding: 4px;
+width: 400px;
+border: 1px solid #CCCCCC;
+border-radius: 5px;
+background-color: #f6f6f6;
+font-size: 13px;
+line-height: 1.3;
+}
+#TOC .toctitle {
+font-weight: bold;
+font-size: 15px;
+margin-left: 5px;
+}
+#TOC ul {
+padding-left: 40px;
+margin-left: -1.5em;
+margin-top: 5px;
+margin-bottom: 5px;
+}
+#TOC ul ul {
+margin-left: -2em;
+}
+#TOC li {
+line-height: 16px;
+}
+table {
+margin: 1em auto;
+border-width: 1px;
+border-color: #DDDDDD;
+border-style: outset;
+border-collapse: collapse;
+}
+table th {
+border-width: 2px;
+padding: 5px;
+border-style: inset;
+}
+table td {
+border-width: 1px;
+border-style: inset;
+line-height: 18px;
+padding: 5px 5px;
+}
+table, table th, table td {
+border-left-style: none;
+border-right-style: none;
+}
+table thead, table tr.even {
+background-color: #f7f7f7;
+}
+p {
+margin: 0.5em 0;
+}
+blockquote {
+background-color: #f6f6f6;
+padding: 0.25em 0.75em;
+}
+hr {
+border-style: solid;
+border: none;
+border-top: 1px solid #777;
+margin: 28px 0;
+}
+dl {
+margin-left: 0;
+}
+dl dd {
+margin-bottom: 13px;
+margin-left: 13px;
+}
+dl dt {
+font-weight: bold;
+}
+ul {
+margin-top: 0;
+}
+ul li {
+list-style: circle outside;
+}
+ul ul {
+margin-bottom: 0;
+}
+pre, code {
+background-color: #f7f7f7;
+border-radius: 3px;
+color: #333;
+white-space: pre-wrap; 
+}
+pre {
+border-radius: 3px;
+margin: 5px 0px 10px 0px;
+padding: 10px;
+}
+pre:not([class]) {
+background-color: #f7f7f7;
+}
+code {
+font-family: Consolas, Monaco, 'Courier New', monospace;
+font-size: 85%;
+}
+p > code, li > code {
+padding: 2px 0px;
+}
+div.figure {
+text-align: center;
+}
+img {
+background-color: #FFFFFF;
+padding: 2px;
+border: 1px solid #DDDDDD;
+border-radius: 3px;
+border: 1px solid #CCCCCC;
+margin: 0 5px;
+}
+h1 {
+margin-top: 0;
+font-size: 35px;
+line-height: 40px;
+}
+h2 {
+border-bottom: 4px solid #f7f7f7;
+padding-top: 10px;
+padding-bottom: 2px;
+font-size: 145%;
+}
+h3 {
+border-bottom: 2px solid #f7f7f7;
+padding-top: 10px;
+font-size: 120%;
+}
+h4 {
+border-bottom: 1px solid #f7f7f7;
+margin-left: 8px;
+font-size: 105%;
+}
+h5, h6 {
+border-bottom: 1px solid #ccc;
+font-size: 105%;
+}
+a {
+color: #0033dd;
+text-decoration: none;
+}
+a:hover {
+color: #6666ff; }
+a:visited {
+color: #800080; }
+a:visited:hover {
+color: #BB00BB; }
+a[href^="http:"] {
+text-decoration: underline; }
+a[href^="https:"] {
+text-decoration: underline; }
+
+code > span.kw { color: #555; font-weight: bold; } 
+code > span.dt { color: #902000; } 
+code > span.dv { color: #40a070; } 
+code > span.bn { color: #d14; } 
+code > span.fl { color: #d14; } 
+code > span.ch { color: #d14; } 
+code > span.st { color: #d14; } 
+code > span.co { color: #888888; font-style: italic; } 
+code > span.ot { color: #007020; } 
+code > span.al { color: #ff0000; font-weight: bold; } 
+code > span.fu { color: #900; font-weight: bold; } 
+code > span.er { color: #a61717; background-color: #e3d2d2; } 
+</style>
+
+
+
+
+</head>
+
+<body>
+
+
+
+
+<h1 class="title toc-ignore">Defaults and Hiding Controls</h1>
+
+
+
+<p>Two closely related arguments — <code>defaults</code> and
+<code>hide.inputs</code>/<code>hide.tabs</code> — let you control what
+users see and what the module starts with. This vignette covers both in
+depth.</p>
+<div id="defaults-pre-filling-inputs" class="section level2">
+<h2><code>defaults</code>: pre-filling inputs</h2>
+<p>Pass a named list to the <code>defaults</code> argument of any
+<code>*InputsUI()</code> call. Each name is an input ID (matching the
+underlying plot function argument), and its value is what the control
+initialises to.</p>
+<div class="sourceCode" id="cb1"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" tabindex="-1"></a><span class="fu">library</span>(VizModules)</span>
+<span id="cb1-2"><a href="#cb1-2" tabindex="-1"></a></span>
+<span id="cb1-3"><a href="#cb1-3" tabindex="-1"></a>ui <span class="ot">&lt;-</span> <span class="fu">fluidPage</span>(</span>
+<span id="cb1-4"><a href="#cb1-4" tabindex="-1"></a>    <span class="fu">sidebarLayout</span>(</span>
+<span id="cb1-5"><a href="#cb1-5" tabindex="-1"></a>        <span class="fu">sidebarPanel</span>(</span>
+<span id="cb1-6"><a href="#cb1-6" tabindex="-1"></a>            <span class="fu">dittoViz_scatterPlotInputsUI</span>(</span>
+<span id="cb1-7"><a href="#cb1-7" tabindex="-1"></a>                <span class="st">&quot;p&quot;</span>, mtcars,</span>
+<span id="cb1-8"><a href="#cb1-8" tabindex="-1"></a>                <span class="at">defaults =</span> <span class="fu">list</span>(</span>
+<span id="cb1-9"><a href="#cb1-9" tabindex="-1"></a>                    <span class="at">x.by        =</span> <span class="st">&quot;wt&quot;</span>,</span>
+<span id="cb1-10"><a href="#cb1-10" tabindex="-1"></a>                    <span class="at">y.by        =</span> <span class="st">&quot;mpg&quot;</span>,</span>
+<span id="cb1-11"><a href="#cb1-11" tabindex="-1"></a>                    <span class="at">color.by    =</span> <span class="st">&quot;cyl&quot;</span>,</span>
+<span id="cb1-12"><a href="#cb1-12" tabindex="-1"></a>                    <span class="at">size        =</span> <span class="dv">3</span>,</span>
+<span id="cb1-13"><a href="#cb1-13" tabindex="-1"></a>                    <span class="at">best.fit    =</span> <span class="cn">TRUE</span></span>
+<span id="cb1-14"><a href="#cb1-14" tabindex="-1"></a>                )</span>
+<span id="cb1-15"><a href="#cb1-15" tabindex="-1"></a>            )</span>
+<span id="cb1-16"><a href="#cb1-16" tabindex="-1"></a>        ),</span>
+<span id="cb1-17"><a href="#cb1-17" tabindex="-1"></a>        <span class="fu">mainPanel</span>(<span class="fu">dittoViz_scatterPlotOutputUI</span>(<span class="st">&quot;p&quot;</span>))</span>
+<span id="cb1-18"><a href="#cb1-18" tabindex="-1"></a>    )</span>
+<span id="cb1-19"><a href="#cb1-19" tabindex="-1"></a>)</span>
+<span id="cb1-20"><a href="#cb1-20" tabindex="-1"></a></span>
+<span id="cb1-21"><a href="#cb1-21" tabindex="-1"></a>server <span class="ot">&lt;-</span> <span class="cf">function</span>(input, output, session) {</span>
+<span id="cb1-22"><a href="#cb1-22" tabindex="-1"></a>    <span class="fu">dittoViz_scatterPlotServer</span>(<span class="st">&quot;p&quot;</span>, <span class="at">data =</span> <span class="fu">reactive</span>(mtcars))</span>
+<span id="cb1-23"><a href="#cb1-23" tabindex="-1"></a>}</span>
+<span id="cb1-24"><a href="#cb1-24" tabindex="-1"></a></span>
+<span id="cb1-25"><a href="#cb1-25" tabindex="-1"></a><span class="fu">shinyApp</span>(ui, server)</span></code></pre></div>
+<div id="finding-valid-keys" class="section level3">
+<h3>Finding valid keys</h3>
+<p>Defaults keys map directly to the argument names of the underlying
+plot function. The quickest way to find them is the module’s
+<code>*InputsUI()</code> help page,
+e.g. <code>?dittoViz_scatterPlotInputsUI</code>. The <strong>Plot
+parameters and defaults</strong> section lists every wired argument, its
+UI label, and its built-in default.</p>
+<p>For inputs that come from the uniform tab helpers (Axes, Legend,
+Lines, Plotly), see <code>?uniform_axes_inputs_ui</code>,
+<code>?uniform_legend_inputs_ui</code>,
+<code>?uniform_lines_inputs_ui</code>, and
+<code>?uniform_plotly_inputs_ui</code> respectively.</p>
+</div>
+<div id="validation" class="section level3">
+<h3>Validation</h3>
+<p><code>get_default()</code> (used internally by every module) accepts
+an optional <code>validator</code> predicate. If the value you supply
+fails validation — e.g. passing a string where a logical is expected —
+the module silently falls back to its built-in default rather than
+erroring. This means a typo in a key is silent; double-check key names
+against the help page if a default appears to have no effect.</p>
+</div>
+<div id="passing-defaults-through-createmoduleapp-and-app" class="section level3">
+<h3>Passing defaults through <code>createModuleApp()</code> and
+<code>*App()</code></h3>
+<p><code>defaults</code> is forwarded all the way through the app
+factory:</p>
+<div class="sourceCode" id="cb2"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" tabindex="-1"></a><span class="fu">plotthis_BoxPlotApp</span>(</span>
+<span id="cb2-2"><a href="#cb2-2" tabindex="-1"></a>    <span class="at">defaults =</span> <span class="fu">list</span>(</span>
+<span id="cb2-3"><a href="#cb2-3" tabindex="-1"></a>        <span class="at">x.by     =</span> <span class="st">&quot;Species&quot;</span>,</span>
+<span id="cb2-4"><a href="#cb2-4" tabindex="-1"></a>        <span class="at">y.by     =</span> <span class="st">&quot;Sepal.Length&quot;</span>,</span>
+<span id="cb2-5"><a href="#cb2-5" tabindex="-1"></a>        <span class="at">pt.size  =</span> <span class="dv">0</span></span>
+<span id="cb2-6"><a href="#cb2-6" tabindex="-1"></a>    )</span>
+<span id="cb2-7"><a href="#cb2-7" tabindex="-1"></a>)</span></code></pre></div>
+<p>The same <code>defaults</code> list is accepted by
+<code>createModuleApp()</code> directly:</p>
+<div class="sourceCode" id="cb3"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" tabindex="-1"></a>app <span class="ot">&lt;-</span> <span class="fu">createModuleApp</span>(</span>
+<span id="cb3-2"><a href="#cb3-2" tabindex="-1"></a>    <span class="at">inputs_ui_fn =</span> plotthis_BoxPlotInputsUI,</span>
+<span id="cb3-3"><a href="#cb3-3" tabindex="-1"></a>    <span class="at">output_ui_fn =</span> plotthis_BoxPlotOutputUI,</span>
+<span id="cb3-4"><a href="#cb3-4" tabindex="-1"></a>    <span class="at">server_fn    =</span> plotthis_BoxPlotServer,</span>
+<span id="cb3-5"><a href="#cb3-5" tabindex="-1"></a>    <span class="at">data_list    =</span> <span class="fu">list</span>(<span class="st">&quot;iris&quot;</span> <span class="ot">=</span> iris),</span>
+<span id="cb3-6"><a href="#cb3-6" tabindex="-1"></a>    <span class="at">defaults     =</span> <span class="fu">list</span>(<span class="at">x.by =</span> <span class="st">&quot;Species&quot;</span>, <span class="at">y.by =</span> <span class="st">&quot;Sepal.Length&quot;</span>)</span>
+<span id="cb3-7"><a href="#cb3-7" tabindex="-1"></a>)</span>
+<span id="cb3-8"><a href="#cb3-8" tabindex="-1"></a><span class="cf">if</span> (<span class="fu">interactive</span>()) <span class="fu">runApp</span>(app)</span></code></pre></div>
+<hr />
+</div>
+</div>
+<div id="hide.inputs-hiding-individual-controls" class="section level2">
+<h2><code>hide.inputs</code>: hiding individual controls</h2>
+<p>Pass a character vector of input IDs to <code>hide.inputs</code> on
+the <strong>server</strong> function. Those controls are hidden from the
+UI while their values are still initialised (from <code>defaults</code>
+if supplied, otherwise the built-in default) and passed to the plot on
+every render.</p>
+<div class="sourceCode" id="cb4"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" tabindex="-1"></a>server <span class="ot">&lt;-</span> <span class="cf">function</span>(input, output, session) {</span>
+<span id="cb4-2"><a href="#cb4-2" tabindex="-1"></a>    <span class="fu">dittoViz_scatterPlotServer</span>(</span>
+<span id="cb4-3"><a href="#cb4-3" tabindex="-1"></a>        <span class="st">&quot;p&quot;</span>,</span>
+<span id="cb4-4"><a href="#cb4-4" tabindex="-1"></a>        <span class="at">data        =</span> <span class="fu">reactive</span>(mtcars),</span>
+<span id="cb4-5"><a href="#cb4-5" tabindex="-1"></a>        <span class="at">hide.inputs =</span> <span class="fu">c</span>(<span class="st">&quot;shape.by&quot;</span>, <span class="st">&quot;plot.order&quot;</span>, <span class="st">&quot;opacity&quot;</span>)</span>
+<span id="cb4-6"><a href="#cb4-6" tabindex="-1"></a>    )</span>
+<span id="cb4-7"><a href="#cb4-7" tabindex="-1"></a>}</span></code></pre></div>
+<p>Hidden inputs reflow: the surrounding controls close the gap rather
+than leaving an empty space. This is handled automatically by the
+flexbox grid that <code>organize_inputs()</code> creates.</p>
+<div id="use-case-app-level-fixed-parameters" class="section level3">
+<h3>Use case: app-level fixed parameters</h3>
+<p>A common pattern is to fix a column mapping or aesthetic so that app
+users cannot change it, while still applying it to every plot:</p>
+<div class="sourceCode" id="cb5"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" tabindex="-1"></a>server <span class="ot">&lt;-</span> <span class="cf">function</span>(input, output, session) {</span>
+<span id="cb5-2"><a href="#cb5-2" tabindex="-1"></a>    <span class="fu">dittoViz_scatterPlotServer</span>(</span>
+<span id="cb5-3"><a href="#cb5-3" tabindex="-1"></a>        <span class="st">&quot;p&quot;</span>,</span>
+<span id="cb5-4"><a href="#cb5-4" tabindex="-1"></a>        <span class="at">data        =</span> <span class="fu">reactive</span>(mtcars),</span>
+<span id="cb5-5"><a href="#cb5-5" tabindex="-1"></a>        <span class="at">defaults    =</span> <span class="fu">list</span>(<span class="at">color.by =</span> <span class="st">&quot;cyl&quot;</span>),</span>
+<span id="cb5-6"><a href="#cb5-6" tabindex="-1"></a>        <span class="at">hide.inputs =</span> <span class="st">&quot;color.by&quot;</span></span>
+<span id="cb5-7"><a href="#cb5-7" tabindex="-1"></a>    )</span>
+<span id="cb5-8"><a href="#cb5-8" tabindex="-1"></a>}</span></code></pre></div>
+<p>The colour mapping is always <code>cyl</code>, and the control for it
+never appears.</p>
+<hr />
+</div>
+</div>
+<div id="hide.tabs-hiding-entire-tab-panels" class="section level2">
+<h2><code>hide.tabs</code>: hiding entire tab panels</h2>
+<p>Modules organise their inputs into named tabs
+(e.g. <code>&quot;Data&quot;</code>, <code>&quot;Points&quot;</code>, <code>&quot;Lines&quot;</code>,
+<code>&quot;Axes&quot;</code>, <code>&quot;Legend&quot;</code>, <code>&quot;Plotly&quot;</code>). Pass
+a character vector of tab names to <code>hide.tabs</code> to remove
+whole groups at once.</p>
+<div class="sourceCode" id="cb6"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" tabindex="-1"></a>server <span class="ot">&lt;-</span> <span class="cf">function</span>(input, output, session) {</span>
+<span id="cb6-2"><a href="#cb6-2" tabindex="-1"></a>    <span class="fu">dittoViz_scatterPlotServer</span>(</span>
+<span id="cb6-3"><a href="#cb6-3" tabindex="-1"></a>        <span class="st">&quot;p&quot;</span>,</span>
+<span id="cb6-4"><a href="#cb6-4" tabindex="-1"></a>        <span class="at">data      =</span> <span class="fu">reactive</span>(mtcars),</span>
+<span id="cb6-5"><a href="#cb6-5" tabindex="-1"></a>        <span class="at">hide.tabs =</span> <span class="fu">c</span>(<span class="st">&quot;Plotly&quot;</span>, <span class="st">&quot;Lines&quot;</span>, <span class="st">&quot;Trajectory&quot;</span>)</span>
+<span id="cb6-6"><a href="#cb6-6" tabindex="-1"></a>    )</span>
+<span id="cb6-7"><a href="#cb6-7" tabindex="-1"></a>}</span></code></pre></div>
+<p>All inputs in a hidden tab are still initialised and active — they
+just aren’t shown. This is useful when you want to keep the defaults for
+an entire feature group (e.g. plotly export settings) without exposing
+the controls to users.</p>
+<div id="available-tab-names" class="section level3">
+<h3>Available tab names</h3>
+<p>Tab names are module-specific. Inspect the <code>inputs</code> list
+inside the relevant <code>*InputsUI()</code> source, or open
+<code>?&lt;module&gt;InputsUI</code> and look for the tab headings
+described there. Common tabs across most modules include:</p>
+<table>
+<thead>
+<tr class="header">
+<th>Tab</th>
+<th>Contents</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>&quot;Data&quot;</code></td>
+<td>Column selectors (x, y, color, split, etc.)</td>
+</tr>
+<tr class="even">
+<td><code>&quot;Axes&quot;</code></td>
+<td>Title font, gridlines, tick styling</td>
+</tr>
+<tr class="odd">
+<td><code>&quot;Legend&quot;</code></td>
+<td>Legend title and text sizes</td>
+</tr>
+<tr class="even">
+<td><code>&quot;Lines&quot;</code></td>
+<td>Reference lines (h/v/ablines)</td>
+</tr>
+<tr class="odd">
+<td><code>&quot;Plotly&quot;</code></td>
+<td>Download format, margins, drawn shape styling</td>
+</tr>
+<tr class="even">
+<td><code>&quot;Facet&quot;</code></td>
+<td>Facet rows/columns, scales, subplot spacing</td>
+</tr>
+</tbody>
+</table>
+<hr />
+</div>
+</div>
+<div id="combining-defaults-hide.inputs-and-hide.tabs" class="section level2">
+<h2>Combining <code>defaults</code>, <code>hide.inputs</code>, and
+<code>hide.tabs</code></h2>
+<p>These three arguments compose freely. A typical production pattern is
+to set defaults for everything the user shouldn’t touch, hide the
+individual controls that need fine-grained locking, and hide any whole
+tabs that are irrelevant for your use case:</p>
+<div class="sourceCode" id="cb7"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" tabindex="-1"></a>ui <span class="ot">&lt;-</span> <span class="fu">fluidPage</span>(</span>
+<span id="cb7-2"><a href="#cb7-2" tabindex="-1"></a>    <span class="fu">sidebarLayout</span>(</span>
+<span id="cb7-3"><a href="#cb7-3" tabindex="-1"></a>        <span class="fu">sidebarPanel</span>(</span>
+<span id="cb7-4"><a href="#cb7-4" tabindex="-1"></a>            <span class="fu">plotthis_ViolinPlotInputsUI</span>(</span>
+<span id="cb7-5"><a href="#cb7-5" tabindex="-1"></a>                <span class="st">&quot;v&quot;</span>, example_rnaseq,</span>
+<span id="cb7-6"><a href="#cb7-6" tabindex="-1"></a>                <span class="at">defaults =</span> <span class="fu">list</span>(</span>
+<span id="cb7-7"><a href="#cb7-7" tabindex="-1"></a>                    <span class="at">x.by     =</span> <span class="st">&quot;condition&quot;</span>,</span>
+<span id="cb7-8"><a href="#cb7-8" tabindex="-1"></a>                    <span class="at">y.by     =</span> <span class="st">&quot;expression&quot;</span>,</span>
+<span id="cb7-9"><a href="#cb7-9" tabindex="-1"></a>                    <span class="at">color.by =</span> <span class="st">&quot;condition&quot;</span></span>
+<span id="cb7-10"><a href="#cb7-10" tabindex="-1"></a>                )</span>
+<span id="cb7-11"><a href="#cb7-11" tabindex="-1"></a>            )</span>
+<span id="cb7-12"><a href="#cb7-12" tabindex="-1"></a>        ),</span>
+<span id="cb7-13"><a href="#cb7-13" tabindex="-1"></a>        <span class="fu">mainPanel</span>(<span class="fu">plotthis_ViolinPlotOutputUI</span>(<span class="st">&quot;v&quot;</span>))</span>
+<span id="cb7-14"><a href="#cb7-14" tabindex="-1"></a>    )</span>
+<span id="cb7-15"><a href="#cb7-15" tabindex="-1"></a>)</span>
+<span id="cb7-16"><a href="#cb7-16" tabindex="-1"></a></span>
+<span id="cb7-17"><a href="#cb7-17" tabindex="-1"></a>server <span class="ot">&lt;-</span> <span class="cf">function</span>(input, output, session) {</span>
+<span id="cb7-18"><a href="#cb7-18" tabindex="-1"></a>    <span class="fu">plotthis_ViolinPlotServer</span>(</span>
+<span id="cb7-19"><a href="#cb7-19" tabindex="-1"></a>        <span class="st">&quot;v&quot;</span>,</span>
+<span id="cb7-20"><a href="#cb7-20" tabindex="-1"></a>        <span class="at">data        =</span> <span class="fu">reactive</span>(example_rnaseq),</span>
+<span id="cb7-21"><a href="#cb7-21" tabindex="-1"></a>        <span class="at">hide.inputs =</span> <span class="fu">c</span>(<span class="st">&quot;color.by&quot;</span>),</span>
+<span id="cb7-22"><a href="#cb7-22" tabindex="-1"></a>        <span class="at">hide.tabs   =</span> <span class="fu">c</span>(<span class="st">&quot;Plotly&quot;</span>, <span class="st">&quot;Lines&quot;</span>)</span>
+<span id="cb7-23"><a href="#cb7-23" tabindex="-1"></a>    )</span>
+<span id="cb7-24"><a href="#cb7-24" tabindex="-1"></a>}</span>
+<span id="cb7-25"><a href="#cb7-25" tabindex="-1"></a></span>
+<span id="cb7-26"><a href="#cb7-26" tabindex="-1"></a><span class="fu">shinyApp</span>(ui, server)</span></code></pre></div>
+<p>Here <code>color.by</code> is fixed to <code>&quot;condition&quot;</code> and
+hidden. The entire <code>&quot;Plotly&quot;</code> and <code>&quot;Lines&quot;</code> tabs
+are removed because they aren’t relevant to this app.</p>
+<hr />
+</div>
+<div id="using-hide.inputs-in-createmoduleapp-and-app" class="section level2">
+<h2>Using <code>hide.inputs</code> in <code>createModuleApp()</code> and
+<code>*App()</code></h2>
+<p>Both accept <code>hide.inputs</code> and <code>hide.tabs</code>,
+forwarding them to the server if it supports those arguments:</p>
+<div class="sourceCode" id="cb8"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" tabindex="-1"></a><span class="fu">plotthis_ViolinPlotApp</span>(</span>
+<span id="cb8-2"><a href="#cb8-2" tabindex="-1"></a>    <span class="at">defaults    =</span> <span class="fu">list</span>(<span class="at">x.by =</span> <span class="st">&quot;Species&quot;</span>, <span class="at">y.by =</span> <span class="st">&quot;Sepal.Length&quot;</span>),</span>
+<span id="cb8-3"><a href="#cb8-3" tabindex="-1"></a>    <span class="at">hide.inputs =</span> <span class="st">&quot;color.by&quot;</span>,</span>
+<span id="cb8-4"><a href="#cb8-4" tabindex="-1"></a>    <span class="at">hide.tabs   =</span> <span class="st">&quot;Plotly&quot;</span></span>
+<span id="cb8-5"><a href="#cb8-5" tabindex="-1"></a>)</span></code></pre></div>
+<hr />
+</div>
+<div id="hiding-inputs-dynamically-in-a-custom-module" class="section level2">
+<h2>Hiding inputs dynamically in a custom module</h2>
+<p>When building a wrapper module (see
+<code>vignette(&quot;custom-modules&quot;, package = &quot;VizModules&quot;)</code>), you
+can hide and show inputs at runtime in response to other inputs using
+<code>shinyjs</code>:</p>
+<div class="sourceCode" id="cb9"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" tabindex="-1"></a><span class="fu">library</span>(shinyjs)</span>
+<span id="cb9-2"><a href="#cb9-2" tabindex="-1"></a></span>
+<span id="cb9-3"><a href="#cb9-3" tabindex="-1"></a>myModuleServer <span class="ot">&lt;-</span> <span class="cf">function</span>(id, data_reactive) {</span>
+<span id="cb9-4"><a href="#cb9-4" tabindex="-1"></a>    <span class="fu">moduleServer</span>(id, <span class="cf">function</span>(input, output, session) {</span>
+<span id="cb9-5"><a href="#cb9-5" tabindex="-1"></a>        <span class="co"># Hide the &#39;size&#39; input whenever a size.by column is chosen</span></span>
+<span id="cb9-6"><a href="#cb9-6" tabindex="-1"></a>        <span class="fu">observe</span>({</span>
+<span id="cb9-7"><a href="#cb9-7" tabindex="-1"></a>            <span class="cf">if</span> (<span class="fu">nzchar</span>(input<span class="sc">$</span>size.by)) {</span>
+<span id="cb9-8"><a href="#cb9-8" tabindex="-1"></a>                shinyjs<span class="sc">::</span><span class="fu">hide</span>(<span class="at">id =</span> <span class="st">&quot;size&quot;</span>)</span>
+<span id="cb9-9"><a href="#cb9-9" tabindex="-1"></a>            } <span class="cf">else</span> {</span>
+<span id="cb9-10"><a href="#cb9-10" tabindex="-1"></a>                shinyjs<span class="sc">::</span><span class="fu">show</span>(<span class="at">id =</span> <span class="st">&quot;size&quot;</span>)</span>
+<span id="cb9-11"><a href="#cb9-11" tabindex="-1"></a>            }</span>
+<span id="cb9-12"><a href="#cb9-12" tabindex="-1"></a>        })</span>
+<span id="cb9-13"><a href="#cb9-13" tabindex="-1"></a>    })</span>
+<span id="cb9-14"><a href="#cb9-14" tabindex="-1"></a></span>
+<span id="cb9-15"><a href="#cb9-15" tabindex="-1"></a>    <span class="fu">dittoViz_scatterPlotServer</span>(id, data_reactive)</span>
+<span id="cb9-16"><a href="#cb9-16" tabindex="-1"></a>}</span></code></pre></div>
+<p>Note that <code>shinyjs::hide()</code> / <code>shinyjs::show()</code>
+act on the input element itself. For the reflow behaviour (no empty
+gap), use the internal <code>.hide_input()</code> /
+<code>.show_input()</code> helpers instead, which target the wrapping
+cell in the flexbox grid:</p>
+<div class="sourceCode" id="cb10"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" tabindex="-1"></a>myModuleServer <span class="ot">&lt;-</span> <span class="cf">function</span>(id, data_reactive) {</span>
+<span id="cb10-2"><a href="#cb10-2" tabindex="-1"></a>    <span class="fu">moduleServer</span>(id, <span class="cf">function</span>(input, output, session) {</span>
+<span id="cb10-3"><a href="#cb10-3" tabindex="-1"></a>        <span class="fu">observe</span>({</span>
+<span id="cb10-4"><a href="#cb10-4" tabindex="-1"></a>            <span class="cf">if</span> (<span class="fu">nzchar</span>(input<span class="sc">$</span>size.by)) {</span>
+<span id="cb10-5"><a href="#cb10-5" tabindex="-1"></a>                VizModules<span class="sc">:::</span><span class="fu">.hide_input</span>(session, <span class="st">&quot;size&quot;</span>)</span>
+<span id="cb10-6"><a href="#cb10-6" tabindex="-1"></a>            } <span class="cf">else</span> {</span>
+<span id="cb10-7"><a href="#cb10-7" tabindex="-1"></a>                VizModules<span class="sc">:::</span><span class="fu">.show_input</span>(session, <span class="st">&quot;size&quot;</span>)</span>
+<span id="cb10-8"><a href="#cb10-8" tabindex="-1"></a>            }</span>
+<span id="cb10-9"><a href="#cb10-9" tabindex="-1"></a>        })</span>
+<span id="cb10-10"><a href="#cb10-10" tabindex="-1"></a>    })</span>
+<span id="cb10-11"><a href="#cb10-11" tabindex="-1"></a></span>
+<span id="cb10-12"><a href="#cb10-12" tabindex="-1"></a>    <span class="fu">dittoViz_scatterPlotServer</span>(id, data_reactive)</span>
+<span id="cb10-13"><a href="#cb10-13" tabindex="-1"></a>}</span></code></pre></div>
+</div>
+
+
+
+<!-- code folding -->
+
+
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+  (function () {
+    var script = document.createElement("script");
+    script.type = "text/javascript";
+    script.src  = "https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML";
+    document.getElementsByTagName("head")[0].appendChild(script);
+  })();
+</script>
+
+</body>
+</html>

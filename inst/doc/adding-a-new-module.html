@@ -383,6 +383,10 @@ lines, etc)</li>
 </ul></li>
 <li><label><input type="checkbox"></input>Add an example app that uses the
 module twice to prove multi-instance behavior.</label></li>
+<li><label><input type="checkbox"></input>Wire up manual layout-edit
+persistence so user-dragged titles, legends, annotations, and colorbars
+survive re-renders (see <a href="#persisting-manual-layout-edits">Persisting Manual Layout
+Edits</a>).</label></li>
 <li><label><input type="checkbox"></input>Cover the base plotting function
 with <code>testthat</code>; cover the module/app with
 <code>shinytest2</code>.</label></li>
@@ -569,6 +573,87 @@ for the plotting function (happy paths + invalid inputs).</label></li>
 stable, build the module UI/server/app wrappers around it.</label></li>
 </ul>
 </div>
+<div id="persisting-manual-layout-edits" class="section level2">
+<h2>Persisting Manual Layout Edits</h2>
+<p>Every VizModules plot is interactively editable: users can drag the
+legend, reposition or re-text annotations, drag the (draggable) axis
+titles, and slide a continuous-colour legend (colorbar) to their heart’s
+content.</p>
+<p>Because each module rebuilds its figure from scratch on every input
+change, those hand-made tweaks would be lost on the next re-render
+unless they are captured and re-applied.</p>
+<p>Two exported helpers handle this for you. Use them in
+<strong>every</strong> new module so the behaviour is available from the
+start.</p>
+<div id="server" class="section level3">
+<h3>Server</h3>
+<ul class="task-list">
+<li><p><label><input type="checkbox"></input>Near the top of your
+<code>moduleServer()</code> body, create a unique plotly event source
+for this module instance and the edit store:</label></p>
+<div class="sourceCode" id="cb5"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" tabindex="-1"></a><span class="co"># Unique source so each module instance captures only its own events.</span></span>
+<span id="cb5-2"><a href="#cb5-2" tabindex="-1"></a>plot_source <span class="ot">&lt;-</span> session<span class="sc">$</span><span class="fu">ns</span>(<span class="st">&quot;myplot&quot;</span>)</span>
+<span id="cb5-3"><a href="#cb5-3" tabindex="-1"></a>edit_store <span class="ot">&lt;-</span> <span class="fu">setup_manual_edits</span>(input, session, plot_source)</span></code></pre></div></li>
+<li><p><label><input type="checkbox"></input>In your
+<code>renderPlotly()</code>, pass the freshly built figure through
+<code>finalize_manual_edits()</code> immediately before returning
+it:</label></p>
+<div class="sourceCode" id="cb6"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" tabindex="-1"></a>output<span class="sc">$</span>myPlot <span class="ot">&lt;-</span> <span class="fu">renderPlotly</span>({</span>
+<span id="cb6-2"><a href="#cb6-2" tabindex="-1"></a>    <span class="fu">req</span>(input<span class="sc">$</span>x, input<span class="sc">$</span>y)</span>
+<span id="cb6-3"><a href="#cb6-3" tabindex="-1"></a>    fig <span class="ot">&lt;-</span> <span class="fu">generate_myPlot</span>()  <span class="co"># your function that builds the plotly figure</span></span>
+<span id="cb6-4"><a href="#cb6-4" tabindex="-1"></a>    <span class="fu">finalize_manual_edits</span>(fig, plot_source, edit_store, session)</span>
+<span id="cb6-5"><a href="#cb6-5" tabindex="-1"></a>})</span></code></pre></div></li>
+</ul>
+<p>Pretty simple.</p>
+<p><code>setup_manual_edits()</code> registers the observers that
+capture <code>plotly_relayout</code> events (legend, annotation, and
+axis-title drags) plus the JavaScript-forwarded colorbar drag;
+<code>finalize_manual_edits()</code> tags the figure with the event
+source, restores any captured edits, records the figure for stable
+annotation keying, and re-attaches the colorbar listener.</p>
+<p>Edits are matched to annotations by a content-derived key, so they
+survive even when annotations are added, removed, or reordered between
+rebuilds (e.g. when statistical brackets or reference labels
+appear).</p>
+</div>
+<div id="key-helpers-all-in-rplot_helpers.r" class="section level3">
+<h3>Key helpers (all in <code>R/plot_helpers.R</code>)</h3>
+<table>
+<colgroup>
+<col width="50%" />
+<col width="50%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Function</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>setup_manual_edits()</code></td>
+<td>Create the edit store and register the relayout/colorbar capture
+observers (call <strong>once</strong>, near the top of the server)</td>
+</tr>
+<tr class="even">
+<td><code>finalize_manual_edits()</code></td>
+<td>Tag the event source, restore captured edits, record the figure, and
+attach the colorbar listener (call in <code>renderPlotly()</code>, just
+before returning)</td>
+</tr>
+</tbody>
+</table>
+<p>Both functions are exported, so the same two-step pattern works from
+a custom module in your own package. The supporting internals
+(<code>.capture_manual_edits()</code>,
+<code>.reapply_manual_edits()</code>,
+<code>.add_colorbar_listener()</code>) are not exported and shouldn’t
+need to be used directly (though you can always access them via
+<code>VizModules:::</code> if really necessary.</p>
+<p>See any module server (e.g. <code>dittoViz_scatterPlotServer</code>)
+for a complete example.</p>
+</div>
+</div>
 <div id="integrating-statistical-testing-stats-tab" class="section level2">
 <h2>Integrating Statistical Testing (Stats Tab)</h2>
 <p>Modules for categorical-vs-numeric plots (box, violin, etc.) can
@@ -584,7 +669,7 @@ the module’s <code>tabsetPanel</code> containing
 <code>.uniform_stats_inputs_ui(ns, defaults)</code>.</label></li>
 </ul>
 </div>
-<div id="server" class="section level3">
+<div id="server-1" class="section level3">
 <h3>Server</h3>
 <ul class="task-list">
 <li><label><input type="checkbox"></input>Create a <code>reactiveVal</code> to
@@ -715,17 +800,17 @@ correction methods, bracket inset).</li>
 <p>Standard pattern — always use <code>placement = &quot;top&quot;</code> and
 <code>options = list(container = &quot;body&quot;)</code> so tooltips render
 correctly inside sidebar panels:</p>
-<div class="sourceCode" id="cb5"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" tabindex="-1"></a><span class="fu">tipify</span>(</span>
-<span id="cb5-2"><a href="#cb5-2" tabindex="-1"></a>    <span class="fu">textInput</span>(<span class="fu">ns</span>(<span class="st">&quot;hline.intercepts&quot;</span>), <span class="st">&quot;Y-intercepts&quot;</span>,</span>
-<span id="cb5-3"><a href="#cb5-3" tabindex="-1"></a>        <span class="at">placeholder =</span> <span class="st">&quot;e.g. 2, -2&quot;</span>,</span>
-<span id="cb5-4"><a href="#cb5-4" tabindex="-1"></a>        <span class="at">value =</span> <span class="fu">.get_default</span>(defaults, <span class="st">&quot;hline.intercepts&quot;</span>, <span class="st">&quot;&quot;</span>)</span>
-<span id="cb5-5"><a href="#cb5-5" tabindex="-1"></a>    ),</span>
-<span id="cb5-6"><a href="#cb5-6" tabindex="-1"></a>    <span class="fu">paste</span>(</span>
-<span id="cb5-7"><a href="#cb5-7" tabindex="-1"></a>        <span class="st">&quot;For categorical or factor axes, enter the index (position) of the&quot;</span>,</span>
-<span id="cb5-8"><a href="#cb5-8" tabindex="-1"></a>        <span class="st">&quot;category rather than its name.&quot;</span></span>
-<span id="cb5-9"><a href="#cb5-9" tabindex="-1"></a>    ),</span>
-<span id="cb5-10"><a href="#cb5-10" tabindex="-1"></a>    <span class="at">placement =</span> <span class="st">&quot;top&quot;</span>, <span class="at">options =</span> <span class="fu">list</span>(<span class="at">container =</span> <span class="st">&quot;body&quot;</span>)</span>
-<span id="cb5-11"><a href="#cb5-11" tabindex="-1"></a>)</span></code></pre></div>
+<div class="sourceCode" id="cb7"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" tabindex="-1"></a><span class="fu">tipify</span>(</span>
+<span id="cb7-2"><a href="#cb7-2" tabindex="-1"></a>    <span class="fu">textInput</span>(<span class="fu">ns</span>(<span class="st">&quot;hline.intercepts&quot;</span>), <span class="st">&quot;Y-intercepts&quot;</span>,</span>
+<span id="cb7-3"><a href="#cb7-3" tabindex="-1"></a>        <span class="at">placeholder =</span> <span class="st">&quot;e.g. 2, -2&quot;</span>,</span>
+<span id="cb7-4"><a href="#cb7-4" tabindex="-1"></a>        <span class="at">value =</span> <span class="fu">get_default</span>(defaults, <span class="st">&quot;hline.intercepts&quot;</span>, <span class="st">&quot;&quot;</span>)</span>
+<span id="cb7-5"><a href="#cb7-5" tabindex="-1"></a>    ),</span>
+<span id="cb7-6"><a href="#cb7-6" tabindex="-1"></a>    <span class="fu">paste</span>(</span>
+<span id="cb7-7"><a href="#cb7-7" tabindex="-1"></a>        <span class="st">&quot;For categorical or factor axes, enter the index (position) of the&quot;</span>,</span>
+<span id="cb7-8"><a href="#cb7-8" tabindex="-1"></a>        <span class="st">&quot;category rather than its name.&quot;</span></span>
+<span id="cb7-9"><a href="#cb7-9" tabindex="-1"></a>    ),</span>
+<span id="cb7-10"><a href="#cb7-10" tabindex="-1"></a>    <span class="at">placement =</span> <span class="st">&quot;top&quot;</span>, <span class="at">options =</span> <span class="fu">list</span>(<span class="at">container =</span> <span class="st">&quot;body&quot;</span>)</span>
+<span id="cb7-11"><a href="#cb7-11" tabindex="-1"></a>)</span></code></pre></div>
 <p>Inputs that are self-explanatory from their label (e.g.,
 <code>&quot;Plot Title&quot;</code>, <code>&quot;X-axis Variable&quot;</code>) do not need a
 tooltip.</p>
@@ -750,11 +835,11 @@ covers your needs:</p>
 </thead>
 <tbody>
 <tr class="odd">
-<td><code>.uniform_lines_inputs_ui()</code></td>
+<td><code>uniform_lines_inputs_ui()</code></td>
 <td>Horizontal, vertical, and diagonal reference line controls</td>
 </tr>
 <tr class="even">
-<td><code>.uniform_axes_inputs_ui()</code></td>
+<td><code>uniform_axes_inputs_ui()</code></td>
 <td>Font, axis border, gridline, tick, and facet styling</td>
 </tr>
 <tr class="odd">
@@ -762,7 +847,7 @@ covers your needs:</p>
 <td>Pairwise statistical testing and bracket annotation controls</td>
 </tr>
 <tr class="even">
-<td><code>.uniform_plotly_inputs_ui()</code></td>
+<td><code>uniform_plotly_inputs_ui()</code></td>
 <td>Download buttons, margins, subplot spacing, and draw-shape
 styling</td>
 </tr>
@@ -818,8 +903,8 @@ expression is parsed, its AST is walked to ensure only allowed
 operations are present (comparisons, logical operators, column
 references, and literals), and then it is evaluated in a restricted
 environment containing only the data frame’s columns.</p>
-<div class="sourceCode" id="cb6"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" tabindex="-1"></a><span class="co"># In a module server — filtering rows by a textInput:</span></span>
-<span id="cb6-2"><a href="#cb6-2" tabindex="-1"></a>rows.use <span class="ot">=</span> <span class="fu">safe_eval_filter</span>(<span class="fu">isolate_fn</span>(input<span class="sc">$</span>rows.use), <span class="fu">data</span>())</span></code></pre></div>
+<div class="sourceCode" id="cb8"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" tabindex="-1"></a><span class="co"># In a module server — filtering rows by a textInput:</span></span>
+<span id="cb8-2"><a href="#cb8-2" tabindex="-1"></a>rows.use <span class="ot">=</span> <span class="fu">safe_eval_filter</span>(<span class="fu">isolate_fn</span>(input<span class="sc">$</span>rows.use), <span class="fu">data</span>())</span></code></pre></div>
 <p>Returns a logical vector (same length as <code>nrow(data)</code>), or
 <code>NULL</code> if the input is empty, unparseable, or contains
 disallowed operations.</p>
@@ -830,8 +915,8 @@ disallowed operations.</p>
 string through to a downstream plotting function that will evaluate it
 internally (e.g., <code>plotthis::BoxPlot(highlight = ...)</code>). The
 string is validated but not executed.</p>
-<div class="sourceCode" id="cb7"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" tabindex="-1"></a><span class="co"># In a module server — passing a highlight expression to plotthis:</span></span>
-<span id="cb7-2"><a href="#cb7-2" tabindex="-1"></a>highlight <span class="ot">&lt;-</span> <span class="fu">validate_expression</span>(<span class="fu">isolate_fn</span>(input<span class="sc">$</span>highlight), <span class="fu">names</span>(<span class="fu">data</span>()))</span></code></pre></div>
+<div class="sourceCode" id="cb9"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" tabindex="-1"></a><span class="co"># In a module server — passing a highlight expression to plotthis:</span></span>
+<span id="cb9-2"><a href="#cb9-2" tabindex="-1"></a>highlight <span class="ot">&lt;-</span> <span class="fu">validate_expression</span>(<span class="fu">isolate_fn</span>(input<span class="sc">$</span>highlight), <span class="fu">names</span>(<span class="fu">data</span>()))</span></code></pre></div>
 <p>Returns the original string if safe, or <code>NULL</code>.</p>
 </div>
 <div id="safe_resolve_adj_fxnfn_name" class="section level3">
@@ -843,8 +928,8 @@ the allowed list (<code>&quot;log2&quot;</code>, <code>&quot;log&quot;</code>,
 <code>&quot;log10&quot;</code>, <code>&quot;neg_log10&quot;</code>, <code>&quot;log1p&quot;</code>,
 <code>&quot;as.factor&quot;</code>, <code>&quot;abs&quot;</code>, <code>&quot;sqrt&quot;</code>) are
 accepted.</p>
-<div class="sourceCode" id="cb8"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" tabindex="-1"></a><span class="co"># In a module server — resolving an adjustment function:</span></span>
-<span id="cb8-2"><a href="#cb8-2" tabindex="-1"></a>x.adj.fxn <span class="ot">=</span> <span class="fu">safe_resolve_adj_fxn</span>(<span class="fu">isolate_fn</span>(input<span class="sc">$</span>x.adj.fxn))</span></code></pre></div>
+<div class="sourceCode" id="cb10"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" tabindex="-1"></a><span class="co"># In a module server — resolving an adjustment function:</span></span>
+<span id="cb10-2"><a href="#cb10-2" tabindex="-1"></a>x.adj.fxn <span class="ot">=</span> <span class="fu">safe_resolve_adj_fxn</span>(<span class="fu">isolate_fn</span>(input<span class="sc">$</span>x.adj.fxn))</span></code></pre></div>
 <p>Returns the function, or <code>NULL</code> if the name is empty or
 not in the allowed list.</p>
 </div>

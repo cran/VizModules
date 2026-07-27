@@ -36,7 +36,7 @@ A plotly object representing the dumbbell (or single dot) plot for the supplied 
 }
 \description{
 Helper function that generates a plotly scatter plot in either single dot or dumbbell mode
-for one dataset (i.e., one facet). Called internally by \code{\link{dumbbellPlot}}.
+for one dataset (i.e., one facet). Called internally by \code{\link[=dumbbellPlot]{dumbbellPlot()}}.
 }
 \author{
 Jacob Martin

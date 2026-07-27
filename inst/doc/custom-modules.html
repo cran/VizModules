@@ -476,13 +476,41 @@ from the user to keep them from being changed:</p>
 <span id="cb4-9"><a href="#cb4-9" tabindex="-1"></a>    )</span>
 <span id="cb4-10"><a href="#cb4-10" tabindex="-1"></a>}</span></code></pre></div>
 </div>
+<div id="automatically-preserving-manual-titlelegendannotation-edits" class="section level2">
+<h2>Automatically Preserving Manual Title/Legend/Annotation Edits</h2>
+<p>The base modules let users interactively drag and edit the plot
+title, legend, annotations, draggable axis titles, and continuous-colour
+legend (colorbar), and they re-apply those manual tweaks across
+re-renders. When you wrap a base module (as in the examples above), this
+persistence is inherited for free.</p>
+<p>If you build a brand-new <code>plotly</code> output from scratch
+inside a custom module (rather than delegating to a base module’s
+server), you can add the same behaviour simply with 3 basic steps:</p>
+<div class="sourceCode" id="cb5"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" tabindex="-1"></a>customPlotServer <span class="ot">&lt;-</span> <span class="cf">function</span>(id, data_reactive) {</span>
+<span id="cb5-2"><a href="#cb5-2" tabindex="-1"></a>    <span class="fu">moduleServer</span>(id, <span class="cf">function</span>(input, output, session) {</span>
+<span id="cb5-3"><a href="#cb5-3" tabindex="-1"></a>        <span class="co"># 1. A unique event source + the edit store, created once.</span></span>
+<span id="cb5-4"><a href="#cb5-4" tabindex="-1"></a>        plot_source <span class="ot">&lt;-</span> session<span class="sc">$</span><span class="fu">ns</span>(<span class="st">&quot;customplot&quot;</span>)</span>
+<span id="cb5-5"><a href="#cb5-5" tabindex="-1"></a>        edit_store <span class="ot">&lt;-</span> <span class="fu">setup_manual_edits</span>(input, session, plot_source)</span>
+<span id="cb5-6"><a href="#cb5-6" tabindex="-1"></a></span>
+<span id="cb5-7"><a href="#cb5-7" tabindex="-1"></a>        output<span class="sc">$</span>plot <span class="ot">&lt;-</span> <span class="fu">renderPlotly</span>({</span>
+<span id="cb5-8"><a href="#cb5-8" tabindex="-1"></a>            <span class="co"># 2. Create your plotly object with your plotting function</span></span>
+<span id="cb5-9"><a href="#cb5-9" tabindex="-1"></a>            fig <span class="ot">&lt;-</span> <span class="fu">build_my_plotly_figure</span>(<span class="fu">data_reactive</span>(), input)</span>
+<span id="cb5-10"><a href="#cb5-10" tabindex="-1"></a>            <span class="co"># 3. Restore + capture edits on every render, then return the figure.</span></span>
+<span id="cb5-11"><a href="#cb5-11" tabindex="-1"></a>            <span class="fu">finalize_manual_edits</span>(fig, plot_source, edit_store, session)</span>
+<span id="cb5-12"><a href="#cb5-12" tabindex="-1"></a>        })</span>
+<span id="cb5-13"><a href="#cb5-13" tabindex="-1"></a>    })</span>
+<span id="cb5-14"><a href="#cb5-14" tabindex="-1"></a>}</span></code></pre></div>
+<p>See the “Adding a New Module” vignette for the full description of
+these helpers, but this is pretty much all you need to do.</p>
+</div>
 <div id="best-practices" class="section level2">
 <h2>Best Practices</h2>
 <ol style="list-style-type: decimal">
 <li><p><strong>Keep wrapper logic focused</strong>: Each wrapper should
 add a cohesive set of related functionality.</p></li>
 <li><p><strong>Document the data requirements</strong>: If your wrapper
-expects certain columns or data types, document this clearly.</p></li>
+expects certain columns, a specific class or data structure, etc,
+document this clearly.</p></li>
 <li><p><strong>Use reactive expressions</strong>: Use reactive data
 inputs.</p></li>
 <li><p><strong>Test the namespace</strong>: If inputs aren’t working,
@@ -491,15 +519,7 @@ namespace issues is that inputs seem to have no effect.</p></li>
 <li><p><strong>Consider composability</strong>: Design your wrappers so
 they could potentially be wrapped by even higher-level modules.</p></li>
 </ol>
-</div>
-<div id="see-also" class="section level2">
-<h2>See Also</h2>
-<ul>
-<li>The base modules (<code>dittoViz_scatterPlotInputsUI</code>,
-<code>dittoViz_scatterPlotOutputUI</code>,
-<code>dittoViz_scatterPlotServer</code>) are documented in the package
-reference.</li>
-</ul>
+<p>See any of the existing modules for clear reference examples.</p>
 </div>
 
 

@@ -352,8 +352,8 @@ code > span.er { color: #a61717; background-color: #e3d2d2; }
 <h2>Drop a module into your app</h2>
 <p>All modules follow the same pattern: <code>*InputsUI()</code> for
 controls, <code>*OutputUI()</code> for the plot, and
-<code>*Server()</code> for the logic. Here is a minimal
-<code>scatterPlot</code> example:</p>
+<code>*Server()</code> for the logic. Here is a minimal scatter plot
+example using the <code>dittoViz_scatterPlot</code> module:</p>
 <div class="sourceCode" id="cb2"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" tabindex="-1"></a><span class="fu">library</span>(VizModules)</span>
 <span id="cb2-2"><a href="#cb2-2" tabindex="-1"></a></span>
 <span id="cb2-3"><a href="#cb2-3" tabindex="-1"></a>ui <span class="ot">&lt;-</span> <span class="fu">fluidPage</span>(</span>
@@ -387,7 +387,9 @@ inputs. Names match the underlying plot function arguments (e.g.,
 <code>defaults = list(fill.color = &quot;steelblue&quot;)</code>).</li>
 <li><strong>Hide inputs</strong>: Use <code>hide.inputs</code> in the
 server call to remove controls while still initializing their values.
-This is useful when your app sets certain parameters itself.</li>
+This is useful when your app sets certain parameters itself or wants to
+hide control of various elements while still passing their initial
+values.</li>
 <li><strong>Hide tabs</strong>: Use <code>hide.tabs</code> to remove
 whole groups of controls (e.g., <code>&quot;Plotly&quot;</code> or
 <code>&quot;Legend&quot;</code> in <code>scatterPlot</code>).</li>
@@ -425,7 +427,7 @@ default data. You can also pass custom wrapper module functions to
 <code>createModuleApp()</code> for rapid prototyping.</p>
 </div>
 <div id="export-summary-data" class="section level2">
-<h2>Export Summary Data:</h2>
+<h2>Export Summary Data</h2>
 <p>We provide <code>collect_source_data()</code> to assemble a compact
 record of the plotted data, stats, UI inputs, and the rendered plot, and
 <code>create_source_download_handler()</code> to turn that record into a

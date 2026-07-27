@@ -84,3 +84,19 @@ knitr::opts_chunk$set(
 #     )
 # }
 
+## ----manual-edits-------------------------------------------------------------
+# customPlotServer <- function(id, data_reactive) {
+#     moduleServer(id, function(input, output, session) {
+#         # 1. A unique event source + the edit store, created once.
+#         plot_source <- session$ns("customplot")
+#         edit_store <- setup_manual_edits(input, session, plot_source)
+# 
+#         output$plot <- renderPlotly({
+#             # 2. Create your plotly object with your plotting function
+#             fig <- build_my_plotly_figure(data_reactive(), input)
+#             # 3. Restore + capture edits on every render, then return the figure.
+#             finalize_manual_edits(fig, plot_source, edit_store, session)
+#         })
+#     })
+# }
+

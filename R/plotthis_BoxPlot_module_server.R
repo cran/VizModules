@@ -18,8 +18,9 @@
 #' @importFrom stats na.omit
 #' @importFrom colourpicker updateColourInput
 #' @importFrom plotthis BoxPlot
-#' @importFrom shinyjs hide show
+#' @importFrom shinyjs hide show delay
 #' @importFrom shinyWidgets updateMaterialSwitch
+#' @importFrom ggplot2 geom_boxplot
 #'
 #' @export
 #' @author Jacob Martin, Jared Andrews
@@ -30,17 +31,25 @@ plotthis_BoxPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs = NUL
         # Constant for y-axis scaling to ensure highest box reaches ~90% of chart height
 
 
-        # Hide individual inputs if specified
-        if (!is.null(hide.inputs)) {
-            for (input.name in hide.inputs) hide(input.name)
-        }
-
-        # Hide tabs if specified
-        if (!is.null(hide.tabs)) {
-            for (tab.name in hide.tabs) hideTab(inputId = "BoxPlotTabsetPanel", target = tab.name)
+        # Hide individual inputs/tabs if specified. The inputs UI is injected by the
+        # parent app via renderUI (and re-injected when the dataset changes), so the
+        # hiding must be (re)applied after the controls exist in the DOM rather than
+        # once at module initialization.
+        if (!is.null(hide.inputs) || !is.null(hide.tabs)) {
+            observeEvent(data(), {
+                delay(100, {
+                    .hide_input(session, hide.inputs)
+                    for (tab.name in hide.tabs) hideTab(inputId = "BoxPlotTabsetPanel", target = tab.name)
+                })
+            })
         }
 
         ns <- session$ns
+
+        # Persist manual legend/annotation/colorbar repositioning across rebuilds.
+        plot_source <- session$ns("box")
+        edit_store <- setup_manual_edits(input, session, plot_source)
+
         default_palette_name <- "dittoColors"
 
         # Store last computed stats table for download
@@ -113,60 +122,71 @@ plotthis_BoxPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs = NUL
 
             # Data
             updateSelectInput(session, "group.by",
-                selected = .get_default(defaults, "group.by", "", function(x) x == "" || x %in% char.choices))
+                selected = get_default(defaults, "group.by", "", function(x) x == "" || x %in% char.choices)
+            )
             updateSelectInput(session, "x.data",
-                selected = .get_default(defaults, "x.data", char.choices[2], function(x) x %in% char.choices))
+                selected = get_default(defaults, "x.data", char.choices[2], function(x) x %in% char.choices)
+            )
             updateSelectInput(session, "y.data",
-                selected = .get_default(defaults, "y.data", num.choices[2], function(x) x %in% num.choices))
+                selected = get_default(defaults, "y.data", num.choices[2], function(x) x %in% num.choices)
+            )
             updateMaterialSwitch(session, "show.outliers",
-                value = .get_default(defaults, "show.outliers", TRUE, is.logical))
+                value = get_default(defaults, "show.outliers", TRUE, is.logical)
+            )
 
             # Adjustments
-            updateSelectInput(session, "sort_x", selected = .get_default(defaults, "sort_x", ""))
-            updateMaterialSwitch(session, "rotate", value = .get_default(defaults, "rotate", FALSE, is.logical))
-            updateNumericInput(session, "y.min", value = .get_default(defaults, "y.min", min.y, is.numeric))
-            updateNumericInput(session, "y.max", value = .get_default(defaults, "y.max", max.y, is.numeric))
+            updateSelectInput(session, "sort_x", selected = get_default(defaults, "sort_x", ""))
+            updateMaterialSwitch(session, "rotate", value = get_default(defaults, "rotate", FALSE, is.logical))
+            updateNumericInput(session, "y.min", value = get_default(defaults, "y.min", min.y, is.numeric))
+            updateNumericInput(session, "y.max", value = get_default(defaults, "y.max", max.y, is.numeric))
 
             # Points
-            updateMaterialSwitch(session, "add.points", value = .get_default(defaults, "add.points", FALSE, is.logical))
-            updateNumericInput(session, "pt.size", value = .get_default(defaults, "pt.size", 1, is.numeric))
-            updateNumericInput(session, "pt.alpha", value = .get_default(defaults, "pt.alpha", 1, is.numeric))
-            updateNumericInput(session, "jitter.width", value = .get_default(defaults, "jitter.width", 0.3, is.numeric))
-            updateNumericInput(session, "boxplot.width", value = .get_default(defaults, "boxplot.width", 0.8, is.numeric))
+            updateMaterialSwitch(session, "add.points", value = get_default(defaults, "add.points", FALSE, is.logical))
+            updateNumericInput(session, "pt.size", value = get_default(defaults, "pt.size", 1, is.numeric))
+            updateNumericInput(session, "pt.alpha", value = get_default(defaults, "pt.alpha", 1, is.numeric))
+            updateNumericInput(session, "jitter.width", value = get_default(defaults, "jitter.width", 0.3, is.numeric))
+            updateNumericInput(session, "boxplot.width", value = get_default(defaults, "boxplot.width", 0.8, is.numeric))
 
             # Colors
             updateColourInput(session, "pt.color",
-                value = .get_default(defaults, "pt.color", "#000000"))
-            updateNumericInput(session, "alpha", value = .get_default(defaults, "alpha", 1, is.numeric))
+                value = get_default(defaults, "pt.color", "#000000")
+            )
+            updateNumericInput(session, "alpha", value = get_default(defaults, "alpha", 1, is.numeric))
 
             # Annotations
-            updateTextInput(session, "highlight", value = .get_default(defaults, "highlight", ""))
+            updateTextInput(session, "highlight", value = get_default(defaults, "highlight", ""))
             updateColourInput(session, "highlight.colour",
-                value = .get_default(defaults, "highlight.colour", "#000000"))
+                value = get_default(defaults, "highlight.colour", "#000000")
+            )
             updateNumericInput(session, "highlight.size",
-                value = .get_default(defaults, "highlight.size", 1, is.numeric))
+                value = get_default(defaults, "highlight.size", 1, is.numeric)
+            )
             updateNumericInput(session, "highlight.alpha",
-                value = .get_default(defaults, "highlight.alpha", 1, is.numeric))
+                value = get_default(defaults, "highlight.alpha", 1, is.numeric)
+            )
 
             # Facet
             updateSelectInput(session, "facet.by",
-                selected = .get_default(defaults, "facet.by", "", function(x) x == "" || x %in% char.choices))
+                selected = get_default(defaults, "facet.by", "", function(x) x == "" || x %in% char.choices)
+            )
             updateSelectInput(session, "facet.scale",
-                selected = .get_default(defaults, "facet.scale", "fixed"))
-            updateNumericInput(session, "facet.ncol", value = .get_default(defaults, "facet.ncol", NA, is.numeric))
-            updateNumericInput(session, "facet.nrow", value = .get_default(defaults, "facet.nrow", NA, is.numeric))
+                selected = get_default(defaults, "facet.scale", "fixed")
+            )
+            updateNumericInput(session, "facet.ncol", value = get_default(defaults, "facet.ncol", NA, is.numeric))
+            updateNumericInput(session, "facet.nrow", value = get_default(defaults, "facet.nrow", NA, is.numeric))
             updateMaterialSwitch(session, "facet.by.row",
-                value = .get_default(defaults, "facet.by.row", TRUE, is.logical))
+                value = get_default(defaults, "facet.by.row", TRUE, is.logical)
+            )
 
             # Action Button
-            .reset_plotly_inputs(session, defaults)
-            .reset_legend_inputs(session, defaults)
+            reset_plotly_inputs(session, defaults)
+            reset_legend_inputs(session, defaults)
 
             # Lines
-            .reset_lines_inputs(session, defaults = defaults)
+            reset_lines_inputs(session, defaults = defaults)
 
             # Axes
-            .reset_axes_inputs(session, defaults)
+            reset_axes_inputs(session, defaults)
 
             # Stats
             .reset_stats_inputs(session, defaults)
@@ -181,21 +201,20 @@ plotthis_BoxPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs = NUL
             }
         })
 
-        observeEvent(c(input$facet.by, input$x.data), {
-            if (input$facet.by == input$x.data){
-                updateSelectInput(session, "facet.scale", selected = "free_x")
-            }
-        }, ignoreInit = FALSE)
+        observeEvent(c(input$facet.by, input$x.data),
+            {
+                if (input$facet.by == input$x.data) {
+                    updateSelectInput(session, "facet.scale", selected = "free_x")
+                }
+            },
+            ignoreInit = FALSE
+        )
 
-        observeEvent(input$facet.by,  {
-            if (!input$facet.by == ""){
-              show("facet.title.font.size")
-              show("facet.title.font.color")
-              show("facet.title.font.family")
+        observeEvent(input$facet.by, {
+            if (!input$facet.by == "") {
+                .show_input(session, c("facet.title.font.size", "facet.title.font.color", "facet.title.font.family"))
             } else {
-              hide("facet.title.font.size")
-              hide("facet.title.font.color")
-              hide("facet.title.font.family")
+                .hide_input(session, c("facet.title.font.size", "facet.title.font.color", "facet.title.font.family"))
             }
         })
 
@@ -234,7 +253,7 @@ plotthis_BoxPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs = NUL
                 palcolor_arg <- as.list(palette_values)
             }
 
-            theme_args <- .create_ggplot_axis_style(input, isolate_fn = isolate_fn)
+            theme_args <- create_ggplot_axis_style(input, isolate_fn = isolate_fn)
 
             # Fill By colour grading
             char.choices <- c("", names(data())[vapply(data(), function(x) !is.numeric(x), logical(1))])
@@ -273,7 +292,10 @@ plotthis_BoxPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs = NUL
                 highlight_alpha = isolate_fn(input$highlight.alpha)
             )
 
-
+            # Remove outliers if jitter points are shown or if user explicitly disabled outliers
+            if (isolate_fn(input$add.points) || !isolate_fn(input$show.outliers)) {
+                p <- p + geom_boxplot(outlier.shape = NA)
+            }
             fig <- ggplotly(p) |>
                 layout(
                     boxmode = ifelse(!is.null(group.by), "group", "overlay"),
@@ -283,17 +305,21 @@ plotthis_BoxPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs = NUL
             # Fix boxplot positioning across faceted subplots
             if (!is.null(facet.by) && nzchar(facet.by)) {
                 fig <- .fix_boxplot_facet_positions(fig)
-                fig <- .apply_facet_subplot_spacing(
+                fig <- apply_facet_subplot_spacing(
                     fig,
                     spacing = c(isolate_fn(input$subplot.margin.x), isolate_fn(input$subplot.margin.y)),
                     ncol = facet.ncol,
                     nrow = facet.nrow
                 )
             }
-            
-            
-            
-            fig <- .apply_title_layout(fig, input, isolate_fn, title_y = 0.95, title_x = isolate_fn(input$axis.title.horizontal.position))
+
+            fig <- apply_title_layout(
+                fig,
+                input,
+                isolate_fn,
+                title_y = 0.95,
+                title_x = isolate_fn(input$axis.title.horizontal.position)
+            )
 
             # Statistical annotations
             if (isolate_fn(input$stats.enabled)) {
@@ -308,7 +334,9 @@ plotthis_BoxPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs = NUL
                     per.facet = isolate_fn(input$stat.per.facet),
                     sig.threshold = isolate_fn(input$stat.sig.threshold)
                 )
+
                 last_stats_df(stats_df)
+
                 stat_result <- create_stat_annotations(
                     stats_df = stats_df, fig = fig, df = data(),
                     x = isolate_fn(input$x.data), y = isolate_fn(input$y.data),
@@ -323,25 +351,28 @@ plotthis_BoxPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs = NUL
                     text.bump = isolate_fn(input$stat.text.bump),
                     bracket.inset = isolate_fn(input$stat.bracket.inset)
                 )
-                fig <- apply_stat_annotations(fig, stat_result,
+
+                fig <- apply_stat_annotations(
+                    fig,
+                    stat_result,
                     y.min = isolate_fn(input$y.min)
                 )
             }
 
 
             # Apply axis styling to all subplot axes (handles faceting/split_by)
-            xaxis_style <- .create_axis_styles(input, axis_side = "x", isolate_fn = isolate_fn)
-            yaxis_style <- .create_axis_styles(input, axis_side = "y", isolate_fn = isolate_fn)
+            xaxis_style <- create_axis_styles(input, axis_side = "x", isolate_fn = isolate_fn)
+            yaxis_style <- create_axis_styles(input, axis_side = "y", isolate_fn = isolate_fn)
 
-            fig <- .apply_subplot_axis_styling(fig, xaxis_style, yaxis_style)
+            fig <- apply_subplot_axis_styling(fig, xaxis_style, yaxis_style)
 
             # Apply axis title font to shared facet annotation titles
             if (!is.null(facet.by) && nzchar(facet.by)) {
-                fig <- .apply_axis_title_to_annotations(fig, input, isolate_fn)
+                fig <- apply_axis_title_to_annotations(fig, input, isolate_fn)
             }
 
             # Add reference lines
-            fig <- .add_reference_lines(fig,
+            fig <- add_reference_lines(fig,
                 hline.intercepts = isolate_fn(input$hline.intercepts),
                 hline.colors = isolate_fn(input$hline.colors),
                 hline.widths = isolate_fn(input$hline.widths),
@@ -360,44 +391,46 @@ plotthis_BoxPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs = NUL
                 abline.opacities = isolate_fn(input$abline.opacities)
             )
 
-            # Remove outliers if jitter points are shown or if user explicitly disabled outliers
-            if (isolate_fn(input$add.points) || !isolate_fn(input$show.outliers)) {
-                fig <- .remove_boxplot_outliers(fig)
-            }
-
             # Hide jitter points from legend if they are shown
             if (isolate_fn(input$add.points)) {
                 fig <- .hide_jitter_from_legend(fig)
             }
 
-            config_list <- .add_plot_config(download.format = isolate_fn(input$download.format), include.modebar.buttons = TRUE, facet.by = facet.by)
+            config_list <- add_plot_config(
+                download.format = isolate_fn(input$download.format),
+                include.modebar.buttons = TRUE, facet.by = facet.by
+            )
+
             fig <- do.call(config, c(list(p = fig), config_list))
-            fig <- .apply_plotly_newshape(fig, input, isolate_fn)
+            fig <- apply_plotly_newshape(fig, input, isolate_fn)
 
             # Apply uniform legend title/label font sizes
-            fig <- .apply_legend_styling(
+            fig <- apply_legend_styling(
                 fig,
                 title.size = isolate_fn(input$legend.title.size),
                 text.size = isolate_fn(input$legend.text.size)
             )
 
             # Make single-panel x/y axis titles draggable (matches faceted behaviour)
-            fig <- .axis_titles_as_annotations(fig)
+            fig <- axis_titles_as_annotations(fig)
 
-            return(fig)
+            fig
         })
-        #Returning all UI inputs: 
+
+        # Returning all UI inputs:
         AllInputs <- reactive({
             x <- reactiveValuesToList(input)
-            return(x)
+            x
         })
+    
         # Render the plot output
         output$BoxPlot <- renderPlotly({
             req(input$x.data, input$y.data)
-            fig <- .apply_render_margins(generate_BoxPlot(), input)
+            fig <- apply_render_margins(generate_BoxPlot(), input)
 
+            fig <- finalize_manual_edits(fig, plot_source, edit_store, session)
 
-            return(fig)
+            fig
         })
 
         # Download handler for source (plot + data + stats)

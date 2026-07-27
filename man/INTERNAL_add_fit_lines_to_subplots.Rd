@@ -50,6 +50,6 @@ when faceting is applied. Determines subplot axes from existing traces and adds
 fit lines to each panel.
 }
 \author{
-Jared Andrews
+Jared Andrews, Jacob Martin
 }
 \keyword{internal}
