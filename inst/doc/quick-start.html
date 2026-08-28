@@ -385,6 +385,12 @@ example using the <code>dittoViz_scatterPlot</code> module:</p>
 <code>defaults</code> argument of <code>*InputsUI()</code> to pre-fill
 inputs. Names match the underlying plot function arguments (e.g.,
 <code>defaults = list(fill.color = &quot;steelblue&quot;)</code>).</li>
+<li><strong>Reactive defaults</strong>: An entry may be a
+<code>reactive()</code> instead of a fixed value, so an input follows
+your app’s state
+(e.g. <code>defaults = list(color.by = reactive(input$colour_col))</code>).
+See
+<code>vignette(&quot;defaults-and-hiding&quot;, package = &quot;VizModules&quot;)</code>.</li>
 <li><strong>Hide inputs</strong>: Use <code>hide.inputs</code> in the
 server call to remove controls while still initializing their values.
 This is useful when your app sets certain parameters itself or wants to

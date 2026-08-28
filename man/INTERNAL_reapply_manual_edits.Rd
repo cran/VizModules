@@ -4,12 +4,19 @@
 \alias{.reapply_manual_edits}
 \title{Re-apply captured manual edits onto a freshly built plotly figure}
 \usage{
-.reapply_manual_edits(fig, edits)
+.reapply_manual_edits(fig, edits, regen_keys = character(0))
 }
 \arguments{
 \item{fig}{A plotly figure object.}
 
 \item{edits}{A list with components \code{legend} and \code{annotations}.}
+
+\item{regen_keys}{Character vector of annotation keys (e.g. \code{"axis:y"}) whose
+\code{text} is regenerated from scratch on every rebuild and must therefore not
+be overwritten by a captured edit. Used for axis titles carrying an active
+data adjustment (e.g. \code{"log2(units)"}), so the fresh label wins while any
+captured position/font still persists. The \verb{#<occurrence>} suffix added by
+\code{.annotation_edit_keys()} is stripped before matching. Defaults to none.}
 }
 \value{
 The figure with manual edits re-applied.

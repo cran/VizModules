@@ -414,6 +414,11 @@ settings.</p>
 <span id="cb2-23"><a href="#cb2-23" tabindex="-1"></a>    )</span>
 <span id="cb2-24"><a href="#cb2-24" tabindex="-1"></a>)</span></code></pre></div>
 <p>These rows appear pre-filled when the app loads.</p>
+<p>Unlike most <code>defaults</code> entries, <code>custom.models</code>
+cannot be supplied as a <code>reactive()</code>. It is backed by a
+compound <code>multiDynamicInput()</code> widget that the generic
+control-sync used by reactive defaults cannot drive; pass a plain
+list.</p>
 </div>
 <div id="adding-a-custom-model-backend" class="section level2">
 <h2>Adding a Custom Model Backend</h2>

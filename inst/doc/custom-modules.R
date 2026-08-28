@@ -77,10 +77,28 @@ knitr::opts_chunk$set(
 #     ns <- NS(id)
 #     tagList(
 #         h4("Simplified Scatter Plot"),
-#         # Hide a few parameters
-#         dittoViz_scatterPlotInputsUI(id, iris,
-#             hide.inputs = c("shape.by", "color.by")
-#         )
+#         # The UI takes no hide.* arguments -- see the server below.
+#         dittoViz_scatterPlotInputsUI(id, iris)
+#     )
+# }
+# 
+# focusedModuleServer <- function(id, data_reactive) {
+#     # hide.inputs and hide.tabs are arguments of the *Server*, not the *InputsUI.
+#     dittoViz_scatterPlotServer(id, data_reactive,
+#         hide.inputs = c("shape.by", "color.by")
+#     )
+# }
+
+## ----reactive-defaults--------------------------------------------------------
+# colouredModuleServer <- function(id, data_reactive) {
+#     colour_col <- moduleServer(id, function(input, output, session) {
+#         reactive(if (isTRUE(input$filter_setosa)) "" else "Species")
+#     })
+# 
+#     # The colour mapping tracks the checkbox, but the user can still change it.
+#     dittoViz_scatterPlotServer(
+#         id, data_reactive,
+#         defaults = list(color.by = colour_col)
 #     )
 # }
 

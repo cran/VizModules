@@ -4,12 +4,17 @@
 \alias{.should_include_trace}
 \title{Check if a plotly trace should be included in annotations}
 \usage{
-.should_include_trace(trace, show.others = TRUE)
+.should_include_trace(trace, show.others = TRUE, require.markers = FALSE)
 }
 \arguments{
 \item{trace}{A single trace object from a plotly figure's data list.}
 
 \item{show.others}{Logical. Whether "show.others" was enabled in the plot.}
+
+\item{require.markers}{Logical. When \code{TRUE}, only traces drawing markers are
+included. Set this for plots where marker traces sit alongside other scatter
+traces built from the same data (e.g. the jitter layer of a box/violin plot,
+whose outlines are also scatter traces).}
 }
 \value{
 Logical. TRUE if the trace should be included in annotation processing,

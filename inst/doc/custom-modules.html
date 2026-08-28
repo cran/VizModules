@@ -469,12 +469,45 @@ from the user to keep them from being changed:</p>
 <span id="cb4-2"><a href="#cb4-2" tabindex="-1"></a>    ns <span class="ot">&lt;-</span> <span class="fu">NS</span>(id)</span>
 <span id="cb4-3"><a href="#cb4-3" tabindex="-1"></a>    <span class="fu">tagList</span>(</span>
 <span id="cb4-4"><a href="#cb4-4" tabindex="-1"></a>        <span class="fu">h4</span>(<span class="st">&quot;Simplified Scatter Plot&quot;</span>),</span>
-<span id="cb4-5"><a href="#cb4-5" tabindex="-1"></a>        <span class="co"># Hide a few parameters</span></span>
-<span id="cb4-6"><a href="#cb4-6" tabindex="-1"></a>        <span class="fu">dittoViz_scatterPlotInputsUI</span>(id, iris,</span>
-<span id="cb4-7"><a href="#cb4-7" tabindex="-1"></a>            <span class="at">hide.inputs =</span> <span class="fu">c</span>(<span class="st">&quot;shape.by&quot;</span>, <span class="st">&quot;color.by&quot;</span>)</span>
-<span id="cb4-8"><a href="#cb4-8" tabindex="-1"></a>        )</span>
-<span id="cb4-9"><a href="#cb4-9" tabindex="-1"></a>    )</span>
-<span id="cb4-10"><a href="#cb4-10" tabindex="-1"></a>}</span></code></pre></div>
+<span id="cb4-5"><a href="#cb4-5" tabindex="-1"></a>        <span class="co"># The UI takes no hide.* arguments -- see the server below.</span></span>
+<span id="cb4-6"><a href="#cb4-6" tabindex="-1"></a>        <span class="fu">dittoViz_scatterPlotInputsUI</span>(id, iris)</span>
+<span id="cb4-7"><a href="#cb4-7" tabindex="-1"></a>    )</span>
+<span id="cb4-8"><a href="#cb4-8" tabindex="-1"></a>}</span>
+<span id="cb4-9"><a href="#cb4-9" tabindex="-1"></a></span>
+<span id="cb4-10"><a href="#cb4-10" tabindex="-1"></a>focusedModuleServer <span class="ot">&lt;-</span> <span class="cf">function</span>(id, data_reactive) {</span>
+<span id="cb4-11"><a href="#cb4-11" tabindex="-1"></a>    <span class="co"># hide.inputs and hide.tabs are arguments of the *Server*, not the *InputsUI.</span></span>
+<span id="cb4-12"><a href="#cb4-12" tabindex="-1"></a>    <span class="fu">dittoViz_scatterPlotServer</span>(id, data_reactive,</span>
+<span id="cb4-13"><a href="#cb4-13" tabindex="-1"></a>        <span class="at">hide.inputs =</span> <span class="fu">c</span>(<span class="st">&quot;shape.by&quot;</span>, <span class="st">&quot;color.by&quot;</span>)</span>
+<span id="cb4-14"><a href="#cb4-14" tabindex="-1"></a>    )</span>
+<span id="cb4-15"><a href="#cb4-15" tabindex="-1"></a>}</span></code></pre></div>
+</div>
+<div id="driving-base-module-inputs-from-your-wrapper" class="section level2">
+<h2>Driving Base Module Inputs From Your Wrapper</h2>
+<p>Hiding an input fixes it to one value. When a base module parameter
+instead needs to <em>follow</em> something your wrapper computes, pass a
+<code>reactive()</code> as that entry of <code>defaults</code> rather
+than reaching for <code>update*Input()</code>. The key must name an
+input the module actually reads – <code>get_default()</code> falls back
+silently, so a <code>defaults</code> entry for an unexposed key does
+nothing at all. (<code>main</code> is the one to watch: no module
+exposes a plot title, so <code>defaults = list(main = ...)</code> has no
+effect.)</p>
+<div class="sourceCode" id="cb5"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" tabindex="-1"></a>colouredModuleServer <span class="ot">&lt;-</span> <span class="cf">function</span>(id, data_reactive) {</span>
+<span id="cb5-2"><a href="#cb5-2" tabindex="-1"></a>    colour_col <span class="ot">&lt;-</span> <span class="fu">moduleServer</span>(id, <span class="cf">function</span>(input, output, session) {</span>
+<span id="cb5-3"><a href="#cb5-3" tabindex="-1"></a>        <span class="fu">reactive</span>(<span class="cf">if</span> (<span class="fu">isTRUE</span>(input<span class="sc">$</span>filter_setosa)) <span class="st">&quot;&quot;</span> <span class="cf">else</span> <span class="st">&quot;Species&quot;</span>)</span>
+<span id="cb5-4"><a href="#cb5-4" tabindex="-1"></a>    })</span>
+<span id="cb5-5"><a href="#cb5-5" tabindex="-1"></a></span>
+<span id="cb5-6"><a href="#cb5-6" tabindex="-1"></a>    <span class="co"># The colour mapping tracks the checkbox, but the user can still change it.</span></span>
+<span id="cb5-7"><a href="#cb5-7" tabindex="-1"></a>    <span class="fu">dittoViz_scatterPlotServer</span>(</span>
+<span id="cb5-8"><a href="#cb5-8" tabindex="-1"></a>        id, data_reactive,</span>
+<span id="cb5-9"><a href="#cb5-9" tabindex="-1"></a>        <span class="at">defaults =</span> <span class="fu">list</span>(<span class="at">color.by =</span> colour_col)</span>
+<span id="cb5-10"><a href="#cb5-10" tabindex="-1"></a>    )</span>
+<span id="cb5-11"><a href="#cb5-11" tabindex="-1"></a>}</span></code></pre></div>
+<p>This is the recommended parent-to-child channel for parameter values.
+It resolves server-side, so the plot renders once per change instead of
+twice, and the control stays user-editable. See
+<code>vignette(&quot;defaults-and-hiding&quot;, package = &quot;VizModules&quot;)</code> for
+the full semantics.</p>
 </div>
 <div id="automatically-preserving-manual-titlelegendannotation-edits" class="section level2">
 <h2>Automatically Preserving Manual Title/Legend/Annotation Edits</h2>
@@ -486,20 +519,20 @@ persistence is inherited for free.</p>
 <p>If you build a brand-new <code>plotly</code> output from scratch
 inside a custom module (rather than delegating to a base module’s
 server), you can add the same behaviour simply with 3 basic steps:</p>
-<div class="sourceCode" id="cb5"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" tabindex="-1"></a>customPlotServer <span class="ot">&lt;-</span> <span class="cf">function</span>(id, data_reactive) {</span>
-<span id="cb5-2"><a href="#cb5-2" tabindex="-1"></a>    <span class="fu">moduleServer</span>(id, <span class="cf">function</span>(input, output, session) {</span>
-<span id="cb5-3"><a href="#cb5-3" tabindex="-1"></a>        <span class="co"># 1. A unique event source + the edit store, created once.</span></span>
-<span id="cb5-4"><a href="#cb5-4" tabindex="-1"></a>        plot_source <span class="ot">&lt;-</span> session<span class="sc">$</span><span class="fu">ns</span>(<span class="st">&quot;customplot&quot;</span>)</span>
-<span id="cb5-5"><a href="#cb5-5" tabindex="-1"></a>        edit_store <span class="ot">&lt;-</span> <span class="fu">setup_manual_edits</span>(input, session, plot_source)</span>
-<span id="cb5-6"><a href="#cb5-6" tabindex="-1"></a></span>
-<span id="cb5-7"><a href="#cb5-7" tabindex="-1"></a>        output<span class="sc">$</span>plot <span class="ot">&lt;-</span> <span class="fu">renderPlotly</span>({</span>
-<span id="cb5-8"><a href="#cb5-8" tabindex="-1"></a>            <span class="co"># 2. Create your plotly object with your plotting function</span></span>
-<span id="cb5-9"><a href="#cb5-9" tabindex="-1"></a>            fig <span class="ot">&lt;-</span> <span class="fu">build_my_plotly_figure</span>(<span class="fu">data_reactive</span>(), input)</span>
-<span id="cb5-10"><a href="#cb5-10" tabindex="-1"></a>            <span class="co"># 3. Restore + capture edits on every render, then return the figure.</span></span>
-<span id="cb5-11"><a href="#cb5-11" tabindex="-1"></a>            <span class="fu">finalize_manual_edits</span>(fig, plot_source, edit_store, session)</span>
-<span id="cb5-12"><a href="#cb5-12" tabindex="-1"></a>        })</span>
-<span id="cb5-13"><a href="#cb5-13" tabindex="-1"></a>    })</span>
-<span id="cb5-14"><a href="#cb5-14" tabindex="-1"></a>}</span></code></pre></div>
+<div class="sourceCode" id="cb6"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" tabindex="-1"></a>customPlotServer <span class="ot">&lt;-</span> <span class="cf">function</span>(id, data_reactive) {</span>
+<span id="cb6-2"><a href="#cb6-2" tabindex="-1"></a>    <span class="fu">moduleServer</span>(id, <span class="cf">function</span>(input, output, session) {</span>
+<span id="cb6-3"><a href="#cb6-3" tabindex="-1"></a>        <span class="co"># 1. A unique event source + the edit store, created once.</span></span>
+<span id="cb6-4"><a href="#cb6-4" tabindex="-1"></a>        plot_source <span class="ot">&lt;-</span> session<span class="sc">$</span><span class="fu">ns</span>(<span class="st">&quot;customplot&quot;</span>)</span>
+<span id="cb6-5"><a href="#cb6-5" tabindex="-1"></a>        edit_store <span class="ot">&lt;-</span> <span class="fu">setup_manual_edits</span>(input, session, plot_source)</span>
+<span id="cb6-6"><a href="#cb6-6" tabindex="-1"></a></span>
+<span id="cb6-7"><a href="#cb6-7" tabindex="-1"></a>        output<span class="sc">$</span>plot <span class="ot">&lt;-</span> <span class="fu">renderPlotly</span>({</span>
+<span id="cb6-8"><a href="#cb6-8" tabindex="-1"></a>            <span class="co"># 2. Create your plotly object with your plotting function</span></span>
+<span id="cb6-9"><a href="#cb6-9" tabindex="-1"></a>            fig <span class="ot">&lt;-</span> <span class="fu">build_my_plotly_figure</span>(<span class="fu">data_reactive</span>(), input)</span>
+<span id="cb6-10"><a href="#cb6-10" tabindex="-1"></a>            <span class="co"># 3. Restore + capture edits on every render, then return the figure.</span></span>
+<span id="cb6-11"><a href="#cb6-11" tabindex="-1"></a>            <span class="fu">finalize_manual_edits</span>(fig, plot_source, edit_store, session)</span>
+<span id="cb6-12"><a href="#cb6-12" tabindex="-1"></a>        })</span>
+<span id="cb6-13"><a href="#cb6-13" tabindex="-1"></a>    })</span>
+<span id="cb6-14"><a href="#cb6-14" tabindex="-1"></a>}</span></code></pre></div>
 <p>See the “Adding a New Module” vignette for the full description of
 these helpers, but this is pretty much all you need to do.</p>
 </div>
@@ -518,6 +551,20 @@ check that you’re handling namespaces correctly. A common symptom of
 namespace issues is that inputs seem to have no effect.</p></li>
 <li><p><strong>Consider composability</strong>: Design your wrappers so
 they could potentially be wrapped by even higher-level modules.</p></li>
+<li><p><strong>Prefer reactive <code>defaults</code> over
+<code>update*Input()</code></strong>: To drive a base module parameter
+from your wrapper’s state, pass a <code>reactive()</code> in
+<code>defaults</code>. Pushing values with <code>update*Input()</code>
+costs an extra render on every change. When you must update one of your
+<em>own</em> inputs from the server, call
+<code>freezeReactiveValue()</code> on it first so readers pause instead
+of rendering with the stale value. Freezing does not cover an input you
+rebuild with <code>renderUI()</code>, though. In those cases, resolve
+the value server-side and have the plot read that instead, as
+<code>setup_group_colors()</code> does for a colour picker (see the
+“Updating Your Own Inputs From the Server” section in
+<code>vignette(&quot;adding-a-new-module&quot;, package = &quot;VizModules&quot;)</code> for
+more info).</p></li>
 </ol>
 <p>See any of the existing modules for clear reference examples.</p>
 </div>

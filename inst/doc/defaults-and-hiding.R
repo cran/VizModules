@@ -32,6 +32,33 @@ knitr::opts_chunk$set(
 # 
 # shinyApp(ui, server)
 
+## ----defaults-reactive--------------------------------------------------------
+# library(VizModules)
+# 
+# ui <- fluidPage(
+#     selectInput("colour_col", "Colour by", choices = c("cyl", "gear", "carb")),
+#     sidebarLayout(
+#         sidebarPanel(uiOutput("controls")),
+#         mainPanel(dittoViz_scatterPlotOutputUI("p"))
+#     )
+# )
+# 
+# server <- function(input, output, session) {
+#     plot_defaults <- list(
+#         x.by = "wt",
+#         y.by = "mpg",
+#         color.by = reactive(input$colour_col)
+#     )
+# 
+#     output$controls <- renderUI({
+#         dittoViz_scatterPlotInputsUI("p", mtcars, defaults = plot_defaults)
+#     })
+# 
+#     dittoViz_scatterPlotServer("p", data = reactive(mtcars), defaults = plot_defaults)
+# }
+# 
+# shinyApp(ui, server)
+
 ## ----defaults-app-------------------------------------------------------------
 # plotthis_BoxPlotApp(
 #     defaults = list(
@@ -137,9 +164,9 @@ knitr::opts_chunk$set(
 #     moduleServer(id, function(input, output, session) {
 #         observe({
 #             if (nzchar(input$size.by)) {
-#                 VizModules:::.hide_input(session, "size")
+#                 VizModules::hide_input(session, "size")
 #             } else {
-#                 VizModules:::.show_input(session, "size")
+#                 VizModules::show_input(session, "size")
 #             }
 #         })
 #     })

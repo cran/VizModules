@@ -12,7 +12,8 @@
   x_col,
   y_col,
   annotation_params,
-  show.others = TRUE
+  show.others = TRUE,
+  require.markers = FALSE
 )
 }
 \arguments{
@@ -31,6 +32,9 @@
 \item{annotation_params}{List of annotation styling parameters.}
 
 \item{show.others}{Logical. Whether "show.others" was enabled in the plot.}
+
+\item{require.markers}{Logical. Passed to \code{\link[=.should_include_trace]{.should_include_trace()}} to restrict
+matching to marker traces.}
 }
 \value{
 List of plotly annotation objects, or NULL if no valid annotations.

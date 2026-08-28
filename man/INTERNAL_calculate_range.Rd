@@ -20,8 +20,10 @@
 when \code{grouping = TRUE} or \code{stack_by} is specified, as it defines
 the groups over which Y values are summed.}
 
-\item{data_col_y}{Character string. Name of the numeric Y-axis data column.
-Takes priority over \code{data_col_x} if both are provided.}
+\item{data_col_y}{Character vector. Name(s) of the numeric Y-axis data
+column(s). Takes priority over \code{data_col_x} if both are provided. When
+several columns are given (e.g. a multi-variable Y selection), the range
+spans all of them so a single pair of limits fits every one.}
 
 \item{axis_scale_factor}{Numeric. Multiplicative factor applied to the
 maximum Y value to provide additional headroom on the axis.}
@@ -48,8 +50,10 @@ simple (non-stacked) and stacked bar scenarios, where stacking occurs when
 \code{group.by} or \code{fill.by} is numeric.
 }
 \details{
-The function resolves the primary data column from \code{data_col_y} or
-\code{data_col_x} and validates that it exists and is numeric in \code{df}.
+The function resolves the primary data column(s) from \code{data_col_y} or
+\code{data_col_x} and validates that they exist and are numeric in \code{df}. Blank
+and \code{NA} names are dropped first, and \code{NULL} is returned if nothing usable
+remains.
 
 Behaviour depends on whether bars are stacked:
 \itemize{

@@ -344,6 +344,12 @@ code > span.er { color: #a61717; background-color: #e3d2d2; }
 <p>This checklist walks through how to add a new plotting module to
 <strong>VizModules</strong> so it matches the package’s organization,
 documentation, and testing standards.</p>
+<p><strong>VizModules</strong> modules are designed to be a joy to use,
+which requires some discipline to implement in a consistent way. This
+checklist may seem daunting at first glance, but most of the items
+already have helpers to implement them.</p>
+<p>And a fair few are to keep you from shooting yourself in the foot and
+avoiding most of the common module pitfalls.</p>
 <div id="quick-checklist" class="section level2">
 <h2>Quick Checklist</h2>
 <ul class="task-list">
@@ -383,13 +389,20 @@ lines, etc)</li>
 </ul></li>
 <li><label><input type="checkbox"></input>Add an example app that uses the
 module twice to prove multi-instance behavior.</label></li>
+<li><label><input type="checkbox"></input>Wire up reactive
+<code>defaults</code> support so parent apps can drive parameters from
+app state (see <a href="#supporting-reactive-defaults">Supporting
+Reactive Defaults</a>).</label></li>
+<li><label><input type="checkbox"></input>Freeze any input you update from the
+server so the plot does not render twice (see <a href="#updating-your-own-inputs-from-the-server">Updating Your Own
+Inputs From the Server</a>).</label></li>
 <li><label><input type="checkbox"></input>Wire up manual layout-edit
 persistence so user-dragged titles, legends, annotations, and colorbars
 survive re-renders (see <a href="#persisting-manual-layout-edits">Persisting Manual Layout
 Edits</a>).</label></li>
 <li><label><input type="checkbox"></input>Cover the base plotting function
 with <code>testthat</code>; cover the module/app with
-<code>shinytest2</code>.</label></li>
+<code>testServer</code> where feasible.</label></li>
 <li><label><input type="checkbox"></input>Note any <code>ggplotly</code>
 conversion quirks that change or drop functionality.</label></li>
 <li><label><input type="checkbox"></input><strong>Never use
@@ -540,9 +553,8 @@ alongside the other modules.</label></li>
 <li><label><input type="checkbox"></input><code>testthat</code>: cover the
 base plotting function’s core behavior and arguments (data handling,
 grouping, palette handling, etc.).</label></li>
-<li><label><input type="checkbox"></input><code>shinytest2</code>: cover the
-module/app (rendering inputs, updating outputs, download buttons if
-present).</label></li>
+<li><label><input type="checkbox"></input><code>testServer</code>: cover the
+module/app where feasible.</label></li>
 <li><label><input type="checkbox"></input>Place tests under
 <code>tests/testthat/</code> with clear file names
 (<code>test-&lt;plot&gt;.R</code>,
@@ -573,12 +585,184 @@ for the plotting function (happy paths + invalid inputs).</label></li>
 stable, build the module UI/server/app wrappers around it.</label></li>
 </ul>
 </div>
+<div id="supporting-reactive-defaults" class="section level2">
+<h2>Supporting Reactive Defaults</h2>
+<p>An entry in <code>defaults</code> may be a <code>reactive()</code>
+rather than a fixed value, so a parent app can make an input follow its
+state without the double render that <code>update*Input()</code> causes
+(see
+<code>vignette(&quot;defaults-and-hiding&quot;, package = &quot;VizModules&quot;)</code>).
+Two lines wire this up, and they are required in every new module.</p>
+<ul class="task-list">
+<li><p><label><input type="checkbox"></input>Make the first statement of your
+<code>moduleServer()</code> body build the parameter store:</label></p>
+<div class="sourceCode" id="cb5"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" tabindex="-1"></a>params <span class="ot">&lt;-</span> <span class="fu">setup_reactive_defaults</span>(defaults, input, session)</span></code></pre></div></li>
+<li><p><label><input type="checkbox"></input>Pass that store to
+<code>setup_auto_update_logic()</code> inside your generate
+reactive:</label></p>
+<div class="sourceCode" id="cb6"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" tabindex="-1"></a>generate_myPlot <span class="ot">&lt;-</span> <span class="fu">reactive</span>({</span>
+<span id="cb6-2"><a href="#cb6-2" tabindex="-1"></a>    isolate_fn <span class="ot">&lt;-</span> <span class="fu">setup_auto_update_logic</span>(input, params)</span>
+<span id="cb6-3"><a href="#cb6-3" tabindex="-1"></a>    ...</span>
+<span id="cb6-4"><a href="#cb6-4" tabindex="-1"></a>    main <span class="ot">=</span> <span class="fu">isolate_fn</span>(input<span class="sc">$</span>main)</span>
+<span id="cb6-5"><a href="#cb6-5" tabindex="-1"></a>})</span></code></pre></div></li>
+</ul>
+<p>Easy. <code>setup_reactive_defaults()</code> returns
+<code>NULL</code> when no entry is reactive, in which case
+<code>isolate_fn</code> is the plain
+<code>identity()</code>/<code>isolate()</code> it has always been. When
+a store is present, <code>isolate_fn</code> recognises direct
+<code>input$&lt;key&gt;</code> reads and resolves them from the store
+instead, so your existing read sites need no edits, as long as they stay
+in the <code>isolate_fn(input$&lt;key&gt;)</code> form. A wrapped read
+such as <code>isolate_fn(as.numeric(input$size))</code> cannot be
+recognised and will not support a reactive default; do the conversion
+outside the call instead.</p>
+<p>Your <code>*InputsUI()</code> and reset observer need no special
+handling: both go through <code>get_default()</code>, which resolves
+reactive entries on its own. Reset therefore restores the reactive’s
+current value.</p>
+</div>
+<div id="updating-your-own-inputs-from-the-server" class="section level2">
+<h2>Updating Your Own Inputs From the Server</h2>
+<p>Modules often derive a value on the server and push it back into one
+of their own controls, e.g. an auto-calculated y-axis range, a
+regenerated list of stat comparison pairs, a rebuilt colour picker.
+<code>update*Input()</code> is an asynchronous round-trip to the
+browser, so the plot renders <strong>twice</strong>: once immediately
+with the stale value, then again when the client echoes the new one.
+This is annoying as hell and can be avoided by freezing the input before
+you update it:</p>
+<ul class="task-list">
+<li><p><label><input type="checkbox"></input>Call
+<code>freezeReactiveValue()</code> on the input immediately before you
+update it:</label></p>
+<div class="sourceCode" id="cb7"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" tabindex="-1"></a><span class="fu">observeEvent</span>(input<span class="sc">$</span>stat.x, {</span>
+<span id="cb7-2"><a href="#cb7-2" tabindex="-1"></a>    pairs <span class="ot">&lt;-</span> <span class="fu">generate_pair_strings</span>(<span class="fu">data</span>(), input<span class="sc">$</span>stat.x)</span>
+<span id="cb7-3"><a href="#cb7-3" tabindex="-1"></a>    <span class="cf">if</span> (<span class="fu">length</span>(pairs) <span class="sc">&gt;</span> <span class="dv">0</span>) {</span>
+<span id="cb7-4"><a href="#cb7-4" tabindex="-1"></a>        <span class="fu">freezeReactiveValue</span>(input, <span class="st">&quot;stat.pairs&quot;</span>)</span>
+<span id="cb7-5"><a href="#cb7-5" tabindex="-1"></a>        <span class="fu">update_viz_select</span>(session, <span class="st">&quot;stat.pairs&quot;</span>, <span class="at">choices =</span> <span class="fu">c</span>(<span class="st">&quot;&quot;</span>, pairs), <span class="at">selected =</span> <span class="st">&quot;&quot;</span>)</span>
+<span id="cb7-6"><a href="#cb7-6" tabindex="-1"></a>    }</span>
+<span id="cb7-7"><a href="#cb7-7" tabindex="-1"></a>})</span></code></pre></div></li>
+</ul>
+<p>Freezing pauses everything that reads that input until the real value
+arrives, so the intermediate render never happens. Three rules:</p>
+<ul>
+<li><strong>Freeze only when you are definitely going to
+update.</strong> A frozen input that never receives a value leaves the
+plot suspended. Keep the freeze inside the same <code>if</code> branch
+as the <code>update*Input()</code> call.</li>
+<li><strong>Do not add a catch-all <code>tryCatch()</code> to your
+<code>renderPlotly()</code>.</strong> The pause is delivered as a silent
+condition; swallowing it turns a clean pause into a blank plot. Guard
+with <code>req()</code> and explicit <code>if</code> branches
+instead.</li>
+</ul>
+<p>This does not apply to the reset observer, where a burst of updates
+is expected.</p>
+<div id="inputs-rebuilt-by-renderui" class="section level3">
+<h3>Inputs Rebuilt by <code>renderUI()</code></h3>
+<p>Freezing does <strong>not</strong> cover an input your module
+rebuilds with <code>renderUI()</code>, such as a [multiColorPicker()]
+whose groups follow the data. A freeze pauses only the readers that run
+<em>after</em> it in that flush, and at startup the plot output runs
+first. The freeze lands too late to pause anything, and the value the
+freshly built input reports then rebuilds the plot for a mapping it was
+already drawing.</p>
+<p>In short, this results in the plot being re-rendered one or more
+times in a way that can be annoying, particularly for large data
+sets.</p>
+<p>Give the plot a server-side value to read instead, so the client’s
+echo is compared against what is already in use rather than against
+<code>NULL</code>. For a colour picker,
+<code>setup_group_colors()</code> does this for you — it resolves the
+mapping as soon as the group set is known and holds it in a
+<code>reactiveVal()</code>, which only invalidates on a real change:</p>
+<ul class="task-list">
+<li><p><label><input type="checkbox"></input>Create the store beside your
+group-levels reactive:</label></p>
+<div class="sourceCode" id="cb8"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" tabindex="-1"></a>palette_store <span class="ot">&lt;-</span> <span class="fu">setup_group_colors</span>(</span>
+<span id="cb8-2"><a href="#cb8-2" tabindex="-1"></a>    input, <span class="st">&quot;palette.colours&quot;</span>, palette_groups,</span>
+<span id="cb8-3"><a href="#cb8-3" tabindex="-1"></a>    default_palette_values, defaults, params</span>
+<span id="cb8-4"><a href="#cb8-4" tabindex="-1"></a>)</span></code></pre></div></li>
+<li><p><label><input type="checkbox"></input>Seed it inside the picker’s
+<code>renderUI()</code>, with the same colours the input itself is built
+from, so the mapping is right even when the render was deferred (a
+picker on a hidden tab is suspended until that tab is
+opened):</label></p>
+<div class="sourceCode" id="cb9"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" tabindex="-1"></a>initial_colors <span class="ot">&lt;-</span> <span class="fu">isolate</span>(<span class="fu">resolve_palette</span>(</span>
+<span id="cb9-2"><a href="#cb9-2" tabindex="-1"></a>    groups, input<span class="sc">$</span>palette.colours, default_palette_values,</span>
+<span id="cb9-3"><a href="#cb9-3" tabindex="-1"></a>    <span class="fu">.default_group_colors</span>(defaults, <span class="st">&quot;palette.colours&quot;</span>)</span>
+<span id="cb9-4"><a href="#cb9-4" tabindex="-1"></a>))</span>
+<span id="cb9-5"><a href="#cb9-5" tabindex="-1"></a><span class="fu">palette_store</span>(initial_colors)</span></code></pre></div></li>
+<li><p><label><input type="checkbox"></input>Read the store in the plot
+reactive, in place of the raw input:</label></p>
+<div class="sourceCode" id="cb10"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" tabindex="-1"></a>palette_values <span class="ot">&lt;-</span> <span class="fu">isolate_fn</span>(<span class="fu">palette_store</span>())   <span class="co"># not isolate_fn(input$palette.colours)</span></span></code></pre></div></li>
+</ul>
+<p>The same shape works for any <code>renderUI()</code>-rebuilt input:
+resolve the value on the server, hold it in a
+<code>reactiveVal()</code>, and have the plot read that.</p>
+</div>
+<div id="axis-limits" class="section level3">
+<h3>Axis Limits</h3>
+<p>Limits behave the same way, and for the same reason: the module
+derives them on the server, pushes them into the
+<code>y.min</code>/<code>y.max</code> controls, and the echo of that
+push rebuilds the plot. <code>setup_axis_range()</code> is the store for
+them.</p>
+<ul class="task-list">
+<li><p><label><input type="checkbox"></input>Create the store, then seed it
+beside every <code>update*Input()</code> that sets the limits — the
+y-data observer and the Reset button:</label></p>
+<div class="sourceCode" id="cb11"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" tabindex="-1"></a>y_range_store <span class="ot">&lt;-</span> <span class="fu">setup_axis_range</span>(input, session, <span class="at">params =</span> params)</span>
+<span id="cb11-2"><a href="#cb11-2" tabindex="-1"></a></span>
+<span id="cb11-3"><a href="#cb11-3" tabindex="-1"></a><span class="fu">observeEvent</span>(input<span class="sc">$</span>y.data, {</span>
+<span id="cb11-4"><a href="#cb11-4" tabindex="-1"></a>    y_range <span class="ot">&lt;-</span> <span class="fu">.calculate_range</span>(<span class="at">df =</span> <span class="fu">data</span>(), <span class="at">data_col_y =</span> input<span class="sc">$</span>y.data,</span>
+<span id="cb11-5"><a href="#cb11-5" tabindex="-1"></a>                                <span class="at">axis_scale_factor =</span> .y_axis_scale_factor)</span>
+<span id="cb11-6"><a href="#cb11-6" tabindex="-1"></a>    <span class="cf">if</span> (<span class="sc">!</span><span class="fu">is.null</span>(y_range)) {</span>
+<span id="cb11-7"><a href="#cb11-7" tabindex="-1"></a>        <span class="fu">y_range_store</span>(<span class="fu">list</span>(<span class="at">min =</span> y_range<span class="sc">$</span>min, <span class="at">max =</span> y_range<span class="sc">$</span>max))</span>
+<span id="cb11-8"><a href="#cb11-8" tabindex="-1"></a>        <span class="fu">updateNumericInput</span>(session, <span class="st">&quot;y.min&quot;</span>, <span class="at">value =</span> y_range<span class="sc">$</span>min)</span>
+<span id="cb11-9"><a href="#cb11-9" tabindex="-1"></a>        <span class="fu">updateNumericInput</span>(session, <span class="st">&quot;y.max&quot;</span>, <span class="at">value =</span> y_range<span class="sc">$</span>max)</span>
+<span id="cb11-10"><a href="#cb11-10" tabindex="-1"></a>    }</span>
+<span id="cb11-11"><a href="#cb11-11" tabindex="-1"></a>})</span></code></pre></div></li>
+<li><p><label><input type="checkbox"></input>Read
+<code>isolate_fn(y_range_store())</code> in the plot reactive, in place
+of <code>isolate_fn(input$y.min)</code> and
+<code>isolate_fn(input$y.max)</code>.</label></p></li>
+</ul>
+<p>If your module draws significance brackets, pass
+<code>headroom</code> as well. The brackets are stacked above the data,
+so the limits have to clear them or they are drawn clipped;
+<code>stat_bracket_y_max()</code> works out how high they will reach,
+and the store raises the maximum to meet it and updates the control to
+match. It only ever raises, so a larger limit the user chose is left
+alone:</p>
+<div class="sourceCode" id="cb12"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb12-1"><a href="#cb12-1" tabindex="-1"></a>y_range_store <span class="ot">&lt;-</span> <span class="fu">setup_axis_range</span>(</span>
+<span id="cb12-2"><a href="#cb12-2" tabindex="-1"></a>    input, session, <span class="at">params =</span> params,</span>
+<span id="cb12-3"><a href="#cb12-3" tabindex="-1"></a>    <span class="at">headroom =</span> <span class="cf">function</span>() {</span>
+<span id="cb12-4"><a href="#cb12-4" tabindex="-1"></a>        <span class="cf">if</span> (<span class="sc">!</span><span class="fu">isTRUE</span>(input<span class="sc">$</span>stats.enabled)) {</span>
+<span id="cb12-5"><a href="#cb12-5" tabindex="-1"></a>            <span class="fu">return</span>(<span class="cn">NULL</span>)</span>
+<span id="cb12-6"><a href="#cb12-6" tabindex="-1"></a>        }</span>
+<span id="cb12-7"><a href="#cb12-7" tabindex="-1"></a>        <span class="fu">.stat_bracket_headroom</span>(</span>
+<span id="cb12-8"><a href="#cb12-8" tabindex="-1"></a>            <span class="at">df =</span> <span class="fu">data</span>(), <span class="at">x =</span> input<span class="sc">$</span>x.data, <span class="at">y =</span> input<span class="sc">$</span>y.data,</span>
+<span id="cb12-9"><a href="#cb12-9" tabindex="-1"></a>            <span class="at">group.by =</span> <span class="fu">.blank_to_null</span>(input<span class="sc">$</span>group.by),</span>
+<span id="cb12-10"><a href="#cb12-10" tabindex="-1"></a>            <span class="at">facet.by =</span> <span class="fu">.blank_to_null</span>(input<span class="sc">$</span>facet.by),</span>
+<span id="cb12-11"><a href="#cb12-11" tabindex="-1"></a>            <span class="at">per.facet =</span> <span class="fu">isTRUE</span>(input<span class="sc">$</span>stat.per.facet),</span>
+<span id="cb12-12"><a href="#cb12-12" tabindex="-1"></a>            <span class="at">input =</span> input</span>
+<span id="cb12-13"><a href="#cb12-13" tabindex="-1"></a>        )</span>
+<span id="cb12-14"><a href="#cb12-14" tabindex="-1"></a>    }</span>
+<span id="cb12-15"><a href="#cb12-15" tabindex="-1"></a>)</span></code></pre></div>
+<p>Pass the resolved limits on to <code>apply_stat_annotations()</code>
+too, as <code>y.min</code> and <code>y.max</code>. It has the last word
+on the drawn range, and knowing what you asked for is what lets it leave
+a large maximum alone rather than shrinking the axis onto the
+brackets.</p>
+</div>
+</div>
 <div id="persisting-manual-layout-edits" class="section level2">
 <h2>Persisting Manual Layout Edits</h2>
 <p>Every VizModules plot is interactively editable: users can drag the
 legend, reposition or re-text annotations, drag the (draggable) axis
-titles, and slide a continuous-colour legend (colorbar) to their heart’s
-content.</p>
+titles to their heart’s content.</p>
 <p>Because each module rebuilds its figure from scratch on every input
 change, those hand-made tweaks would be lost on the next re-render
 unless they are captured and re-applied.</p>
@@ -591,18 +775,18 @@ start.</p>
 <li><p><label><input type="checkbox"></input>Near the top of your
 <code>moduleServer()</code> body, create a unique plotly event source
 for this module instance and the edit store:</label></p>
-<div class="sourceCode" id="cb5"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" tabindex="-1"></a><span class="co"># Unique source so each module instance captures only its own events.</span></span>
-<span id="cb5-2"><a href="#cb5-2" tabindex="-1"></a>plot_source <span class="ot">&lt;-</span> session<span class="sc">$</span><span class="fu">ns</span>(<span class="st">&quot;myplot&quot;</span>)</span>
-<span id="cb5-3"><a href="#cb5-3" tabindex="-1"></a>edit_store <span class="ot">&lt;-</span> <span class="fu">setup_manual_edits</span>(input, session, plot_source)</span></code></pre></div></li>
+<div class="sourceCode" id="cb13"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb13-1"><a href="#cb13-1" tabindex="-1"></a><span class="co"># Unique source so each module instance captures only its own events.</span></span>
+<span id="cb13-2"><a href="#cb13-2" tabindex="-1"></a>plot_source <span class="ot">&lt;-</span> session<span class="sc">$</span><span class="fu">ns</span>(<span class="st">&quot;myplot&quot;</span>)</span>
+<span id="cb13-3"><a href="#cb13-3" tabindex="-1"></a>edit_store <span class="ot">&lt;-</span> <span class="fu">setup_manual_edits</span>(input, session, plot_source)</span></code></pre></div></li>
 <li><p><label><input type="checkbox"></input>In your
 <code>renderPlotly()</code>, pass the freshly built figure through
 <code>finalize_manual_edits()</code> immediately before returning
 it:</label></p>
-<div class="sourceCode" id="cb6"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" tabindex="-1"></a>output<span class="sc">$</span>myPlot <span class="ot">&lt;-</span> <span class="fu">renderPlotly</span>({</span>
-<span id="cb6-2"><a href="#cb6-2" tabindex="-1"></a>    <span class="fu">req</span>(input<span class="sc">$</span>x, input<span class="sc">$</span>y)</span>
-<span id="cb6-3"><a href="#cb6-3" tabindex="-1"></a>    fig <span class="ot">&lt;-</span> <span class="fu">generate_myPlot</span>()  <span class="co"># your function that builds the plotly figure</span></span>
-<span id="cb6-4"><a href="#cb6-4" tabindex="-1"></a>    <span class="fu">finalize_manual_edits</span>(fig, plot_source, edit_store, session)</span>
-<span id="cb6-5"><a href="#cb6-5" tabindex="-1"></a>})</span></code></pre></div></li>
+<div class="sourceCode" id="cb14"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb14-1"><a href="#cb14-1" tabindex="-1"></a>output<span class="sc">$</span>myPlot <span class="ot">&lt;-</span> <span class="fu">renderPlotly</span>({</span>
+<span id="cb14-2"><a href="#cb14-2" tabindex="-1"></a>    <span class="fu">req</span>(input<span class="sc">$</span>x, input<span class="sc">$</span>y)</span>
+<span id="cb14-3"><a href="#cb14-3" tabindex="-1"></a>    fig <span class="ot">&lt;-</span> <span class="fu">generate_myPlot</span>()  <span class="co"># your function that builds the plotly figure</span></span>
+<span id="cb14-4"><a href="#cb14-4" tabindex="-1"></a>    <span class="fu">finalize_manual_edits</span>(fig, plot_source, edit_store, session)</span>
+<span id="cb14-5"><a href="#cb14-5" tabindex="-1"></a>})</span></code></pre></div></li>
 </ul>
 <p>Pretty simple.</p>
 <p><code>setup_manual_edits()</code> registers the observers that
@@ -782,6 +966,24 @@ users can cross-reference the upstream docs. E.g., label the
 <code>group_by</code> input <code>&quot;Group By&quot;</code>.</li>
 </ul>
 </div>
+<div id="select-inputs" class="section level3">
+<h3>Select Inputs</h3>
+<p>Use <code>viz_select_input()</code> rather than
+<code>shiny::selectInput()</code> or
+<code>shiny::selectizeInput()</code>, and
+<code>update_viz_select()</code> in place of their
+<code>update*()</code> counterparts. It takes the same
+<code>inputId</code>/<code>label</code>/<code>choices</code>/<code>selected</code>/<code>multiple</code>
+arguments, but renders a virtualised dropdown, so an input backed by a
+column with tens of thousands of distinct values stays usable. A search
+box appears automatically once there are more than ten choices.</p>
+<p>An empty-string choice still means “no selection”; it is displayed as
+<code>(none)</code> so users can see and pick it.</p>
+<div class="sourceCode" id="cb15"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb15-1"><a href="#cb15-1" tabindex="-1"></a><span class="fu">viz_select_input</span>(<span class="fu">ns</span>(<span class="st">&quot;group.by&quot;</span>), <span class="st">&quot;Group By&quot;</span>,</span>
+<span id="cb15-2"><a href="#cb15-2" tabindex="-1"></a>    <span class="at">choices =</span> cat.choices,</span>
+<span id="cb15-3"><a href="#cb15-3" tabindex="-1"></a>    <span class="at">selected =</span> <span class="fu">get_default</span>(defaults, <span class="st">&quot;group.by&quot;</span>, <span class="st">&quot;&quot;</span>, <span class="cf">function</span>(x) x <span class="sc">%in%</span> cat.choices)</span>
+<span id="cb15-4"><a href="#cb15-4" tabindex="-1"></a>)</span></code></pre></div>
+</div>
 <div id="tooltips-with-tipify" class="section level3">
 <h3>Tooltips with <code>tipify</code></h3>
 <p>Wrap any non-obvious input in <code>shinyBS::tipify()</code> to show
@@ -800,17 +1002,17 @@ correction methods, bracket inset).</li>
 <p>Standard pattern — always use <code>placement = &quot;top&quot;</code> and
 <code>options = list(container = &quot;body&quot;)</code> so tooltips render
 correctly inside sidebar panels:</p>
-<div class="sourceCode" id="cb7"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" tabindex="-1"></a><span class="fu">tipify</span>(</span>
-<span id="cb7-2"><a href="#cb7-2" tabindex="-1"></a>    <span class="fu">textInput</span>(<span class="fu">ns</span>(<span class="st">&quot;hline.intercepts&quot;</span>), <span class="st">&quot;Y-intercepts&quot;</span>,</span>
-<span id="cb7-3"><a href="#cb7-3" tabindex="-1"></a>        <span class="at">placeholder =</span> <span class="st">&quot;e.g. 2, -2&quot;</span>,</span>
-<span id="cb7-4"><a href="#cb7-4" tabindex="-1"></a>        <span class="at">value =</span> <span class="fu">get_default</span>(defaults, <span class="st">&quot;hline.intercepts&quot;</span>, <span class="st">&quot;&quot;</span>)</span>
-<span id="cb7-5"><a href="#cb7-5" tabindex="-1"></a>    ),</span>
-<span id="cb7-6"><a href="#cb7-6" tabindex="-1"></a>    <span class="fu">paste</span>(</span>
-<span id="cb7-7"><a href="#cb7-7" tabindex="-1"></a>        <span class="st">&quot;For categorical or factor axes, enter the index (position) of the&quot;</span>,</span>
-<span id="cb7-8"><a href="#cb7-8" tabindex="-1"></a>        <span class="st">&quot;category rather than its name.&quot;</span></span>
-<span id="cb7-9"><a href="#cb7-9" tabindex="-1"></a>    ),</span>
-<span id="cb7-10"><a href="#cb7-10" tabindex="-1"></a>    <span class="at">placement =</span> <span class="st">&quot;top&quot;</span>, <span class="at">options =</span> <span class="fu">list</span>(<span class="at">container =</span> <span class="st">&quot;body&quot;</span>)</span>
-<span id="cb7-11"><a href="#cb7-11" tabindex="-1"></a>)</span></code></pre></div>
+<div class="sourceCode" id="cb16"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb16-1"><a href="#cb16-1" tabindex="-1"></a><span class="fu">tipify</span>(</span>
+<span id="cb16-2"><a href="#cb16-2" tabindex="-1"></a>    <span class="fu">textInput</span>(<span class="fu">ns</span>(<span class="st">&quot;hline.intercepts&quot;</span>), <span class="st">&quot;Y-intercepts&quot;</span>,</span>
+<span id="cb16-3"><a href="#cb16-3" tabindex="-1"></a>        <span class="at">placeholder =</span> <span class="st">&quot;e.g. 2, -2&quot;</span>,</span>
+<span id="cb16-4"><a href="#cb16-4" tabindex="-1"></a>        <span class="at">value =</span> <span class="fu">get_default</span>(defaults, <span class="st">&quot;hline.intercepts&quot;</span>, <span class="st">&quot;&quot;</span>)</span>
+<span id="cb16-5"><a href="#cb16-5" tabindex="-1"></a>    ),</span>
+<span id="cb16-6"><a href="#cb16-6" tabindex="-1"></a>    <span class="fu">paste</span>(</span>
+<span id="cb16-7"><a href="#cb16-7" tabindex="-1"></a>        <span class="st">&quot;For categorical or factor axes, enter the index (position) of the&quot;</span>,</span>
+<span id="cb16-8"><a href="#cb16-8" tabindex="-1"></a>        <span class="st">&quot;category rather than its name.&quot;</span></span>
+<span id="cb16-9"><a href="#cb16-9" tabindex="-1"></a>    ),</span>
+<span id="cb16-10"><a href="#cb16-10" tabindex="-1"></a>    <span class="at">placement =</span> <span class="st">&quot;top&quot;</span>, <span class="at">options =</span> <span class="fu">list</span>(<span class="at">container =</span> <span class="st">&quot;body&quot;</span>)</span>
+<span id="cb16-11"><a href="#cb16-11" tabindex="-1"></a>)</span></code></pre></div>
 <p>Inputs that are self-explanatory from their label (e.g.,
 <code>&quot;Plot Title&quot;</code>, <code>&quot;X-axis Variable&quot;</code>) do not need a
 tooltip.</p>
@@ -851,8 +1053,32 @@ covers your needs:</p>
 <td>Download buttons, margins, subplot spacing, and draw-shape
 styling</td>
 </tr>
+<tr class="odd">
+<td><code>uniform_legend_inputs_ui()</code></td>
+<td>Legend title and entry label font sizes</td>
+</tr>
+<tr class="even">
+<td><code>uniform_annotation_inputs_ui()</code></td>
+<td>Highlighting and labelling of individual data points</td>
+</tr>
 </tbody>
 </table>
+<p>Each UI helper has a matching <code>reset_*_inputs()</code> function
+to call from the module’s <code>observeEvent(input$reset, ...)</code>
+block.</p>
+<p>Modules that draw individual points can adopt
+<code>uniform_annotation_inputs_ui()</code> to let users highlight and
+label points by the values of a chosen column. The server side needs the
+chosen column carried in the plot’s hover text (that is where the values
+are read back from), then <code>.apply_highlight_styling()</code> to
+restyle matching markers and
+<code>.create_highlight_annotations()</code>/<code>.create_selected_annotations()</code>
+to build the labels. Set <code>require.markers = TRUE</code> when other
+scatter traces are drawn from the same data (box or violin outlines,
+say) so only the point markers are matched. Append the resulting
+annotations to <code>fig$x$layout$annotations</code> rather than
+replacing them, or facet strip labels and statistical brackets will be
+lost.</p>
 <p>Pass <code>ns</code> and a <code>defaults</code> list to each helper.
 Use the <code>include.*</code> arguments to opt in to optional groups
 (e.g., <code>include.fit.lines = TRUE</code> for scatter plots,
@@ -903,8 +1129,8 @@ expression is parsed, its AST is walked to ensure only allowed
 operations are present (comparisons, logical operators, column
 references, and literals), and then it is evaluated in a restricted
 environment containing only the data frame’s columns.</p>
-<div class="sourceCode" id="cb8"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" tabindex="-1"></a><span class="co"># In a module server — filtering rows by a textInput:</span></span>
-<span id="cb8-2"><a href="#cb8-2" tabindex="-1"></a>rows.use <span class="ot">=</span> <span class="fu">safe_eval_filter</span>(<span class="fu">isolate_fn</span>(input<span class="sc">$</span>rows.use), <span class="fu">data</span>())</span></code></pre></div>
+<div class="sourceCode" id="cb17"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb17-1"><a href="#cb17-1" tabindex="-1"></a><span class="co"># In a module server — filtering rows by a textInput:</span></span>
+<span id="cb17-2"><a href="#cb17-2" tabindex="-1"></a>rows.use <span class="ot">=</span> <span class="fu">safe_eval_filter</span>(<span class="fu">isolate_fn</span>(input<span class="sc">$</span>rows.use), <span class="fu">data</span>())</span></code></pre></div>
 <p>Returns a logical vector (same length as <code>nrow(data)</code>), or
 <code>NULL</code> if the input is empty, unparseable, or contains
 disallowed operations.</p>
@@ -915,8 +1141,8 @@ disallowed operations.</p>
 string through to a downstream plotting function that will evaluate it
 internally (e.g., <code>plotthis::BoxPlot(highlight = ...)</code>). The
 string is validated but not executed.</p>
-<div class="sourceCode" id="cb9"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" tabindex="-1"></a><span class="co"># In a module server — passing a highlight expression to plotthis:</span></span>
-<span id="cb9-2"><a href="#cb9-2" tabindex="-1"></a>highlight <span class="ot">&lt;-</span> <span class="fu">validate_expression</span>(<span class="fu">isolate_fn</span>(input<span class="sc">$</span>highlight), <span class="fu">names</span>(<span class="fu">data</span>()))</span></code></pre></div>
+<div class="sourceCode" id="cb18"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb18-1"><a href="#cb18-1" tabindex="-1"></a><span class="co"># In a module server — passing a highlight expression to plotthis:</span></span>
+<span id="cb18-2"><a href="#cb18-2" tabindex="-1"></a>highlight <span class="ot">&lt;-</span> <span class="fu">validate_expression</span>(<span class="fu">isolate_fn</span>(input<span class="sc">$</span>highlight), <span class="fu">names</span>(<span class="fu">data</span>()))</span></code></pre></div>
 <p>Returns the original string if safe, or <code>NULL</code>.</p>
 </div>
 <div id="safe_resolve_adj_fxnfn_name" class="section level3">
@@ -928,8 +1154,8 @@ the allowed list (<code>&quot;log2&quot;</code>, <code>&quot;log&quot;</code>,
 <code>&quot;log10&quot;</code>, <code>&quot;neg_log10&quot;</code>, <code>&quot;log1p&quot;</code>,
 <code>&quot;as.factor&quot;</code>, <code>&quot;abs&quot;</code>, <code>&quot;sqrt&quot;</code>) are
 accepted.</p>
-<div class="sourceCode" id="cb10"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" tabindex="-1"></a><span class="co"># In a module server — resolving an adjustment function:</span></span>
-<span id="cb10-2"><a href="#cb10-2" tabindex="-1"></a>x.adj.fxn <span class="ot">=</span> <span class="fu">safe_resolve_adj_fxn</span>(<span class="fu">isolate_fn</span>(input<span class="sc">$</span>x.adj.fxn))</span></code></pre></div>
+<div class="sourceCode" id="cb19"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb19-1"><a href="#cb19-1" tabindex="-1"></a><span class="co"># In a module server — resolving an adjustment function:</span></span>
+<span id="cb19-2"><a href="#cb19-2" tabindex="-1"></a>x.adj.fxn <span class="ot">=</span> <span class="fu">safe_resolve_adj_fxn</span>(<span class="fu">isolate_fn</span>(input<span class="sc">$</span>x.adj.fxn))</span></code></pre></div>
 <p>Returns the function, or <code>NULL</code> if the name is empty or
 not in the allowed list.</p>
 </div>
