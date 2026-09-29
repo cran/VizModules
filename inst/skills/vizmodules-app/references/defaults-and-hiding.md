@@ -20,12 +20,39 @@ module help page first.
 `hide.tabs` to both the UI and the server, so you can set them in one place:
 
 ```r
-plotthis_ViolinPlotApp(
+plotthis_BoxPlotApp(
     defaults    = list(x.data = "Species", y.data = "Sepal.Length"),
     hide.inputs = "group.by",
     hide.tabs   = "Plotly"
 )
 ```
+
+## Seeding colours
+
+A `defaults` entry under the module's **colour key** takes a *named* character vector
+mapping group level to colour, so a plot can open on a specific palette while every colour
+stays editable:
+
+```r
+plotthis_BoxPlotServer("b", data = reactive(example_rnaseq),
+    defaults = list(palette.colours = c(Healthy = "#0072B2", Disease = "red")))
+```
+
+- Precedence is **picker > `defaults` > stock palette**. A group the mapping does not name
+  still gets a sensible stock colour.
+- **Reset restores the supplied mapping**, not the stock palette.
+- The key differs per module — `palette.colours` on most, `color.panel` on
+  `dittoViz_scatterPlot`, `slice.colors` on `piePlot`, `trace.colors` on `radarPlot`. Check
+  `module-inventory.md`.
+- The ungrouped single-colour controls (`single.point.color`, `single.fill.color`,
+  `single.color`) and the continuous palette selectors (`palette.name`,
+  `gradient.palette`) are seedable from `defaults` too; those take a single value, not a
+  named vector.
+- Like any other entry, the mapping may be a `reactive()`, so a parent app can drive the
+  palette from its own state.
+
+There is no `manual.colors` argument — a fixed colour list would hard-override the picker,
+so the colours could not be edited. Use `defaults = list(color.panel = ...)` instead.
 
 ## Reactive defaults — the parent-to-child channel
 
@@ -66,9 +93,9 @@ so a `defaults` entry for an unexposed key does nothing at all — no error, no 
 
 > Known trap: `main` (plot title) is **not** exposed by any module. Every module server
 > passes `main = NULL` and none reads `input$main`, and no module UI builds a title
-> control. The `quick-start`, `defaults-and-hiding`, and `custom-modules` vignettes all
-> use `defaults = list(main = reactive(...))` as their reactive-defaults example anyway;
-> that example is a no-op. Drive a title through the plotly figure instead.
+> control, so `defaults = list(main = ...)` is a silent no-op. Drive a title through the
+> plotly figure instead, or let the user edit it on the plot — the modules persist manual
+> title edits across re-renders.
 
 ## Hiding
 
@@ -76,7 +103,7 @@ so a `defaults` entry for an unexposed key does nothing at all — no error, no 
 still initialised and still feed the plot — hiding is cosmetic, never disabling.
 
 ```r
-plotthis_ViolinPlotServer("v", data = reactive(example_rnaseq),
+plotthis_BoxPlotServer("b", data = reactive(example_rnaseq),
     defaults    = list(group.by = "condition"),
     hide.inputs = "group.by",
     hide.tabs   = c("Plotly", "Lines"))
@@ -84,6 +111,10 @@ plotthis_ViolinPlotServer("v", data = reactive(example_rnaseq),
 
 Hidden inputs reflow (no empty gap) because `organize_inputs()` lays the controls out in
 a flexbox grid.
+
+A module that shows and hides controls itself as other inputs change (`linePlot`'s error
+bar controls, the facet title inputs) leaves alone any you listed in `hide.inputs`: they
+stay hidden however the other inputs move.
 
 A hidden control whose default is a `reactive()` still drives the plot — the value
 resolves server-side rather than being read back from the invisible input. That is the

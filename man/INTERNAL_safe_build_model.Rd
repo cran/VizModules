@@ -16,7 +16,7 @@ against which the model is fitted.}
 
 \item{fit_fn_name}{Character string naming the model backend. Must be a name
 registered via \code{\link[=register_model_backend]{register_model_backend()}} (e.g. \code{"lm"}, \code{"glm"},
-\code{"loess"}, \code{"nls"}, or any user-registered backend).}
+\code{"loess"}, or any user-registered backend).}
 
 \item{...}{Extra arguments forwarded to the backend's \code{fit} function. These
 typically come from additional fields in the \code{\link[=multiDynamicInput]{multiDynamicInput()}} row

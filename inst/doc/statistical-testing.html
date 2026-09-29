@@ -341,16 +341,31 @@ code > span.er { color: #a61717; background-color: #e3d2d2; }
 
 
 
-<p>The <strong>BoxPlot</strong>, <strong>ViolinPlot</strong>, and
-<strong>yPlot</strong> modules include a <strong>Stats</strong> tab that
-adds pairwise statistical test results as bracket annotations directly
-on the plotly figure. The same helpers are exported so you can add
-bracket annotations to any custom plotly figure.</p>
+<p>The <strong>BoxPlot</strong>, <strong>yPlot</strong>, and
+<strong>freqPlot</strong> modules include a <strong>Stats</strong> tab
+that adds pairwise statistical test results as bracket annotations
+directly on the plotly figure. The same helpers are exported so you can
+add bracket annotations to any custom plotly figure.</p>
 <div id="using-the-stats-tab" class="section level2">
 <h2>Using the Stats tab</h2>
-<p>Enable testing from the Stats tab in any supported module app:</p>
+<p>Enable testing from the Stats tab in any supported module app. The
+bundled example apps open with it already on; the box plot compares
+salaries between neighbouring job levels:</p>
 <div class="sourceCode" id="cb1"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" tabindex="-1"></a><span class="fu">library</span>(VizModules)</span>
 <span id="cb1-2"><a href="#cb1-2" tabindex="-1"></a><span class="fu">plotthis_BoxPlotApp</span>()</span></code></pre></div>
+<p>Every Stats control can also be set from <code>defaults</code>,
+including which comparisons to draw, as <code>&quot;A vs B&quot;</code> strings
+(either order matches):</p>
+<div class="sourceCode" id="cb2"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" tabindex="-1"></a><span class="fu">plotthis_BoxPlotApp</span>(</span>
+<span id="cb2-2"><a href="#cb2-2" tabindex="-1"></a>    <span class="at">data_list =</span> <span class="fu">list</span>(<span class="st">&quot;iris&quot;</span> <span class="ot">=</span> example_iris),</span>
+<span id="cb2-3"><a href="#cb2-3" tabindex="-1"></a>    <span class="at">defaults =</span> <span class="fu">list</span>(</span>
+<span id="cb2-4"><a href="#cb2-4" tabindex="-1"></a>        <span class="at">x.data        =</span> <span class="st">&quot;Species&quot;</span>,</span>
+<span id="cb2-5"><a href="#cb2-5" tabindex="-1"></a>        <span class="at">y.data        =</span> <span class="st">&quot;Sepal.Length&quot;</span>,</span>
+<span id="cb2-6"><a href="#cb2-6" tabindex="-1"></a>        <span class="at">stats.enabled =</span> <span class="cn">TRUE</span>,</span>
+<span id="cb2-7"><a href="#cb2-7" tabindex="-1"></a>        <span class="at">stat.display  =</span> <span class="st">&quot;symbol&quot;</span>,</span>
+<span id="cb2-8"><a href="#cb2-8" tabindex="-1"></a>        <span class="at">stat.pairs    =</span> <span class="fu">c</span>(<span class="st">&quot;setosa vs versicolor&quot;</span>, <span class="st">&quot;versicolor vs virginica&quot;</span>)</span>
+<span id="cb2-9"><a href="#cb2-9" tabindex="-1"></a>    )</span>
+<span id="cb2-10"><a href="#cb2-10" tabindex="-1"></a>)</span></code></pre></div>
 <p>The Stats tab exposes these controls:</p>
 <table>
 <colgroup>
@@ -395,7 +410,7 @@ bracket annotations to any custom plotly figure.</p>
 </tr>
 <tr class="even">
 <td>Hide Non-Significant</td>
-<td>OFF</td>
+<td>ON</td>
 <td>Suppress <code>ns</code> brackets</td>
 </tr>
 <tr class="odd">
@@ -406,7 +421,8 @@ bracket annotations to any custom plotly figure.</p>
 <tr class="even">
 <td>Comparisons</td>
 <td>(all pairs)</td>
-<td>Restrict to specific pairs</td>
+<td>Restrict to specific pairs (<code>stat.pairs</code> in
+<code>defaults</code>)</td>
 </tr>
 <tr class="odd">
 <td>Bracket Style</td>
@@ -440,6 +456,27 @@ draggable text annotation with the overall p-value.</li>
 the same number of observations, sorted so paired samples align
 row-by-row within each group.</p>
 </div>
+<div id="adjusted-faceted-and-rotated-axes" class="section level3">
+<h3>Adjusted, faceted and rotated axes</h3>
+<p>Tests run on the values as plotted. In the <code>yPlot</code> module
+a <strong>Y Adjustment</strong> (z-score, log10, …) is applied before
+testing, so a t-test on log-scaled data tests the log values, and the
+brackets and <strong>Y Axis Min/Max</strong> are in those units too. The
+<strong>Y Adjustment Function</strong> is applied first and the
+<strong>Y Adjustment</strong> then rescales the result, so log10 with
+z-score gives z-scored log values. Rank-based tests (Wilcoxon,
+Kruskal-Wallis) give the same p-values either way for an
+order-preserving adjustment.</p>
+<p>Under a free y facet scale (<code>&quot;free&quot;</code> or
+<code>&quot;free_y&quot;</code>) each panel keeps its own range, so the <strong>Y
+Axis Min/Max</strong> are not applied and each panel’s brackets sit just
+above that panel’s data.</p>
+<p>Brackets are stacked above the data on the y-axis, so none are drawn
+while the values run along the x-axis: a rotated <code>BoxPlot</code>,
+or a <code>yPlot</code>/<code>freqPlot</code> that includes a ridge
+plot. The tests still run, and their results are in the source data
+download.</p>
+</div>
 <div id="downloading-statistics" class="section level3">
 <h3>Downloading statistics</h3>
 <p>The <strong>Download Summary</strong> button (Source Data, at the
@@ -459,36 +496,36 @@ shapes and annotations.</li>
 <li><code>apply_stat_annotations()</code> — append them to a plotly
 figure.</li>
 </ol>
-<div class="sourceCode" id="cb2"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" tabindex="-1"></a><span class="fu">library</span>(VizModules)</span>
-<span id="cb2-2"><a href="#cb2-2" tabindex="-1"></a><span class="fu">library</span>(ggplot2)</span>
-<span id="cb2-3"><a href="#cb2-3" tabindex="-1"></a><span class="fu">library</span>(plotly)</span>
-<span id="cb2-4"><a href="#cb2-4" tabindex="-1"></a></span>
-<span id="cb2-5"><a href="#cb2-5" tabindex="-1"></a>stats_df <span class="ot">&lt;-</span> <span class="fu">compute_pairwise_stats</span>(</span>
-<span id="cb2-6"><a href="#cb2-6" tabindex="-1"></a>    <span class="at">df   =</span> example_iris,</span>
-<span id="cb2-7"><a href="#cb2-7" tabindex="-1"></a>    <span class="at">x    =</span> <span class="st">&quot;Species&quot;</span>,</span>
-<span id="cb2-8"><a href="#cb2-8" tabindex="-1"></a>    <span class="at">y    =</span> <span class="st">&quot;Sepal.Length&quot;</span>,</span>
-<span id="cb2-9"><a href="#cb2-9" tabindex="-1"></a>    <span class="at">test =</span> <span class="st">&quot;wilcox.test&quot;</span>,</span>
-<span id="cb2-10"><a href="#cb2-10" tabindex="-1"></a>    <span class="at">p.adjust.method =</span> <span class="st">&quot;holm&quot;</span></span>
-<span id="cb2-11"><a href="#cb2-11" tabindex="-1"></a>)</span>
-<span id="cb2-12"><a href="#cb2-12" tabindex="-1"></a></span>
-<span id="cb2-13"><a href="#cb2-13" tabindex="-1"></a><span class="co"># Build the figure with ggplot2 + ggplotly(), matching how the plot modules</span></span>
-<span id="cb2-14"><a href="#cb2-14" tabindex="-1"></a><span class="co"># construct their figures. This matters for bracket placement: ggplotly()</span></span>
-<span id="cb2-15"><a href="#cb2-15" tabindex="-1"></a><span class="co"># categorical axes are 1-based (the first factor level sits at x = 1), which</span></span>
-<span id="cb2-16"><a href="#cb2-16" tabindex="-1"></a><span class="co"># is the convention create_stat_annotations() expects.</span></span>
-<span id="cb2-17"><a href="#cb2-17" tabindex="-1"></a>p <span class="ot">&lt;-</span> <span class="fu">ggplot</span>(example_iris, <span class="fu">aes</span>(<span class="at">x =</span> Species, <span class="at">y =</span> Sepal.Length)) <span class="sc">+</span></span>
-<span id="cb2-18"><a href="#cb2-18" tabindex="-1"></a>    <span class="fu">geom_boxplot</span>()</span>
-<span id="cb2-19"><a href="#cb2-19" tabindex="-1"></a>fig <span class="ot">&lt;-</span> <span class="fu">ggplotly</span>(p)</span>
-<span id="cb2-20"><a href="#cb2-20" tabindex="-1"></a></span>
-<span id="cb2-21"><a href="#cb2-21" tabindex="-1"></a>stat_result <span class="ot">&lt;-</span> <span class="fu">create_stat_annotations</span>(</span>
-<span id="cb2-22"><a href="#cb2-22" tabindex="-1"></a>    <span class="at">stats_df =</span> stats_df,</span>
-<span id="cb2-23"><a href="#cb2-23" tabindex="-1"></a>    <span class="at">fig      =</span> fig,</span>
-<span id="cb2-24"><a href="#cb2-24" tabindex="-1"></a>    <span class="at">df       =</span> example_iris,</span>
-<span id="cb2-25"><a href="#cb2-25" tabindex="-1"></a>    <span class="at">x        =</span> <span class="st">&quot;Species&quot;</span>,</span>
-<span id="cb2-26"><a href="#cb2-26" tabindex="-1"></a>    <span class="at">y        =</span> <span class="st">&quot;Sepal.Length&quot;</span>,</span>
-<span id="cb2-27"><a href="#cb2-27" tabindex="-1"></a>    <span class="at">display  =</span> <span class="st">&quot;symbol&quot;</span></span>
-<span id="cb2-28"><a href="#cb2-28" tabindex="-1"></a>)</span>
-<span id="cb2-29"><a href="#cb2-29" tabindex="-1"></a></span>
-<span id="cb2-30"><a href="#cb2-30" tabindex="-1"></a><span class="fu">apply_stat_annotations</span>(fig, stat_result)</span></code></pre></div>
+<div class="sourceCode" id="cb3"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" tabindex="-1"></a><span class="fu">library</span>(VizModules)</span>
+<span id="cb3-2"><a href="#cb3-2" tabindex="-1"></a><span class="fu">library</span>(ggplot2)</span>
+<span id="cb3-3"><a href="#cb3-3" tabindex="-1"></a><span class="fu">library</span>(plotly)</span>
+<span id="cb3-4"><a href="#cb3-4" tabindex="-1"></a></span>
+<span id="cb3-5"><a href="#cb3-5" tabindex="-1"></a>stats_df <span class="ot">&lt;-</span> <span class="fu">compute_pairwise_stats</span>(</span>
+<span id="cb3-6"><a href="#cb3-6" tabindex="-1"></a>    <span class="at">df   =</span> example_iris,</span>
+<span id="cb3-7"><a href="#cb3-7" tabindex="-1"></a>    <span class="at">x    =</span> <span class="st">&quot;Species&quot;</span>,</span>
+<span id="cb3-8"><a href="#cb3-8" tabindex="-1"></a>    <span class="at">y    =</span> <span class="st">&quot;Sepal.Length&quot;</span>,</span>
+<span id="cb3-9"><a href="#cb3-9" tabindex="-1"></a>    <span class="at">test =</span> <span class="st">&quot;wilcox.test&quot;</span>,</span>
+<span id="cb3-10"><a href="#cb3-10" tabindex="-1"></a>    <span class="at">p.adjust.method =</span> <span class="st">&quot;holm&quot;</span></span>
+<span id="cb3-11"><a href="#cb3-11" tabindex="-1"></a>)</span>
+<span id="cb3-12"><a href="#cb3-12" tabindex="-1"></a></span>
+<span id="cb3-13"><a href="#cb3-13" tabindex="-1"></a><span class="co"># Build the figure with ggplot2 + ggplotly(), matching how the plot modules</span></span>
+<span id="cb3-14"><a href="#cb3-14" tabindex="-1"></a><span class="co"># construct their figures. This matters for bracket placement: ggplotly()</span></span>
+<span id="cb3-15"><a href="#cb3-15" tabindex="-1"></a><span class="co"># categorical axes are 1-based (the first factor level sits at x = 1), which</span></span>
+<span id="cb3-16"><a href="#cb3-16" tabindex="-1"></a><span class="co"># is the convention create_stat_annotations() expects.</span></span>
+<span id="cb3-17"><a href="#cb3-17" tabindex="-1"></a>p <span class="ot">&lt;-</span> <span class="fu">ggplot</span>(example_iris, <span class="fu">aes</span>(<span class="at">x =</span> Species, <span class="at">y =</span> Sepal.Length)) <span class="sc">+</span></span>
+<span id="cb3-18"><a href="#cb3-18" tabindex="-1"></a>    <span class="fu">geom_boxplot</span>()</span>
+<span id="cb3-19"><a href="#cb3-19" tabindex="-1"></a>fig <span class="ot">&lt;-</span> <span class="fu">ggplotly</span>(p)</span>
+<span id="cb3-20"><a href="#cb3-20" tabindex="-1"></a></span>
+<span id="cb3-21"><a href="#cb3-21" tabindex="-1"></a>stat_result <span class="ot">&lt;-</span> <span class="fu">create_stat_annotations</span>(</span>
+<span id="cb3-22"><a href="#cb3-22" tabindex="-1"></a>    <span class="at">stats_df =</span> stats_df,</span>
+<span id="cb3-23"><a href="#cb3-23" tabindex="-1"></a>    <span class="at">fig      =</span> fig,</span>
+<span id="cb3-24"><a href="#cb3-24" tabindex="-1"></a>    <span class="at">df       =</span> example_iris,</span>
+<span id="cb3-25"><a href="#cb3-25" tabindex="-1"></a>    <span class="at">x        =</span> <span class="st">&quot;Species&quot;</span>,</span>
+<span id="cb3-26"><a href="#cb3-26" tabindex="-1"></a>    <span class="at">y        =</span> <span class="st">&quot;Sepal.Length&quot;</span>,</span>
+<span id="cb3-27"><a href="#cb3-27" tabindex="-1"></a>    <span class="at">display  =</span> <span class="st">&quot;symbol&quot;</span></span>
+<span id="cb3-28"><a href="#cb3-28" tabindex="-1"></a>)</span>
+<span id="cb3-29"><a href="#cb3-29" tabindex="-1"></a></span>
+<span id="cb3-30"><a href="#cb3-30" tabindex="-1"></a><span class="fu">apply_stat_annotations</span>(fig, stat_result)</span></code></pre></div>
 <blockquote>
 <p><strong>Axis coordinates.</strong>
 <code>create_stat_annotations()</code> positions brackets using 1-based
@@ -507,33 +544,54 @@ length-2 character vectors to <code>pairs</code>, or convert to/from the
 UI’s <code>&quot;A vs B&quot;</code> strings with
 <code>generate_pair_strings()</code> /
 <code>parse_pair_strings()</code>:</p>
-<div class="sourceCode" id="cb3"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" tabindex="-1"></a>choices <span class="ot">&lt;-</span> <span class="fu">generate_pair_strings</span>(example_iris, <span class="at">x =</span> <span class="st">&quot;Species&quot;</span>)</span>
-<span id="cb3-2"><a href="#cb3-2" tabindex="-1"></a>pairs   <span class="ot">&lt;-</span> <span class="fu">parse_pair_strings</span>(choices[<span class="dv">1</span><span class="sc">:</span><span class="dv">2</span>])</span>
-<span id="cb3-3"><a href="#cb3-3" tabindex="-1"></a></span>
-<span id="cb3-4"><a href="#cb3-4" tabindex="-1"></a>stats_df <span class="ot">&lt;-</span> <span class="fu">compute_pairwise_stats</span>(</span>
-<span id="cb3-5"><a href="#cb3-5" tabindex="-1"></a>    <span class="at">df    =</span> example_iris,</span>
-<span id="cb3-6"><a href="#cb3-6" tabindex="-1"></a>    <span class="at">x     =</span> <span class="st">&quot;Species&quot;</span>,</span>
-<span id="cb3-7"><a href="#cb3-7" tabindex="-1"></a>    <span class="at">y     =</span> <span class="st">&quot;Sepal.Length&quot;</span>,</span>
-<span id="cb3-8"><a href="#cb3-8" tabindex="-1"></a>    <span class="at">test  =</span> <span class="st">&quot;wilcox.test&quot;</span>,</span>
-<span id="cb3-9"><a href="#cb3-9" tabindex="-1"></a>    <span class="at">pairs =</span> pairs</span>
-<span id="cb3-10"><a href="#cb3-10" tabindex="-1"></a>)</span></code></pre></div>
+<div class="sourceCode" id="cb4"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" tabindex="-1"></a>choices <span class="ot">&lt;-</span> <span class="fu">generate_pair_strings</span>(example_iris, <span class="at">x =</span> <span class="st">&quot;Species&quot;</span>)</span>
+<span id="cb4-2"><a href="#cb4-2" tabindex="-1"></a>pairs   <span class="ot">&lt;-</span> <span class="fu">parse_pair_strings</span>(choices[<span class="dv">1</span><span class="sc">:</span><span class="dv">2</span>])</span>
+<span id="cb4-3"><a href="#cb4-3" tabindex="-1"></a></span>
+<span id="cb4-4"><a href="#cb4-4" tabindex="-1"></a>stats_df <span class="ot">&lt;-</span> <span class="fu">compute_pairwise_stats</span>(</span>
+<span id="cb4-5"><a href="#cb4-5" tabindex="-1"></a>    <span class="at">df    =</span> example_iris,</span>
+<span id="cb4-6"><a href="#cb4-6" tabindex="-1"></a>    <span class="at">x     =</span> <span class="st">&quot;Species&quot;</span>,</span>
+<span id="cb4-7"><a href="#cb4-7" tabindex="-1"></a>    <span class="at">y     =</span> <span class="st">&quot;Sepal.Length&quot;</span>,</span>
+<span id="cb4-8"><a href="#cb4-8" tabindex="-1"></a>    <span class="at">test  =</span> <span class="st">&quot;wilcox.test&quot;</span>,</span>
+<span id="cb4-9"><a href="#cb4-9" tabindex="-1"></a>    <span class="at">pairs =</span> pairs</span>
+<span id="cb4-10"><a href="#cb4-10" tabindex="-1"></a>)</span></code></pre></div>
 </div>
 <div id="faceted-plots-and-nested-grouping" class="section level3">
 <h3>Faceted plots and nested grouping</h3>
 <p>Pass <code>facet.by</code> with <code>per.facet = TRUE</code> to test
 independently within each panel, or <code>group.by</code> to compare
 group levels within each x category:</p>
-<div class="sourceCode" id="cb4"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" tabindex="-1"></a><span class="fu">compute_pairwise_stats</span>(</span>
-<span id="cb4-2"><a href="#cb4-2" tabindex="-1"></a>    <span class="at">df        =</span> example_rnaseq,</span>
-<span id="cb4-3"><a href="#cb4-3" tabindex="-1"></a>    <span class="at">x         =</span> <span class="st">&quot;condition&quot;</span>,</span>
-<span id="cb4-4"><a href="#cb4-4" tabindex="-1"></a>    <span class="at">y         =</span> <span class="st">&quot;expression&quot;</span>,</span>
-<span id="cb4-5"><a href="#cb4-5" tabindex="-1"></a>    <span class="at">test      =</span> <span class="st">&quot;wilcox.test&quot;</span>,</span>
-<span id="cb4-6"><a href="#cb4-6" tabindex="-1"></a>    <span class="at">facet.by  =</span> <span class="st">&quot;gene&quot;</span>,</span>
-<span id="cb4-7"><a href="#cb4-7" tabindex="-1"></a>    <span class="at">per.facet =</span> <span class="cn">TRUE</span></span>
-<span id="cb4-8"><a href="#cb4-8" tabindex="-1"></a>)</span></code></pre></div>
+<div class="sourceCode" id="cb5"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" tabindex="-1"></a><span class="fu">compute_pairwise_stats</span>(</span>
+<span id="cb5-2"><a href="#cb5-2" tabindex="-1"></a>    <span class="at">df        =</span> example_rnaseq,</span>
+<span id="cb5-3"><a href="#cb5-3" tabindex="-1"></a>    <span class="at">x         =</span> <span class="st">&quot;condition&quot;</span>,</span>
+<span id="cb5-4"><a href="#cb5-4" tabindex="-1"></a>    <span class="at">y         =</span> <span class="st">&quot;log2_cpm&quot;</span>,</span>
+<span id="cb5-5"><a href="#cb5-5" tabindex="-1"></a>    <span class="at">test      =</span> <span class="st">&quot;wilcox.test&quot;</span>,</span>
+<span id="cb5-6"><a href="#cb5-6" tabindex="-1"></a>    <span class="at">facet.by  =</span> <span class="st">&quot;gene&quot;</span>,</span>
+<span id="cb5-7"><a href="#cb5-7" tabindex="-1"></a>    <span class="at">per.facet =</span> <span class="cn">TRUE</span></span>
+<span id="cb5-8"><a href="#cb5-8" tabindex="-1"></a>)</span></code></pre></div>
 <p>Pass the same <code>facet.by</code>/<code>group.by</code> values to
 <code>create_stat_annotations()</code> so brackets land on the correct
-subplot axes.</p>
+subplot axes. If the panels have free y scales, also pass
+<code>free.y = TRUE</code>, so each panel’s brackets are measured
+against that panel’s data rather than the tallest one’s.</p>
+</div>
+<div id="test-and-draw-on-the-plotted-values" class="section level3">
+<h3>Test and draw on the plotted values</h3>
+<p><code>compute_pairwise_stats()</code>,
+<code>create_stat_annotations()</code> and
+<code>stat_bracket_y_max()</code> use whatever values they are given. If
+the plot transforms a column before drawing it (dittoViz’s
+<code>var.adjustment</code>/<code>var.adj.fxn</code>, say), give them
+the transformed values, or the brackets land in a different coordinate
+space from the data. <code>adjust_column_values()</code> reproduces
+dittoViz’s transforms:</p>
+<div class="sourceCode" id="cb6"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" tabindex="-1"></a>plotted <span class="ot">&lt;-</span> <span class="fu">adjust_column_values</span>(example_iris, <span class="at">y.col =</span> <span class="st">&quot;Sepal.Length&quot;</span>, <span class="at">y.adj.fun =</span> <span class="st">&quot;log10&quot;</span>)</span>
+<span id="cb6-2"><a href="#cb6-2" tabindex="-1"></a></span>
+<span id="cb6-3"><a href="#cb6-3" tabindex="-1"></a>stats_df <span class="ot">&lt;-</span> <span class="fu">compute_pairwise_stats</span>(plotted, <span class="at">x =</span> <span class="st">&quot;Species&quot;</span>, <span class="at">y =</span> <span class="st">&quot;Sepal.Length.adj&quot;</span>)</span>
+<span id="cb6-4"><a href="#cb6-4" tabindex="-1"></a>fig <span class="ot">&lt;-</span> dittoViz<span class="sc">::</span><span class="fu">yPlot</span>(example_iris, <span class="st">&quot;Sepal.Length&quot;</span>, <span class="st">&quot;Species&quot;</span>,</span>
+<span id="cb6-5"><a href="#cb6-5" tabindex="-1"></a>    <span class="at">var.adj.fxn =</span> log10, <span class="at">plots =</span> <span class="st">&quot;boxplot&quot;</span>, <span class="at">do.hover =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb6-6"><a href="#cb6-6" tabindex="-1"></a>stat_result <span class="ot">&lt;-</span> <span class="fu">create_stat_annotations</span>(stats_df, <span class="at">fig =</span> fig, <span class="at">df =</span> plotted,</span>
+<span id="cb6-7"><a href="#cb6-7" tabindex="-1"></a>    <span class="at">x =</span> <span class="st">&quot;Species&quot;</span>, <span class="at">y =</span> <span class="st">&quot;Sepal.Length.adj&quot;</span>)</span>
+<span id="cb6-8"><a href="#cb6-8" tabindex="-1"></a><span class="fu">apply_stat_annotations</span>(fig, stat_result)</span></code></pre></div>
 </div>
 <div id="compute_pairwise_stats-return-value" class="section level3">
 <h3><code>compute_pairwise_stats()</code> return value</h3>

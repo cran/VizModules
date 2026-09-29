@@ -16,7 +16,7 @@ A \code{tagList} containing the stats input UI elements.
 }
 \description{
 Creates a standardized tagList of statistical testing inputs for use across
-plot modules that support pairwise comparisons (BoxPlot, ViolinPlot, yPlot).
+plot modules that support pairwise comparisons (BoxPlot, yPlot, freqPlot).
 }
 \author{
 Jared Andrews

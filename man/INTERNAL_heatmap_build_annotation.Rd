@@ -38,7 +38,18 @@ returning that row's color mapping (as from \code{\link[=.heatmap_annotation_col
 or \code{NULL} to skip it. Supplied by the caller so this stays a pure,
 \code{input}-agnostic function — see \code{ComplexHeatmap_HeatmapServer()} for the
 closure that resolves each row's dynamically-rendered color widget(s) via
-\code{\link[=.heatmap_annotation_widget_id]{.heatmap_annotation_widget_id()}}.}
+\code{\link[=.heatmap_annotation_widget_id]{.heatmap_annotation_widget_id()}}.
+
+Each row may also carry \code{label_side} and \code{label_size}, controlling where that
+track's own name is drawn and at what font size, and \code{show_legend}, controlling
+whether that track contributes a legend (absent means show it).
+\code{annotation_name_side}, \code{annotation_name_gp} and \code{show_legend} are all vectorised
+per track by ComplexHeatmap, so these are collected in lockstep with the tracks
+actually added — a row skipped for an unusable or duplicate column must not shift
+the labels or legends of the rows after it.
+Valid sides differ by axis: a row annotation's name goes \code{"top"}/\code{"bottom"}, a
+column annotation's \code{"left"}/\code{"right"}; the wrong one is an error from
+ComplexHeatmap, so anything unrecognised falls back to that axis's default.}
 }
 \value{
 A \code{\link[ComplexHeatmap:rowAnnotation]{ComplexHeatmap::rowAnnotation()}}/\code{\link[ComplexHeatmap:columnAnnotation]{ComplexHeatmap::columnAnnotation()}}

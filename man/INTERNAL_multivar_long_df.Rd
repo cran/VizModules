@@ -23,9 +23,9 @@ recorded in \code{var.which}. Downstream code (e.g. statistics computed per
 variable facet) can then work against the same rows the plot was built from.
 }
 \details{
-No data adjustment is applied here; the raw column values are
-carried over, matching how the module computes statistics from the
-unadjusted data.
+No data adjustment is applied here; the column values are carried
+over as given. dittoViz adjusts each variable before stacking, so pass a
+frame already run through \code{\link[=.as_plotted]{.as_plotted()}} to get the values it plots.
 }
 \author{
 Jared Andrews

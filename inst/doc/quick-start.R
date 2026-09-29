@@ -6,41 +6,44 @@ knitr::opts_chunk$set(
 )
 
 ## ----run-gallery--------------------------------------------------------------
-# library(shiny)
-# shiny::runApp(system.file("apps/module-gallery", package = "VizModules"))
+# library(VizModules)
+# moduleGalleryApp()
+
+## ----install-skills-----------------------------------------------------------
+# VizModules::use_vizmodules_skills(".")                      # .agents/skills/ (OpenAI Codex, GitHub Copilot)
+# VizModules::use_vizmodules_skills(".", client = "copilot")  # .github/skills/ (GitHub Copilot)
+# VizModules::use_vizmodules_skills(".", client = "claude")   # .claude/skills/ (Claude Code)
 
 ## ----scatter-example----------------------------------------------------------
 # library(VizModules)
 # 
+# # The same defaults go to the controls and the server, so Reset returns to them.
+# cars_defaults <- list(x.by = "wt", y.by = "mpg", color.by = "cyl")
+# 
 # ui <- fluidPage(
 #     sidebarLayout(
 #         sidebarPanel(
-#             dittoViz_scatterPlotInputsUI("cars",
-#                 mtcars,
-#                 defaults = list(
-#                     x.by = "wt",
-#                     y.by = "mpg",
-#                     color.by = "cyl"
-#                 )
-#             )
+#             dittoViz_scatterPlotInputsUI("cars", mtcars, defaults = cars_defaults)
 #         ),
 #         mainPanel(dittoViz_scatterPlotOutputUI("cars"))
 #     )
 # )
 # 
 # server <- function(input, output, session) {
-#     dittoViz_scatterPlotServer("cars", data = reactive(mtcars))
+#     dittoViz_scatterPlotServer("cars", data = reactive(mtcars), defaults = cars_defaults)
 # }
 # 
 # shinyApp(ui, server)
 
 ## ----hide-controls------------------------------------------------------------
-# dittoViz_scatterPlotServer(
-#     "cars",
-#     data = reactive(mtcars),
-#     hide.inputs = c("split.by", "rows.use"),
-#     hide.tabs = c("Plotly")
-# )
+# server <- function(input, output, session) {
+#     dittoViz_scatterPlotServer(
+#         "cars",
+#         data = reactive(mtcars),
+#         hide.inputs = c("split.by", "shape.by"),
+#         hide.tabs = c("Plotly")
+#     )
+# }
 
 ## ----create-module-app--------------------------------------------------------
 # library(VizModules)
@@ -49,7 +52,7 @@ knitr::opts_chunk$set(
 #     inputs_ui_fn = plotthis_BarPlotInputsUI,
 #     output_ui_fn = plotthis_BarPlotOutputUI,
 #     server_fn    = plotthis_BarPlotServer,
-#     data_list    = list("cars" = mtcars),
+#     data_list    = list("cars" = example_mtcars),
 #     title        = "My Bar Plot"
 # )
 # if (interactive()) runApp(app)

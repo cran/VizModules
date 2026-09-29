@@ -1,8 +1,8 @@
 # The Stats tab
 
-Available on **`dittoViz_yPlot`, `plotthis_BoxPlot`, and `plotthis_ViolinPlot` only** —
-the categorical-x / numeric-y modules. No other module has one, and `hide.tabs = "Stats"`
-on a module without it is a no-op, not an error.
+Available on **`dittoViz_yPlot`, `plotthis_BoxPlot`, and `dittoViz_freqPlot` only** — the modules that put a numeric value against categorical
+groups. No other module has one, and `hide.tabs = "Stats"` on a module without it is a
+no-op, not an error.
 
 Users switch it on with the **Enable Stats** toggle. To have an app open with it already
 configured, pre-fill the keys through `defaults`.
@@ -28,7 +28,7 @@ Note the naming: the toggle is `stats.enabled` (plural), everything else is `sta
 (singular).
 
 ```r
-plotthis_ViolinPlotServer("v", data = reactive(example_rnaseq),
+plotthis_BoxPlotServer("b", data = reactive(example_rnaseq),
     defaults = list(
         x.data        = "cell_type",
         y.data        = "log2_cpm",
@@ -50,6 +50,14 @@ within each group.
 On `dittoViz_yPlot` the Stats tab is hidden for the `"group"` and `"color"` multivar
 aesthetics, and when a `split.by` facet is combined with several y variables — brackets
 cannot be placed against those layouts.
+
+On `dittoViz_freqPlot` testing is **always** per-facet: the module hides `stat.per.facet`
+and passes `per.facet = TRUE` regardless. Each facet is a different level of the frequency
+variable, so pooling across them would compare non-comparable quantities. A
+`defaults = list(stat.per.facet = FALSE)` there is a no-op. Note also that the tests run
+against the summarised frequency table (one point per sample), not the input rows, so the
+group sizes are donor/sample counts — small enough that `wilcox.test` often cannot reach
+significance.
 
 ## Stats in a hand-built figure
 

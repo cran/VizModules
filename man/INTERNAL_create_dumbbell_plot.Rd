@@ -11,7 +11,8 @@
   colour.by,
   palette.selection,
   line.colour,
-  show.legend
+  show.legend,
+  point.size = 12
 )
 }
 \arguments{
@@ -30,6 +31,8 @@ or \code{"Y variables"} (one color per y category).}
 \item{line.colour}{Character, hex color for the connecting line between dumbbell points.}
 
 \item{show.legend}{Logical, whether to display the legend for this subplot.}
+
+\item{point.size}{Numeric, diameter of the markers in pixels.}
 }
 \value{
 A plotly object representing the dumbbell (or single dot) plot for the supplied data.

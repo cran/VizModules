@@ -58,8 +58,14 @@ remains.
 Behaviour depends on whether bars are stacked:
 \itemize{
 \item \strong{Non-stacked} (\code{grouping = FALSE}, categorical or absent
-\code{stack_by}): the Y range is computed directly from the raw column
+\code{stack_by}): the Y range is computed directly from the finite column
 values using \code{min()} and \code{max()}.
+}
+
+The maximum is padded by \code{axis_scale_factor - 1} of its magnitude, which is
+\code{max * axis_scale_factor} for a positive maximum and still raises a negative
+one (e.g. log-transformed values below 1).
+\itemize{
 \item \strong{Stacked} (\code{grouping = TRUE} or \code{stack_by} is
 numeric): Y values are summed within each unique X category using
 \code{tapply()}, and the maximum of those sums is used. The minimum is

@@ -8,26 +8,25 @@ knitr::opts_chunk$set(
 ## ----defaults-basic-----------------------------------------------------------
 # library(VizModules)
 # 
+# scatter_defaults <- list(
+#     x.by        = "wt",
+#     y.by        = "mpg",
+#     color.by    = "cyl",
+#     size        = 3,
+#     best.fit    = TRUE
+# )
+# 
 # ui <- fluidPage(
 #     sidebarLayout(
 #         sidebarPanel(
-#             dittoViz_scatterPlotInputsUI(
-#                 "p", mtcars,
-#                 defaults = list(
-#                     x.by        = "wt",
-#                     y.by        = "mpg",
-#                     color.by    = "cyl",
-#                     size        = 3,
-#                     best.fit    = TRUE
-#                 )
-#             )
+#             dittoViz_scatterPlotInputsUI("p", mtcars, defaults = scatter_defaults)
 #         ),
 #         mainPanel(dittoViz_scatterPlotOutputUI("p"))
 #     )
 # )
 # 
 # server <- function(input, output, session) {
-#     dittoViz_scatterPlotServer("p", data = reactive(mtcars))
+#     dittoViz_scatterPlotServer("p", data = reactive(mtcars), defaults = scatter_defaults)
 # }
 # 
 # shinyApp(ui, server)
@@ -61,10 +60,12 @@ knitr::opts_chunk$set(
 
 ## ----defaults-app-------------------------------------------------------------
 # plotthis_BoxPlotApp(
+#     data_list = list("iris" = example_iris),
 #     defaults = list(
-#         x.by     = "Species",
-#         y.by     = "Sepal.Length",
-#         pt.size  = 0
+#         x.data     = "Species",
+#         y.data     = "Sepal.Length",
+#         add.points = TRUE,
+#         pt.size    = 2
 #     )
 # )
 
@@ -74,7 +75,7 @@ knitr::opts_chunk$set(
 #     output_ui_fn = plotthis_BoxPlotOutputUI,
 #     server_fn    = plotthis_BoxPlotServer,
 #     data_list    = list("iris" = iris),
-#     defaults     = list(x.by = "Species", y.by = "Sepal.Length")
+#     defaults     = list(x.data = "Species", y.data = "Sepal.Length")
 # )
 # if (interactive()) runApp(app)
 
@@ -110,24 +111,24 @@ knitr::opts_chunk$set(
 # ui <- fluidPage(
 #     sidebarLayout(
 #         sidebarPanel(
-#             plotthis_ViolinPlotInputsUI(
-#                 "v", example_rnaseq,
+#             plotthis_BoxPlotInputsUI(
+#                 "b", example_rnaseq,
 #                 defaults = list(
-#                     x.by     = "condition",
-#                     y.by     = "expression",
-#                     color.by = "condition"
+#                     x.data   = "cell_type",
+#                     y.data   = "log2_cpm",
+#                     group.by = "condition"
 #                 )
 #             )
 #         ),
-#         mainPanel(plotthis_ViolinPlotOutputUI("v"))
+#         mainPanel(plotthis_BoxPlotOutputUI("b"))
 #     )
 # )
 # 
 # server <- function(input, output, session) {
-#     plotthis_ViolinPlotServer(
-#         "v",
+#     plotthis_BoxPlotServer(
+#         "b",
 #         data        = reactive(example_rnaseq),
-#         hide.inputs = c("color.by"),
+#         hide.inputs = c("group.by"),
 #         hide.tabs   = c("Plotly", "Lines")
 #     )
 # }
@@ -135,9 +136,10 @@ knitr::opts_chunk$set(
 # shinyApp(ui, server)
 
 ## ----hide-in-app--------------------------------------------------------------
-# plotthis_ViolinPlotApp(
-#     defaults    = list(x.by = "Species", y.by = "Sepal.Length"),
-#     hide.inputs = "color.by",
+# plotthis_BoxPlotApp(
+#     data_list   = list("iris" = example_iris),
+#     defaults    = list(x.data = "Species", y.data = "Sepal.Length"),
+#     hide.inputs = "group.by",
 #     hide.tabs   = "Plotly"
 # )
 
@@ -146,9 +148,10 @@ knitr::opts_chunk$set(
 # 
 # myModuleServer <- function(id, data_reactive) {
 #     moduleServer(id, function(input, output, session) {
-#         # Hide the 'size' input whenever a size.by column is chosen
+#         # Hide the 'size' input whenever a size.by column is chosen. isTRUE()
+#         # because input$size.by is NULL until the control first reports in.
 #         observe({
-#             if (nzchar(input$size.by)) {
+#             if (isTRUE(nzchar(input$size.by))) {
 #                 shinyjs::hide(id = "size")
 #             } else {
 #                 shinyjs::show(id = "size")
@@ -163,7 +166,7 @@ knitr::opts_chunk$set(
 # myModuleServer <- function(id, data_reactive) {
 #     moduleServer(id, function(input, output, session) {
 #         observe({
-#             if (nzchar(input$size.by)) {
+#             if (isTRUE(nzchar(input$size.by))) {
 #                 VizModules::hide_input(session, "size")
 #             } else {
 #                 VizModules::show_input(session, "size")

@@ -23,18 +23,14 @@
   const rowsContainer = (el) => el.querySelector(".mdi-rows");
   const templateEl = (el) => el.querySelector(".mdi-row-template");
 
-  // Read a single field's value by deferring to its registered Shiny binding,
-  // so any properly-registered input type reports correctly.
+  // Read a single field's value straight off its form control: a checkbox
+  // reports its checked state, everything else its string value (so numeric
+  // fields arrive as strings and the server converts them).
   const readField = (fieldEl) => {
     const bound = fieldEl.querySelector(".shiny-bound-input");
     const target = bound || fieldEl.querySelector("input, select, textarea");
     if (!target) return null;
 
-    if (target.shinyInputBinding && typeof target.shinyInputBinding.getValue === "function") {
-      try {
-        return target.shinyInputBinding.getValue(target);
-      } catch (e) { /* fall through */ }
-    }
     if (target.type === "checkbox") return target.checked;
     return target.value;
   };
@@ -42,6 +38,15 @@
   const readValue = (el) => {
     const prefix = el.dataset.rowPrefix || "row";
     const rows = el.querySelectorAll(".mdi-rows > .mdi-row");
+    if (rows.length === 0 && !el._mdiMounted) {
+      const data = getData(el);
+      if ((data.initial || []).length) {
+        return {
+          _prefix: prefix,
+          rows: data.initial
+        };
+      }
+    }
     return {
       _prefix: prefix,
       rows: Array.prototype.map.call(rows, (row) => {
@@ -89,10 +94,12 @@
       if (!fieldEl) return;
       const target = fieldEl.querySelector("input, select, textarea");
       if (!target) return;
-      if (target.type === "checkbox") {
-        target.checked = !!f.value;
-      } else {
-        target.value = f.value;
+      if (f.value !== undefined && f.value !== null) {
+        if (target.type === "checkbox") {
+          target.checked = !!f.value;
+        } else {
+          target.value = f.value;
+        }
       }
       // Colour inputs are initialized by the colourpicker binding, which reads
       // the starting colour from the `data-init-value` attribute rather than the
@@ -164,6 +171,7 @@
   };
 
   const addRow = (el, fields, callback) => {
+    el._mdiMounted = true;
     const data = getData(el);
     data.counter += 1;
     const row = buildRow(el, data.counter);
@@ -187,6 +195,7 @@
   };
 
   const clearRows = (el, callback) => {
+    el._mdiMounted = true;
     const container = rowsContainer(el);
     Array.prototype.slice.call(container.querySelectorAll(".mdi-row"))
       .forEach((row) => {
@@ -197,6 +206,7 @@
   };
 
   const setValue = (el, rows, callback) => {
+    el._mdiMounted = true;
     clearRows(el, null);
     (rows || []).forEach((r) => addRow(el, r.fields, null));
     if (callback) callback();
@@ -221,7 +231,14 @@
         if ((data.initial || []).length) {
           setTimeout(function () {
             data.initial.forEach((r) => addRow(el, r.fields, null));
+            el._mdiMounted = true;
+            Shiny.setInputValue(
+              el.id + ":VizModules.multiDynamicInput",
+              readValue(el)
+            );
           }, 0);
+        } else {
+          el._mdiMounted = true;
         }
       },
       getValue: function (el) {

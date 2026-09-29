@@ -118,3 +118,19 @@ knitr::opts_chunk$set(
 #     })
 # }
 
+## ----debounce-wrapper---------------------------------------------------------
+# myModuleServer <- function(id, data) {
+#     filtered <- moduleServer(id, function(input, output, session) {
+#         # Once, in the moduleServer body (where the wrapper's own input lives),
+#         # not inside the reactive below. 500-800ms is a good range.
+#         query <- debounce(reactive(input$query), 700)
+# 
+#         reactive({
+#             keep <- safe_eval_filter(query(), data())
+#             if (is.null(keep)) data() else data()[keep, , drop = FALSE]
+#         })
+#     })
+# 
+#     dittoViz_scatterPlotServer(id, filtered)
+# }
+

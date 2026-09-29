@@ -4,16 +4,21 @@
 \alias{.mdi_value_to_payload}
 \title{Convert a rows value into the client JSON payload}
 \usage{
-.mdi_value_to_payload(value, field_keys)
+.mdi_value_to_payload(value, field_keys, row_spec = NULL)
 }
 \arguments{
-\item{value}{A named list of rows (each a named list of field values).}
+\item{value}{Named list of rows, each a named list of field values.}
 
-\item{field_keys}{Optional character vector of field keys to enforce order;
-\code{NULL} uses each row's own names.}
+\item{field_keys}{Optional character vector of field keys.}
+
+\item{row_spec}{Optional named list describing row fields.}
 }
 \value{
 A list of \verb{\{ fields: [\{ key, value \}, ...] \}} row objects.
+
+Shape an elements list into the payload expected by the client
+
+A list of lists, each with a \code{fields} element.
 }
 \description{
 Convert a rows value into the client JSON payload

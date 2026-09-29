@@ -9,6 +9,18 @@ knitr::opts_chunk$set(
 # library(VizModules)
 # plotthis_BoxPlotApp()
 
+## ----stats-defaults-----------------------------------------------------------
+# plotthis_BoxPlotApp(
+#     data_list = list("iris" = example_iris),
+#     defaults = list(
+#         x.data        = "Species",
+#         y.data        = "Sepal.Length",
+#         stats.enabled = TRUE,
+#         stat.display  = "symbol",
+#         stat.pairs    = c("setosa vs versicolor", "versicolor vs virginica")
+#     )
+# )
+
 ## ----stat-helpers-basic-------------------------------------------------------
 # library(VizModules)
 # library(ggplot2)
@@ -57,9 +69,19 @@ knitr::opts_chunk$set(
 # compute_pairwise_stats(
 #     df        = example_rnaseq,
 #     x         = "condition",
-#     y         = "expression",
+#     y         = "log2_cpm",
 #     test      = "wilcox.test",
 #     facet.by  = "gene",
 #     per.facet = TRUE
 # )
+
+## ----plotted-values-----------------------------------------------------------
+# plotted <- adjust_column_values(example_iris, y.col = "Sepal.Length", y.adj.fun = "log10")
+# 
+# stats_df <- compute_pairwise_stats(plotted, x = "Species", y = "Sepal.Length.adj")
+# fig <- dittoViz::yPlot(example_iris, "Sepal.Length", "Species",
+#     var.adj.fxn = log10, plots = "boxplot", do.hover = TRUE)
+# stat_result <- create_stat_annotations(stats_df, fig = fig, df = plotted,
+#     x = "Species", y = "Sepal.Length.adj")
+# apply_stat_annotations(fig, stat_result)
 

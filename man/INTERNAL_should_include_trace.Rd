@@ -29,7 +29,6 @@ Background traces (show.others) are identified by checking for:
 \itemize{
 \item name field containing "show.others"
 \item legendgroup field containing "show.others"
-\item Single text element (this check is REMOVED as it's unreliable)
 }
 }
 \author{

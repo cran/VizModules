@@ -344,9 +344,42 @@ code > span.er { color: #a61717; background-color: #e3d2d2; }
 <div id="see-the-modules" class="section level2">
 <h2>See the modules</h2>
 <p>Start with the hosted gallery to explore what each module can do: <a href="https://j-andrews7-VizModules.share.connect.posit.cloud/" class="uri">https://j-andrews7-VizModules.share.connect.posit.cloud/</a></p>
-<p>You can also run the same gallery locally from this package:</p>
-<div class="sourceCode" id="cb1"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" tabindex="-1"></a><span class="fu">library</span>(shiny)</span>
-<span id="cb1-2"><a href="#cb1-2" tabindex="-1"></a>shiny<span class="sc">::</span><span class="fu">runApp</span>(<span class="fu">system.file</span>(<span class="st">&quot;apps/module-gallery&quot;</span>, <span class="at">package =</span> <span class="st">&quot;VizModules&quot;</span>))</span></code></pre></div>
+<p>You can also run the same gallery locally from this package. Each tab
+opens a module on an example dataset with its main features switched on,
+and the <strong>Figure Builder</strong> tab combines several modules
+into one multi-panel figure:</p>
+<div class="sourceCode" id="cb1"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" tabindex="-1"></a><span class="fu">library</span>(VizModules)</span>
+<span id="cb1-2"><a href="#cb1-2" tabindex="-1"></a><span class="fu">moduleGalleryApp</span>()</span></code></pre></div>
+<p>Each module’s own example app
+(e.g. <code>plotthis_BoxPlotApp()</code>) opens on the same example as
+its gallery tab.</p>
+</div>
+<div id="working-with-an-ai-coding-agent" class="section level2">
+<h2>Working with an AI coding agent</h2>
+<p><strong>VizModules</strong> ships three <a href="https://agentskills.io">Agent Skills</a> that hand an agent the
+package’s conventions up front, rather than having it grep the docs for
+them. Install them into your project with:</p>
+<div class="sourceCode" id="cb2"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" tabindex="-1"></a>VizModules<span class="sc">::</span><span class="fu">use_vizmodules_skills</span>(<span class="st">&quot;.&quot;</span>)                      <span class="co"># .agents/skills/ (OpenAI Codex, GitHub Copilot)</span></span>
+<span id="cb2-2"><a href="#cb2-2" tabindex="-1"></a>VizModules<span class="sc">::</span><span class="fu">use_vizmodules_skills</span>(<span class="st">&quot;.&quot;</span>, <span class="at">client =</span> <span class="st">&quot;copilot&quot;</span>)  <span class="co"># .github/skills/ (GitHub Copilot)</span></span>
+<span id="cb2-3"><a href="#cb2-3" tabindex="-1"></a>VizModules<span class="sc">::</span><span class="fu">use_vizmodules_skills</span>(<span class="st">&quot;.&quot;</span>, <span class="at">client =</span> <span class="st">&quot;claude&quot;</span>)   <span class="co"># .claude/skills/ (Claude Code)</span></span></code></pre></div>
+<ul>
+<li><strong><code>vizmodules-app</code></strong> covers what this
+vignette does: wiring modules into an app, <code>defaults</code>,
+<code>hide.inputs</code>/<code>hide.tabs</code>, the Stats tab,
+<code>createModuleApp()</code>, the data filter table, the figure
+builder, and source-data export. It carries a generated inventory of
+every module’s column-mapping keys, colour key, and tab names, which is
+otherwise the most expensive thing for an agent to look up.</li>
+<li><strong><code>vizmodules-custom-module</code></strong> covers
+building a wrapper module on top of a base module; see
+<code>vignette(&quot;custom-modules&quot;, package = &quot;VizModules&quot;)</code>.</li>
+<li><strong><code>vizmodules-new-module</code></strong> covers authoring
+a module inside this package; see
+<code>vignette(&quot;adding-a-new-module&quot;, package = &quot;VizModules&quot;)</code>.</li>
+</ul>
+<p>Restart your agent session after installing so the new directory is
+picked up. The README has a plain-text prompt for tools that cannot read
+local skill files.</p>
 </div>
 <div id="drop-a-module-into-your-app" class="section level2">
 <h2>Drop a module into your app</h2>
@@ -354,37 +387,36 @@ code > span.er { color: #a61717; background-color: #e3d2d2; }
 controls, <code>*OutputUI()</code> for the plot, and
 <code>*Server()</code> for the logic. Here is a minimal scatter plot
 example using the <code>dittoViz_scatterPlot</code> module:</p>
-<div class="sourceCode" id="cb2"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" tabindex="-1"></a><span class="fu">library</span>(VizModules)</span>
-<span id="cb2-2"><a href="#cb2-2" tabindex="-1"></a></span>
-<span id="cb2-3"><a href="#cb2-3" tabindex="-1"></a>ui <span class="ot">&lt;-</span> <span class="fu">fluidPage</span>(</span>
-<span id="cb2-4"><a href="#cb2-4" tabindex="-1"></a>    <span class="fu">sidebarLayout</span>(</span>
-<span id="cb2-5"><a href="#cb2-5" tabindex="-1"></a>        <span class="fu">sidebarPanel</span>(</span>
-<span id="cb2-6"><a href="#cb2-6" tabindex="-1"></a>            <span class="fu">dittoViz_scatterPlotInputsUI</span>(<span class="st">&quot;cars&quot;</span>,</span>
-<span id="cb2-7"><a href="#cb2-7" tabindex="-1"></a>                mtcars,</span>
-<span id="cb2-8"><a href="#cb2-8" tabindex="-1"></a>                <span class="at">defaults =</span> <span class="fu">list</span>(</span>
-<span id="cb2-9"><a href="#cb2-9" tabindex="-1"></a>                    <span class="at">x.by =</span> <span class="st">&quot;wt&quot;</span>,</span>
-<span id="cb2-10"><a href="#cb2-10" tabindex="-1"></a>                    <span class="at">y.by =</span> <span class="st">&quot;mpg&quot;</span>,</span>
-<span id="cb2-11"><a href="#cb2-11" tabindex="-1"></a>                    <span class="at">color.by =</span> <span class="st">&quot;cyl&quot;</span></span>
-<span id="cb2-12"><a href="#cb2-12" tabindex="-1"></a>                )</span>
-<span id="cb2-13"><a href="#cb2-13" tabindex="-1"></a>            )</span>
-<span id="cb2-14"><a href="#cb2-14" tabindex="-1"></a>        ),</span>
-<span id="cb2-15"><a href="#cb2-15" tabindex="-1"></a>        <span class="fu">mainPanel</span>(<span class="fu">dittoViz_scatterPlotOutputUI</span>(<span class="st">&quot;cars&quot;</span>))</span>
-<span id="cb2-16"><a href="#cb2-16" tabindex="-1"></a>    )</span>
-<span id="cb2-17"><a href="#cb2-17" tabindex="-1"></a>)</span>
-<span id="cb2-18"><a href="#cb2-18" tabindex="-1"></a></span>
-<span id="cb2-19"><a href="#cb2-19" tabindex="-1"></a>server <span class="ot">&lt;-</span> <span class="cf">function</span>(input, output, session) {</span>
-<span id="cb2-20"><a href="#cb2-20" tabindex="-1"></a>    <span class="fu">dittoViz_scatterPlotServer</span>(<span class="st">&quot;cars&quot;</span>, <span class="at">data =</span> <span class="fu">reactive</span>(mtcars))</span>
-<span id="cb2-21"><a href="#cb2-21" tabindex="-1"></a>}</span>
-<span id="cb2-22"><a href="#cb2-22" tabindex="-1"></a></span>
-<span id="cb2-23"><a href="#cb2-23" tabindex="-1"></a><span class="fu">shinyApp</span>(ui, server)</span></code></pre></div>
+<div class="sourceCode" id="cb3"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" tabindex="-1"></a><span class="fu">library</span>(VizModules)</span>
+<span id="cb3-2"><a href="#cb3-2" tabindex="-1"></a></span>
+<span id="cb3-3"><a href="#cb3-3" tabindex="-1"></a><span class="co"># The same defaults go to the controls and the server, so Reset returns to them.</span></span>
+<span id="cb3-4"><a href="#cb3-4" tabindex="-1"></a>cars_defaults <span class="ot">&lt;-</span> <span class="fu">list</span>(<span class="at">x.by =</span> <span class="st">&quot;wt&quot;</span>, <span class="at">y.by =</span> <span class="st">&quot;mpg&quot;</span>, <span class="at">color.by =</span> <span class="st">&quot;cyl&quot;</span>)</span>
+<span id="cb3-5"><a href="#cb3-5" tabindex="-1"></a></span>
+<span id="cb3-6"><a href="#cb3-6" tabindex="-1"></a>ui <span class="ot">&lt;-</span> <span class="fu">fluidPage</span>(</span>
+<span id="cb3-7"><a href="#cb3-7" tabindex="-1"></a>    <span class="fu">sidebarLayout</span>(</span>
+<span id="cb3-8"><a href="#cb3-8" tabindex="-1"></a>        <span class="fu">sidebarPanel</span>(</span>
+<span id="cb3-9"><a href="#cb3-9" tabindex="-1"></a>            <span class="fu">dittoViz_scatterPlotInputsUI</span>(<span class="st">&quot;cars&quot;</span>, mtcars, <span class="at">defaults =</span> cars_defaults)</span>
+<span id="cb3-10"><a href="#cb3-10" tabindex="-1"></a>        ),</span>
+<span id="cb3-11"><a href="#cb3-11" tabindex="-1"></a>        <span class="fu">mainPanel</span>(<span class="fu">dittoViz_scatterPlotOutputUI</span>(<span class="st">&quot;cars&quot;</span>))</span>
+<span id="cb3-12"><a href="#cb3-12" tabindex="-1"></a>    )</span>
+<span id="cb3-13"><a href="#cb3-13" tabindex="-1"></a>)</span>
+<span id="cb3-14"><a href="#cb3-14" tabindex="-1"></a></span>
+<span id="cb3-15"><a href="#cb3-15" tabindex="-1"></a>server <span class="ot">&lt;-</span> <span class="cf">function</span>(input, output, session) {</span>
+<span id="cb3-16"><a href="#cb3-16" tabindex="-1"></a>    <span class="fu">dittoViz_scatterPlotServer</span>(<span class="st">&quot;cars&quot;</span>, <span class="at">data =</span> <span class="fu">reactive</span>(mtcars), <span class="at">defaults =</span> cars_defaults)</span>
+<span id="cb3-17"><a href="#cb3-17" tabindex="-1"></a>}</span>
+<span id="cb3-18"><a href="#cb3-18" tabindex="-1"></a></span>
+<span id="cb3-19"><a href="#cb3-19" tabindex="-1"></a><span class="fu">shinyApp</span>(ui, server)</span></code></pre></div>
 </div>
 <div id="set-defaults-and-hide-controls" class="section level2">
 <h2>Set defaults and hide controls</h2>
 <ul>
 <li><strong>Defaults</strong>: Pass a named list to the
 <code>defaults</code> argument of <code>*InputsUI()</code> to pre-fill
-inputs. Names match the underlying plot function arguments (e.g.,
-<code>defaults = list(fill.color = &quot;steelblue&quot;)</code>).</li>
+inputs, and the same list to the module’s <code>*Server()</code> so its
+Reset button returns to them. Names are the module’s input IDs, which
+mostly match the underlying plot function’s arguments (e.g.,
+<code>defaults = list(color.by = &quot;cyl&quot;, size = 3)</code> for the scatter
+plot).</li>
 <li><strong>Reactive defaults</strong>: An entry may be a
 <code>reactive()</code> instead of a fixed value, so an input follows
 your app’s state
@@ -400,12 +432,14 @@ values.</li>
 whole groups of controls (e.g., <code>&quot;Plotly&quot;</code> or
 <code>&quot;Legend&quot;</code> in <code>scatterPlot</code>).</li>
 </ul>
-<div class="sourceCode" id="cb3"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" tabindex="-1"></a><span class="fu">dittoViz_scatterPlotServer</span>(</span>
-<span id="cb3-2"><a href="#cb3-2" tabindex="-1"></a>    <span class="st">&quot;cars&quot;</span>,</span>
-<span id="cb3-3"><a href="#cb3-3" tabindex="-1"></a>    <span class="at">data =</span> <span class="fu">reactive</span>(mtcars),</span>
-<span id="cb3-4"><a href="#cb3-4" tabindex="-1"></a>    <span class="at">hide.inputs =</span> <span class="fu">c</span>(<span class="st">&quot;split.by&quot;</span>, <span class="st">&quot;rows.use&quot;</span>),</span>
-<span id="cb3-5"><a href="#cb3-5" tabindex="-1"></a>    <span class="at">hide.tabs =</span> <span class="fu">c</span>(<span class="st">&quot;Plotly&quot;</span>)</span>
-<span id="cb3-6"><a href="#cb3-6" tabindex="-1"></a>)</span></code></pre></div>
+<div class="sourceCode" id="cb4"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" tabindex="-1"></a>server <span class="ot">&lt;-</span> <span class="cf">function</span>(input, output, session) {</span>
+<span id="cb4-2"><a href="#cb4-2" tabindex="-1"></a>    <span class="fu">dittoViz_scatterPlotServer</span>(</span>
+<span id="cb4-3"><a href="#cb4-3" tabindex="-1"></a>        <span class="st">&quot;cars&quot;</span>,</span>
+<span id="cb4-4"><a href="#cb4-4" tabindex="-1"></a>        <span class="at">data =</span> <span class="fu">reactive</span>(mtcars),</span>
+<span id="cb4-5"><a href="#cb4-5" tabindex="-1"></a>        <span class="at">hide.inputs =</span> <span class="fu">c</span>(<span class="st">&quot;split.by&quot;</span>, <span class="st">&quot;shape.by&quot;</span>),</span>
+<span id="cb4-6"><a href="#cb4-6" tabindex="-1"></a>        <span class="at">hide.tabs =</span> <span class="fu">c</span>(<span class="st">&quot;Plotly&quot;</span>)</span>
+<span id="cb4-7"><a href="#cb4-7" tabindex="-1"></a>    )</span>
+<span id="cb4-8"><a href="#cb4-8" tabindex="-1"></a>}</span></code></pre></div>
 <p>Hidden inputs and tabs still feed their values into the plot, so the
 module stays fully configured while exposing only what your users
 need.</p>
@@ -416,16 +450,16 @@ need.</p>
 factory function that returns a full standalone app with data import, a
 filterable data table, and dataset switching for any module -
 <code>createModuleApp()</code>:</p>
-<div class="sourceCode" id="cb4"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" tabindex="-1"></a><span class="fu">library</span>(VizModules)</span>
-<span id="cb4-2"><a href="#cb4-2" tabindex="-1"></a></span>
-<span id="cb4-3"><a href="#cb4-3" tabindex="-1"></a>app <span class="ot">&lt;-</span> <span class="fu">createModuleApp</span>(</span>
-<span id="cb4-4"><a href="#cb4-4" tabindex="-1"></a>    <span class="at">inputs_ui_fn =</span> plotthis_BarPlotInputsUI,</span>
-<span id="cb4-5"><a href="#cb4-5" tabindex="-1"></a>    <span class="at">output_ui_fn =</span> plotthis_BarPlotOutputUI,</span>
-<span id="cb4-6"><a href="#cb4-6" tabindex="-1"></a>    <span class="at">server_fn    =</span> plotthis_BarPlotServer,</span>
-<span id="cb4-7"><a href="#cb4-7" tabindex="-1"></a>    <span class="at">data_list    =</span> <span class="fu">list</span>(<span class="st">&quot;cars&quot;</span> <span class="ot">=</span> mtcars),</span>
-<span id="cb4-8"><a href="#cb4-8" tabindex="-1"></a>    <span class="at">title        =</span> <span class="st">&quot;My Bar Plot&quot;</span></span>
-<span id="cb4-9"><a href="#cb4-9" tabindex="-1"></a>)</span>
-<span id="cb4-10"><a href="#cb4-10" tabindex="-1"></a><span class="cf">if</span> (<span class="fu">interactive</span>()) <span class="fu">runApp</span>(app)</span></code></pre></div>
+<div class="sourceCode" id="cb5"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" tabindex="-1"></a><span class="fu">library</span>(VizModules)</span>
+<span id="cb5-2"><a href="#cb5-2" tabindex="-1"></a></span>
+<span id="cb5-3"><a href="#cb5-3" tabindex="-1"></a>app <span class="ot">&lt;-</span> <span class="fu">createModuleApp</span>(</span>
+<span id="cb5-4"><a href="#cb5-4" tabindex="-1"></a>    <span class="at">inputs_ui_fn =</span> plotthis_BarPlotInputsUI,</span>
+<span id="cb5-5"><a href="#cb5-5" tabindex="-1"></a>    <span class="at">output_ui_fn =</span> plotthis_BarPlotOutputUI,</span>
+<span id="cb5-6"><a href="#cb5-6" tabindex="-1"></a>    <span class="at">server_fn    =</span> plotthis_BarPlotServer,</span>
+<span id="cb5-7"><a href="#cb5-7" tabindex="-1"></a>    <span class="at">data_list    =</span> <span class="fu">list</span>(<span class="st">&quot;cars&quot;</span> <span class="ot">=</span> example_mtcars),</span>
+<span id="cb5-8"><a href="#cb5-8" tabindex="-1"></a>    <span class="at">title        =</span> <span class="st">&quot;My Bar Plot&quot;</span></span>
+<span id="cb5-9"><a href="#cb5-9" tabindex="-1"></a>)</span>
+<span id="cb5-10"><a href="#cb5-10" tabindex="-1"></a><span class="cf">if</span> (<span class="fu">interactive</span>()) <span class="fu">runApp</span>(app)</span></code></pre></div>
 <p>All built-in <code>*App()</code> convenience functions
 (e.g. <code>plotthis_BarPlotApp()</code>, <code>linePlotApp()</code>)
 are thin wrappers around <code>createModuleApp()</code> with sensible
@@ -441,56 +475,66 @@ downloadable <code>.zip</code>. <code>collect_source_data()</code>
 requires a reactive plotly plot; the output summary can be optionally
 enriched by both a stats reactive and a UI inputs reactive.
 <code>create_source_download_handler()</code> also accepts a named list
-of summaries (one per plot), which is how the Panel Builder bundles
+of summaries (one per plot), which is how the Figure Builder bundles
 every plot on its canvas into a single download.</p>
-<div class="sourceCode" id="cb5"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" tabindex="-1"></a></span>
-<span id="cb5-2"><a href="#cb5-2" tabindex="-1"></a><span class="cf">if</span> (<span class="fu">interactive</span>()) {</span>
-<span id="cb5-3"><a href="#cb5-3" tabindex="-1"></a>    <span class="fu">library</span>(shiny)</span>
-<span id="cb5-4"><a href="#cb5-4" tabindex="-1"></a>    <span class="fu">library</span>(plotly)</span>
-<span id="cb5-5"><a href="#cb5-5" tabindex="-1"></a></span>
-<span id="cb5-6"><a href="#cb5-6" tabindex="-1"></a>    ui <span class="ot">&lt;-</span> <span class="fu">fluidPage</span>(</span>
-<span id="cb5-7"><a href="#cb5-7" tabindex="-1"></a>        <span class="fu">plotlyOutput</span>(<span class="st">&quot;plot&quot;</span>),</span>
-<span id="cb5-8"><a href="#cb5-8" tabindex="-1"></a>        <span class="fu">downloadButton</span>(<span class="st">&quot;download_summary&quot;</span>, <span class="st">&quot;Download Summary&quot;</span>)</span>
-<span id="cb5-9"><a href="#cb5-9" tabindex="-1"></a>    )</span>
-<span id="cb5-10"><a href="#cb5-10" tabindex="-1"></a></span>
-<span id="cb5-11"><a href="#cb5-11" tabindex="-1"></a>    server <span class="ot">&lt;-</span> <span class="cf">function</span>(input, output, session) {</span>
-<span id="cb5-12"><a href="#cb5-12" tabindex="-1"></a>        <span class="co"># A reactive plotly plot</span></span>
-<span id="cb5-13"><a href="#cb5-13" tabindex="-1"></a>        plot_reactive <span class="ot">&lt;-</span> <span class="fu">reactive</span>({</span>
-<span id="cb5-14"><a href="#cb5-14" tabindex="-1"></a>            <span class="fu">plot_ly</span>(mtcars, <span class="at">x =</span> <span class="sc">~</span>wt, <span class="at">y =</span> <span class="sc">~</span>mpg, <span class="at">type =</span> <span class="st">&quot;scatter&quot;</span>, <span class="at">mode =</span> <span class="st">&quot;markers&quot;</span>)</span>
-<span id="cb5-15"><a href="#cb5-15" tabindex="-1"></a>        })</span>
-<span id="cb5-16"><a href="#cb5-16" tabindex="-1"></a></span>
-<span id="cb5-17"><a href="#cb5-17" tabindex="-1"></a>        <span class="co"># Optional: a reactive returning a stats data.frame</span></span>
-<span id="cb5-18"><a href="#cb5-18" tabindex="-1"></a>        stats_reactive <span class="ot">&lt;-</span> <span class="fu">reactive</span>({</span>
-<span id="cb5-19"><a href="#cb5-19" tabindex="-1"></a>            <span class="fu">data.frame</span>(</span>
-<span id="cb5-20"><a href="#cb5-20" tabindex="-1"></a>                <span class="at">metric =</span> <span class="fu">c</span>(<span class="st">&quot;mean_mpg&quot;</span>, <span class="st">&quot;sd_mpg&quot;</span>),</span>
-<span id="cb5-21"><a href="#cb5-21" tabindex="-1"></a>                <span class="at">value  =</span> <span class="fu">c</span>(<span class="fu">mean</span>(mtcars<span class="sc">$</span>mpg), <span class="fu">sd</span>(mtcars<span class="sc">$</span>mpg))</span>
-<span id="cb5-22"><a href="#cb5-22" tabindex="-1"></a>            )</span>
-<span id="cb5-23"><a href="#cb5-23" tabindex="-1"></a>        })</span>
-<span id="cb5-24"><a href="#cb5-24" tabindex="-1"></a></span>
-<span id="cb5-25"><a href="#cb5-25" tabindex="-1"></a>        <span class="co"># Optional: capture all UI inputs as a named list</span></span>
-<span id="cb5-26"><a href="#cb5-26" tabindex="-1"></a>        AllInputs <span class="ot">&lt;-</span> <span class="fu">reactive</span>({</span>
-<span id="cb5-27"><a href="#cb5-27" tabindex="-1"></a>            <span class="fu">reactiveValuesToList</span>(input)</span>
-<span id="cb5-28"><a href="#cb5-28" tabindex="-1"></a>        })</span>
-<span id="cb5-29"><a href="#cb5-29" tabindex="-1"></a></span>
-<span id="cb5-30"><a href="#cb5-30" tabindex="-1"></a>        output<span class="sc">$</span>plot <span class="ot">&lt;-</span> <span class="fu">renderPlotly</span>(<span class="fu">plot_reactive</span>())</span>
-<span id="cb5-31"><a href="#cb5-31" tabindex="-1"></a></span>
-<span id="cb5-32"><a href="#cb5-32" tabindex="-1"></a>        <span class="co"># Assemble the summary, then wire up the download handler.</span></span>
-<span id="cb5-33"><a href="#cb5-33" tabindex="-1"></a>        plot_summary_reactive <span class="ot">&lt;-</span> <span class="fu">reactive</span>({</span>
-<span id="cb5-34"><a href="#cb5-34" tabindex="-1"></a>            <span class="fu">collect_source_data</span>(</span>
-<span id="cb5-35"><a href="#cb5-35" tabindex="-1"></a>                <span class="at">plot_reactive   =</span> plot_reactive,</span>
-<span id="cb5-36"><a href="#cb5-36" tabindex="-1"></a>                <span class="at">stats_reactive  =</span> stats_reactive,</span>
-<span id="cb5-37"><a href="#cb5-37" tabindex="-1"></a>                <span class="at">inputs_reactive =</span> <span class="fu">AllInputs</span>()</span>
-<span id="cb5-38"><a href="#cb5-38" tabindex="-1"></a>            )</span>
-<span id="cb5-39"><a href="#cb5-39" tabindex="-1"></a>        })</span>
-<span id="cb5-40"><a href="#cb5-40" tabindex="-1"></a></span>
-<span id="cb5-41"><a href="#cb5-41" tabindex="-1"></a>        output<span class="sc">$</span>download_summary <span class="ot">&lt;-</span> <span class="fu">create_source_download_handler</span>(</span>
-<span id="cb5-42"><a href="#cb5-42" tabindex="-1"></a>            <span class="at">data_list     =</span> plot_summary_reactive,</span>
-<span id="cb5-43"><a href="#cb5-43" tabindex="-1"></a>            <span class="at">filename_base =</span> <span class="st">&quot;my_plot_summary&quot;</span></span>
-<span id="cb5-44"><a href="#cb5-44" tabindex="-1"></a>        )</span>
-<span id="cb5-45"><a href="#cb5-45" tabindex="-1"></a>    }</span>
-<span id="cb5-46"><a href="#cb5-46" tabindex="-1"></a></span>
-<span id="cb5-47"><a href="#cb5-47" tabindex="-1"></a>    <span class="fu">shinyApp</span>(ui, server)</span>
-<span id="cb5-48"><a href="#cb5-48" tabindex="-1"></a>}</span></code></pre></div>
+<p>The <code>.zip</code> also carries an SVG and a PNG of each plot.
+Those are photographed in the browser, off the graph the user is looking
+at, so they match it exactly – including everything applied after the
+figure was built, such as reference lines, statistical brackets and
+dragged annotations. A module whose output is not a plotly graph has
+nothing to photograph and supplies its own instead, by putting a
+<code>vector_svg</code> and/or <code>raster_png</code> function of
+<code>(width, height, res)</code> on its summary list;
+<code>draw_to_svg()</code> and <code>draw_to_png()</code> build one from
+any grid or base drawing.</p>
+<div class="sourceCode" id="cb6"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" tabindex="-1"></a></span>
+<span id="cb6-2"><a href="#cb6-2" tabindex="-1"></a><span class="cf">if</span> (<span class="fu">interactive</span>()) {</span>
+<span id="cb6-3"><a href="#cb6-3" tabindex="-1"></a>    <span class="fu">library</span>(shiny)</span>
+<span id="cb6-4"><a href="#cb6-4" tabindex="-1"></a>    <span class="fu">library</span>(plotly)</span>
+<span id="cb6-5"><a href="#cb6-5" tabindex="-1"></a></span>
+<span id="cb6-6"><a href="#cb6-6" tabindex="-1"></a>    ui <span class="ot">&lt;-</span> <span class="fu">fluidPage</span>(</span>
+<span id="cb6-7"><a href="#cb6-7" tabindex="-1"></a>        <span class="fu">plotlyOutput</span>(<span class="st">&quot;plot&quot;</span>),</span>
+<span id="cb6-8"><a href="#cb6-8" tabindex="-1"></a>        <span class="fu">downloadButton</span>(<span class="st">&quot;download_summary&quot;</span>, <span class="st">&quot;Download Summary&quot;</span>)</span>
+<span id="cb6-9"><a href="#cb6-9" tabindex="-1"></a>    )</span>
+<span id="cb6-10"><a href="#cb6-10" tabindex="-1"></a></span>
+<span id="cb6-11"><a href="#cb6-11" tabindex="-1"></a>    server <span class="ot">&lt;-</span> <span class="cf">function</span>(input, output, session) {</span>
+<span id="cb6-12"><a href="#cb6-12" tabindex="-1"></a>        <span class="co"># A reactive plotly plot</span></span>
+<span id="cb6-13"><a href="#cb6-13" tabindex="-1"></a>        plot_reactive <span class="ot">&lt;-</span> <span class="fu">reactive</span>({</span>
+<span id="cb6-14"><a href="#cb6-14" tabindex="-1"></a>            <span class="fu">plot_ly</span>(mtcars, <span class="at">x =</span> <span class="sc">~</span>wt, <span class="at">y =</span> <span class="sc">~</span>mpg, <span class="at">type =</span> <span class="st">&quot;scatter&quot;</span>, <span class="at">mode =</span> <span class="st">&quot;markers&quot;</span>)</span>
+<span id="cb6-15"><a href="#cb6-15" tabindex="-1"></a>        })</span>
+<span id="cb6-16"><a href="#cb6-16" tabindex="-1"></a></span>
+<span id="cb6-17"><a href="#cb6-17" tabindex="-1"></a>        <span class="co"># Optional: a reactive returning a stats data.frame</span></span>
+<span id="cb6-18"><a href="#cb6-18" tabindex="-1"></a>        stats_reactive <span class="ot">&lt;-</span> <span class="fu">reactive</span>({</span>
+<span id="cb6-19"><a href="#cb6-19" tabindex="-1"></a>            <span class="fu">data.frame</span>(</span>
+<span id="cb6-20"><a href="#cb6-20" tabindex="-1"></a>                <span class="at">metric =</span> <span class="fu">c</span>(<span class="st">&quot;mean_mpg&quot;</span>, <span class="st">&quot;sd_mpg&quot;</span>),</span>
+<span id="cb6-21"><a href="#cb6-21" tabindex="-1"></a>                <span class="at">value  =</span> <span class="fu">c</span>(<span class="fu">mean</span>(mtcars<span class="sc">$</span>mpg), <span class="fu">sd</span>(mtcars<span class="sc">$</span>mpg))</span>
+<span id="cb6-22"><a href="#cb6-22" tabindex="-1"></a>            )</span>
+<span id="cb6-23"><a href="#cb6-23" tabindex="-1"></a>        })</span>
+<span id="cb6-24"><a href="#cb6-24" tabindex="-1"></a></span>
+<span id="cb6-25"><a href="#cb6-25" tabindex="-1"></a>        <span class="co"># Optional: capture all UI inputs as a named list</span></span>
+<span id="cb6-26"><a href="#cb6-26" tabindex="-1"></a>        AllInputs <span class="ot">&lt;-</span> <span class="fu">reactive</span>({</span>
+<span id="cb6-27"><a href="#cb6-27" tabindex="-1"></a>            <span class="fu">reactiveValuesToList</span>(input)</span>
+<span id="cb6-28"><a href="#cb6-28" tabindex="-1"></a>        })</span>
+<span id="cb6-29"><a href="#cb6-29" tabindex="-1"></a></span>
+<span id="cb6-30"><a href="#cb6-30" tabindex="-1"></a>        output<span class="sc">$</span>plot <span class="ot">&lt;-</span> <span class="fu">renderPlotly</span>(<span class="fu">plot_reactive</span>())</span>
+<span id="cb6-31"><a href="#cb6-31" tabindex="-1"></a></span>
+<span id="cb6-32"><a href="#cb6-32" tabindex="-1"></a>        <span class="co"># Assemble the summary, then wire up the download handler.</span></span>
+<span id="cb6-33"><a href="#cb6-33" tabindex="-1"></a>        plot_summary_reactive <span class="ot">&lt;-</span> <span class="fu">reactive</span>({</span>
+<span id="cb6-34"><a href="#cb6-34" tabindex="-1"></a>            <span class="fu">collect_source_data</span>(</span>
+<span id="cb6-35"><a href="#cb6-35" tabindex="-1"></a>                <span class="at">plot_reactive   =</span> plot_reactive,</span>
+<span id="cb6-36"><a href="#cb6-36" tabindex="-1"></a>                <span class="at">stats_reactive  =</span> stats_reactive,</span>
+<span id="cb6-37"><a href="#cb6-37" tabindex="-1"></a>                <span class="at">inputs_reactive =</span> <span class="fu">AllInputs</span>()</span>
+<span id="cb6-38"><a href="#cb6-38" tabindex="-1"></a>            )</span>
+<span id="cb6-39"><a href="#cb6-39" tabindex="-1"></a>        })</span>
+<span id="cb6-40"><a href="#cb6-40" tabindex="-1"></a></span>
+<span id="cb6-41"><a href="#cb6-41" tabindex="-1"></a>        output<span class="sc">$</span>download_summary <span class="ot">&lt;-</span> <span class="fu">create_source_download_handler</span>(</span>
+<span id="cb6-42"><a href="#cb6-42" tabindex="-1"></a>            <span class="at">data_list     =</span> plot_summary_reactive,</span>
+<span id="cb6-43"><a href="#cb6-43" tabindex="-1"></a>            <span class="at">filename_base =</span> <span class="st">&quot;my_plot_summary&quot;</span></span>
+<span id="cb6-44"><a href="#cb6-44" tabindex="-1"></a>        )</span>
+<span id="cb6-45"><a href="#cb6-45" tabindex="-1"></a>    }</span>
+<span id="cb6-46"><a href="#cb6-46" tabindex="-1"></a></span>
+<span id="cb6-47"><a href="#cb6-47" tabindex="-1"></a>    <span class="fu">shinyApp</span>(ui, server)</span>
+<span id="cb6-48"><a href="#cb6-48" tabindex="-1"></a>}</span></code></pre></div>
 </div>
 <div id="which-plot-parameters-are-exposed" class="section level2">
 <h2>Which plot parameters are exposed?</h2>
@@ -510,7 +554,8 @@ arguments when they are supported.</li>
 </ol>
 <p>If an argument is listed as missing or non-functional in the module
 docs, it has been intentionally hidden because it does not round-trip
-well in the interactive Plotly output.</p>
+well in the interactive Plotly output or is simply unnecessary due to
+plotly functionality.</p>
 </div>
 
 

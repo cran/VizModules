@@ -11,11 +11,13 @@
   group.by = NULL,
   facet.by = NULL,
   per.facet = TRUE,
-  input
+  input,
+  dodge.width = 1
 )
 }
 \arguments{
-\item{df, x, y, group.by, facet.by, per.facet}{Passed to \code{\link[=stat_bracket_y_max]{stat_bracket_y_max()}}.}
+\item{df, x, y, group.by, facet.by, per.facet, dodge.width}{Passed to
+\code{\link[=stat_bracket_y_max]{stat_bracket_y_max()}}.}
 
 \item{input}{The Shiny \code{input} object from inside \code{moduleServer()}.}
 }

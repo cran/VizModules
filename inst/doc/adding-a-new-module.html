@@ -350,6 +350,18 @@ checklist may seem daunting at first glance, but most of the items
 already have helpers to implement them.</p>
 <p>And a fair few are to keep you from shooting yourself in the foot and
 avoiding most of the common module pitfalls.</p>
+<p>If you are working with an AI coding agent, the package ships an <a href="https://agentskills.io">Agent Skill</a> covering exactly this
+checklist - <strong><code>vizmodules-new-module</code></strong> - along
+with the required roxygen sections, the uniform input helpers, the traps
+that have cost real time here, and file templates to copy. Install it
+(and its two siblings) into your project with
+<code>VizModules::use_vizmodules_skills(&quot;.&quot;)</code>, or pass
+<code>client = &quot;copilot&quot;</code> / <code>client = &quot;claude&quot;</code> to
+write to <code>.github/skills/</code> or <code>.claude/skills/</code>
+instead of the default <code>.agents/skills/</code>. The skills live in
+<code>inst/skills/</code> in this repository, so <strong>keep them in
+step with this vignette</strong> when you change a convention it
+documents.</p>
 <div id="quick-checklist" class="section level2">
 <h2>Quick Checklist</h2>
 <ul class="task-list">
@@ -396,6 +408,10 @@ Reactive Defaults</a>).</label></li>
 <li><label><input type="checkbox"></input>Freeze any input you update from the
 server so the plot does not render twice (see <a href="#updating-your-own-inputs-from-the-server">Updating Your Own
 Inputs From the Server</a>).</label></li>
+<li><label><input type="checkbox"></input>Debounce any free-text input the
+plot reads, so a <code>textInput()</code> does not rebuild the plot once
+per keystroke (see <a href="#debouncing-free-text-inputs">Debouncing
+Free-Text Inputs</a>).</label></li>
 <li><label><input type="checkbox"></input>Wire up manual layout-edit
 persistence so user-dragged titles, legends, annotations, and colorbars
 survive re-renders (see <a href="#persisting-manual-layout-edits">Persisting Manual Layout
@@ -410,6 +426,10 @@ conversion quirks that change or drop functionality.</label></li>
 <code>safe_eval_filter()</code>, <code>validate_expression()</code>, or
 <code>safe_resolve_adj_fxn()</code> instead (see <a href="#sanitizing-user-provided-expressions">Sanitizing User-Provided
 Expressions</a> below).</label></li>
+<li><label><input type="checkbox"></input>If you write any CSS, anchor every
+selector on a class this package owns — a stylesheet goes into the host
+app’s document unscoped (see <a href="#styling-and-css-containment">Styling and CSS
+Containment</a>).</label></li>
 </ul>
 </div>
 <div id="naming-organization" class="section level2">
@@ -526,25 +546,36 @@ in the UI docs so users know what to expect.</label></li>
 <code>&lt;plot&gt;_module_app.R</code> as a thin wrapper around
 [createModuleApp()]:</label></li>
 </ul>
-<div class="sourceCode" id="cb4"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" tabindex="-1"></a>myPlotApp <span class="ot">&lt;-</span> <span class="cf">function</span>(<span class="at">data_list =</span> <span class="cn">NULL</span>) {</span>
-<span id="cb4-2"><a href="#cb4-2" tabindex="-1"></a>    <span class="cf">if</span> (<span class="fu">is.null</span>(data_list)) {</span>
-<span id="cb4-3"><a href="#cb4-3" tabindex="-1"></a>        data_list <span class="ot">&lt;-</span> <span class="fu">list</span>(<span class="st">&quot;example&quot;</span> <span class="ot">=</span> my_default_data)</span>
-<span id="cb4-4"><a href="#cb4-4" tabindex="-1"></a>    }</span>
-<span id="cb4-5"><a href="#cb4-5" tabindex="-1"></a>    <span class="fu">createModuleApp</span>(</span>
-<span id="cb4-6"><a href="#cb4-6" tabindex="-1"></a>        <span class="at">inputs_ui_fn =</span> myPlotInputsUI,</span>
-<span id="cb4-7"><a href="#cb4-7" tabindex="-1"></a>        <span class="at">output_ui_fn =</span> myPlotOutputUI,</span>
-<span id="cb4-8"><a href="#cb4-8" tabindex="-1"></a>        <span class="at">server_fn    =</span> myPlotServer,</span>
-<span id="cb4-9"><a href="#cb4-9" tabindex="-1"></a>        <span class="at">data_list    =</span> data_list,</span>
-<span id="cb4-10"><a href="#cb4-10" tabindex="-1"></a>        <span class="at">title        =</span> <span class="st">&quot;Modular myPlots&quot;</span></span>
-<span id="cb4-11"><a href="#cb4-11" tabindex="-1"></a>    )</span>
-<span id="cb4-12"><a href="#cb4-12" tabindex="-1"></a>}</span></code></pre></div>
+<div class="sourceCode" id="cb4"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" tabindex="-1"></a>myPlotApp <span class="ot">&lt;-</span> <span class="cf">function</span>(<span class="at">data_list =</span> <span class="cn">NULL</span>, <span class="at">defaults =</span> <span class="cn">NULL</span>, <span class="at">hide.inputs =</span> <span class="cn">NULL</span>, <span class="at">hide.tabs =</span> <span class="cn">NULL</span>) {</span>
+<span id="cb4-2"><a href="#cb4-2" tabindex="-1"></a>    <span class="co"># With no data, open on the module&#39;s showcase example (its entry in</span></span>
+<span id="cb4-3"><a href="#cb4-3" tabindex="-1"></a>    <span class="co"># .module_showcase()), layering any caller defaults over its own.</span></span>
+<span id="cb4-4"><a href="#cb4-4" tabindex="-1"></a>    <span class="cf">if</span> (<span class="fu">is.null</span>(data_list)) {</span>
+<span id="cb4-5"><a href="#cb4-5" tabindex="-1"></a>        example <span class="ot">&lt;-</span> <span class="fu">.module_example</span>(<span class="st">&quot;myplot&quot;</span>)</span>
+<span id="cb4-6"><a href="#cb4-6" tabindex="-1"></a>        data_list <span class="ot">&lt;-</span> example<span class="sc">$</span>data_list</span>
+<span id="cb4-7"><a href="#cb4-7" tabindex="-1"></a>        defaults <span class="ot">&lt;-</span> utils<span class="sc">::</span><span class="fu">modifyList</span>(example<span class="sc">$</span>defaults, defaults <span class="sc">%||%</span> <span class="fu">list</span>())</span>
+<span id="cb4-8"><a href="#cb4-8" tabindex="-1"></a>    }</span>
+<span id="cb4-9"><a href="#cb4-9" tabindex="-1"></a>    <span class="fu">createModuleApp</span>(</span>
+<span id="cb4-10"><a href="#cb4-10" tabindex="-1"></a>        <span class="at">inputs_ui_fn =</span> myPlotInputsUI,</span>
+<span id="cb4-11"><a href="#cb4-11" tabindex="-1"></a>        <span class="at">output_ui_fn =</span> myPlotOutputUI,</span>
+<span id="cb4-12"><a href="#cb4-12" tabindex="-1"></a>        <span class="at">server_fn    =</span> myPlotServer,</span>
+<span id="cb4-13"><a href="#cb4-13" tabindex="-1"></a>        <span class="at">data_list    =</span> data_list,</span>
+<span id="cb4-14"><a href="#cb4-14" tabindex="-1"></a>        <span class="at">defaults     =</span> defaults,</span>
+<span id="cb4-15"><a href="#cb4-15" tabindex="-1"></a>        <span class="at">hide.inputs  =</span> hide.inputs,</span>
+<span id="cb4-16"><a href="#cb4-16" tabindex="-1"></a>        <span class="at">hide.tabs    =</span> hide.tabs,</span>
+<span id="cb4-17"><a href="#cb4-17" tabindex="-1"></a>        <span class="at">title        =</span> <span class="st">&quot;Modular myPlots&quot;</span></span>
+<span id="cb4-18"><a href="#cb4-18" tabindex="-1"></a>    )</span>
+<span id="cb4-19"><a href="#cb4-19" tabindex="-1"></a>}</span></code></pre></div>
 <ul class="task-list">
 <li><label><input type="checkbox"></input><code>createModuleApp()</code>
 already handles validation, data import, data filtering, and dataset
 switching — no need to duplicate that logic.</label></li>
-<li><label><input type="checkbox"></input>Add the module to the gallery app
-(<code>inst/apps/module-gallery/app.R</code>), placing it in its own tab
-alongside the other modules.</label></li>
+<li><label><input type="checkbox"></input>Open the <code>*App()</code> on the
+module’s showcase example when no <code>data_list</code> is given, as
+the other <code>*App()</code> functions do:
+<code>example &lt;- .module_example(&quot;&lt;id&gt;&quot;)</code>, then use
+<code>example$data_list</code> and layer the caller’s
+<code>defaults</code> over <code>example$defaults</code> (see “Gallery
+App and Figure Builder” below).</label></li>
 </ul>
 </div>
 <div id="testing-requirements" class="section level2">
@@ -583,6 +614,21 @@ shape (e.g., pre-summarized table for pies).</label></li>
 for the plotting function (happy paths + invalid inputs).</label></li>
 <li><label><input type="checkbox"></input>Only after the plotting function is
 stable, build the module UI/server/app wrappers around it.</label></li>
+<li><label><input type="checkbox"></input>If you pass an array to a trace by
+value (such as <code>error_y = list(array = ...)</code>) on a plot
+coloured by a discrete column, sort the data by that column first.
+plotly re-sorts its own copy by the colour column before splitting it
+into traces, but not your array, so otherwise each series is drawn with
+other series’ values. <code>linePlot()</code> does this with
+<code>.group_rows_by_trace()</code>; test it on the built figure, with
+colour columns stored as character, factor and ordered
+factor.</label></li>
+<li><label><input type="checkbox"></input>Inside
+<code>summarise()</code>/<code>mutate()</code>, a data column named like
+one of your arguments (<code>y</code>, say) masks it. Resolve what the
+verb needs into local variables before calling it, and test with a data
+frame whose columns are literally named <code>x</code> and
+<code>y</code>.</label></li>
 </ul>
 </div>
 <div id="supporting-reactive-defaults" class="section level2">
@@ -640,9 +686,11 @@ update it:</label></p>
 <span id="cb7-2"><a href="#cb7-2" tabindex="-1"></a>    pairs <span class="ot">&lt;-</span> <span class="fu">generate_pair_strings</span>(<span class="fu">data</span>(), input<span class="sc">$</span>stat.x)</span>
 <span id="cb7-3"><a href="#cb7-3" tabindex="-1"></a>    <span class="cf">if</span> (<span class="fu">length</span>(pairs) <span class="sc">&gt;</span> <span class="dv">0</span>) {</span>
 <span id="cb7-4"><a href="#cb7-4" tabindex="-1"></a>        <span class="fu">freezeReactiveValue</span>(input, <span class="st">&quot;stat.pairs&quot;</span>)</span>
-<span id="cb7-5"><a href="#cb7-5" tabindex="-1"></a>        <span class="fu">update_viz_select</span>(session, <span class="st">&quot;stat.pairs&quot;</span>, <span class="at">choices =</span> <span class="fu">c</span>(<span class="st">&quot;&quot;</span>, pairs), <span class="at">selected =</span> <span class="st">&quot;&quot;</span>)</span>
-<span id="cb7-6"><a href="#cb7-6" tabindex="-1"></a>    }</span>
-<span id="cb7-7"><a href="#cb7-7" tabindex="-1"></a>})</span></code></pre></div></li>
+<span id="cb7-5"><a href="#cb7-5" tabindex="-1"></a>        <span class="fu">update_viz_select</span>(session, <span class="st">&quot;stat.pairs&quot;</span>,</span>
+<span id="cb7-6"><a href="#cb7-6" tabindex="-1"></a>            <span class="at">choices =</span> <span class="fu">c</span>(<span class="st">&quot;&quot;</span>, pairs), <span class="at">selected =</span> <span class="fu">.default_stat_pairs</span>(defaults, pairs)</span>
+<span id="cb7-7"><a href="#cb7-7" tabindex="-1"></a>        )</span>
+<span id="cb7-8"><a href="#cb7-8" tabindex="-1"></a>    }</span>
+<span id="cb7-9"><a href="#cb7-9" tabindex="-1"></a>})</span></code></pre></div></li>
 </ul>
 <p>Freezing pauses everything that reads that input until the real value
 arrives, so the intermediate render never happens. Three rules:</p>
@@ -758,6 +806,54 @@ a large maximum alone rather than shrinking the axis onto the
 brackets.</p>
 </div>
 </div>
+<div id="debouncing-free-text-inputs" class="section level2">
+<h2>Debouncing Free-Text Inputs</h2>
+<p>The re-render problems above come from the <em>server</em> pushing
+values at the client. Free text has the opposite problem:
+<code>textInput()</code> and <code>textAreaInput()</code> report to the
+server on <strong>every keystroke</strong>, so a plot that reads one
+directly is rebuilt once per character.</p>
+<p>That matters most when the input is an expression, because the
+intermediate states are not just wasted work, they are mostly
+<em>invalid</em> work. Typing <code>condition == &quot;Disease&quot;</code> walks
+through <code>c</code>, <code>co</code>, <code>con</code>, … and every
+one of those is a complete render cycle spent on an expression that
+cannot parse.</p>
+<p>Wrap the read in <code>shiny::debounce()</code> so a burst of typing
+collapses into one render once the user pauses:</p>
+<div class="sourceCode" id="cb13"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb13-1"><a href="#cb13-1" tabindex="-1"></a><span class="co"># Once, in the module server body -- not inside a reactive.</span></span>
+<span id="cb13-2"><a href="#cb13-2" tabindex="-1"></a>filter_text <span class="ot">&lt;-</span> <span class="fu">debounce</span>(<span class="fu">reactive</span>(input<span class="sc">$</span>row_filter), <span class="dv">700</span>)</span>
+<span id="cb13-3"><a href="#cb13-3" tabindex="-1"></a></span>
+<span id="cb13-4"><a href="#cb13-4" tabindex="-1"></a>filtered <span class="ot">&lt;-</span> <span class="fu">reactive</span>({</span>
+<span id="cb13-5"><a href="#cb13-5" tabindex="-1"></a>    keep <span class="ot">&lt;-</span> <span class="fu">safe_eval_filter</span>(<span class="fu">filter_text</span>(), <span class="fu">data</span>())</span>
+<span id="cb13-6"><a href="#cb13-6" tabindex="-1"></a>    <span class="cf">if</span> (<span class="fu">is.null</span>(keep)) <span class="fu">data</span>() <span class="cf">else</span> <span class="fu">data</span>()[keep, , drop <span class="ot">=</span> <span class="cn">FALSE</span>]</span>
+<span id="cb13-7"><a href="#cb13-7" tabindex="-1"></a>})</span></code></pre></div>
+<p><code>debounce()</code> emits its initial value immediately and then
+holds the previous value while typing, so startup is unaffected and
+there is no blank first render to design around.</p>
+<ul class="task-list">
+<li><label><input type="checkbox"></input>Debounce any
+<code>textInput()</code>/<code>textAreaInput()</code> a plot reads,
+especially one holding an expression. 500-800ms is a good range; the
+more expensive the plot, the longer the delay earns its
+keep.</label></li>
+<li><label><input type="checkbox"></input>Leave select, numeric, checkbox, and
+slider inputs alone. They report discrete choices rather than
+keystrokes, so there is nothing to collapse.</label></li>
+<li><label><input type="checkbox"></input>Create the debounced reactive
+<strong>once</strong> in the server body. Creating it inside another
+reactive rebuilds the timer on every invalidation, which defeats
+it.</label></li>
+<li><label><input type="checkbox"></input>Debouncing is not a substitute for
+the Auto Update tack. The tack lets the user opt out of live updates
+entirely; debouncing makes live updates bearable for the user who leaves
+it on.</label></li>
+</ul>
+<p><code>ComplexHeatmap_HeatmapServer()</code>’s Row/Column Filter
+inputs are the worked example — a heatmap is drawn to a device and
+measured before it can be shown, so a per-keystroke rebuild is
+especially painful there.</p>
+</div>
 <div id="persisting-manual-layout-edits" class="section level2">
 <h2>Persisting Manual Layout Edits</h2>
 <p>Every VizModules plot is interactively editable: users can drag the
@@ -775,18 +871,18 @@ start.</p>
 <li><p><label><input type="checkbox"></input>Near the top of your
 <code>moduleServer()</code> body, create a unique plotly event source
 for this module instance and the edit store:</label></p>
-<div class="sourceCode" id="cb13"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb13-1"><a href="#cb13-1" tabindex="-1"></a><span class="co"># Unique source so each module instance captures only its own events.</span></span>
-<span id="cb13-2"><a href="#cb13-2" tabindex="-1"></a>plot_source <span class="ot">&lt;-</span> session<span class="sc">$</span><span class="fu">ns</span>(<span class="st">&quot;myplot&quot;</span>)</span>
-<span id="cb13-3"><a href="#cb13-3" tabindex="-1"></a>edit_store <span class="ot">&lt;-</span> <span class="fu">setup_manual_edits</span>(input, session, plot_source)</span></code></pre></div></li>
+<div class="sourceCode" id="cb14"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb14-1"><a href="#cb14-1" tabindex="-1"></a><span class="co"># Unique source so each module instance captures only its own events.</span></span>
+<span id="cb14-2"><a href="#cb14-2" tabindex="-1"></a>plot_source <span class="ot">&lt;-</span> session<span class="sc">$</span><span class="fu">ns</span>(<span class="st">&quot;myplot&quot;</span>)</span>
+<span id="cb14-3"><a href="#cb14-3" tabindex="-1"></a>edit_store <span class="ot">&lt;-</span> <span class="fu">setup_manual_edits</span>(input, session, plot_source)</span></code></pre></div></li>
 <li><p><label><input type="checkbox"></input>In your
 <code>renderPlotly()</code>, pass the freshly built figure through
 <code>finalize_manual_edits()</code> immediately before returning
 it:</label></p>
-<div class="sourceCode" id="cb14"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb14-1"><a href="#cb14-1" tabindex="-1"></a>output<span class="sc">$</span>myPlot <span class="ot">&lt;-</span> <span class="fu">renderPlotly</span>({</span>
-<span id="cb14-2"><a href="#cb14-2" tabindex="-1"></a>    <span class="fu">req</span>(input<span class="sc">$</span>x, input<span class="sc">$</span>y)</span>
-<span id="cb14-3"><a href="#cb14-3" tabindex="-1"></a>    fig <span class="ot">&lt;-</span> <span class="fu">generate_myPlot</span>()  <span class="co"># your function that builds the plotly figure</span></span>
-<span id="cb14-4"><a href="#cb14-4" tabindex="-1"></a>    <span class="fu">finalize_manual_edits</span>(fig, plot_source, edit_store, session)</span>
-<span id="cb14-5"><a href="#cb14-5" tabindex="-1"></a>})</span></code></pre></div></li>
+<div class="sourceCode" id="cb15"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb15-1"><a href="#cb15-1" tabindex="-1"></a>output<span class="sc">$</span>myPlot <span class="ot">&lt;-</span> <span class="fu">renderPlotly</span>({</span>
+<span id="cb15-2"><a href="#cb15-2" tabindex="-1"></a>    <span class="fu">req</span>(input<span class="sc">$</span>x, input<span class="sc">$</span>y)</span>
+<span id="cb15-3"><a href="#cb15-3" tabindex="-1"></a>    fig <span class="ot">&lt;-</span> <span class="fu">generate_myPlot</span>()  <span class="co"># your function that builds the plotly figure</span></span>
+<span id="cb15-4"><a href="#cb15-4" tabindex="-1"></a>    <span class="fu">finalize_manual_edits</span>(fig, plot_source, edit_store, session)</span>
+<span id="cb15-5"><a href="#cb15-5" tabindex="-1"></a>})</span></code></pre></div></li>
 </ul>
 <p>Pretty simple.</p>
 <p><code>setup_manual_edits()</code> registers the observers that
@@ -869,10 +965,12 @@ them to the plotly figure.</label></li>
 <code>last_stats_df(stats_df)</code>.</label></li>
 <li><label><input type="checkbox"></input>Add an <code>observeEvent</code> to
 update <code>stat.pairs</code> choices when the x or grouping column
-changes, using <code>generate_pair_strings()</code>.</label></li>
+changes, using <code>generate_pair_strings()</code>, selecting
+<code>.default_stat_pairs(defaults, pairs)</code> so a
+<code>stat.pairs</code> default is honoured.</label></li>
 <li><label><input type="checkbox"></input>Call
-<code>.reset_stats_inputs(session)</code> in the reset
-observer.</label></li>
+<code>.reset_stats_inputs(session, defaults, pairs)</code> in the reset
+observer, with the pairs currently on offer.</label></li>
 </ul>
 </div>
 <div id="key-helpers-all-in-rstat_helper.r" class="section level3">
@@ -913,24 +1011,49 @@ y-axes</td>
 </tbody>
 </table>
 <p>See the <code>plotthis_BoxPlotServer</code>,
-<code>plotthis_ViolinPlotServer</code>, or
-<code>dittoViz_yPlotServer</code> implementations for complete
+<code>dittoViz_yPlotServer</code>, or
+<code>dittoViz_freqPlotServer</code> implementations for complete
 integration examples.</p>
 </div>
 </div>
-<div id="gallery-app" class="section level2">
-<h2>Gallery App</h2>
+<div id="gallery-app-and-figure-builder" class="section level2">
+<h2>Gallery App and Figure Builder</h2>
 <ul class="task-list">
-<li><label><input type="checkbox"></input>Add or update the gallery app at
-<code>inst/apps/module-gallery/app.R</code> to include the new module in
-its own tab.</label></li>
-<li><label><input type="checkbox"></input>Each tab should load a small sample
-dataset and show the module’s inputs and outputs together.</label></li>
+<li><label><input type="checkbox"></input>Register the module in
+<code>.module_showcase()</code> (<code>R/module_showcase.R</code>). That
+one entry gives it a tab in the gallery
+(<code>moduleGalleryApp()</code>), a place in the Figure Builder, and
+the example its <code>*App()</code> opens on. It holds the module’s
+three functions, a <code>label</code> and a shorter
+<code>tab_label</code>, the <code>.example_datasets()</code> entry it is
+shown on, and the <code>defaults</code> it opens with.</label></li>
+<li><label><input type="checkbox"></input>Make those <code>defaults</code>
+show the module off: switch on its distinctive features (statistics,
+highlights, fit lines, annotations, splits), not just the column
+mapping. If no bundled dataset gives a feature anything to show, extend
+one in <code>data-raw/generate_example_data.R</code> rather than leaving
+the feature off.</label></li>
+<li><label><input type="checkbox"></input><code>tests/testthat/test-showcase.R</code> checks
+every entry’s defaults name real columns and are accepted by the
+controls they seed; add an assertion there for any data effect your demo
+depends on (e.g. that a showcased comparison is
+significant).</label></li>
 <li><label><input type="checkbox"></input>Verify namespacing: each module
 instance should have a unique <code>id</code> and independent
 state.</label></li>
 <li><label><input type="checkbox"></input>Keep dependencies minimal (prefer
 built-in or generated datasets).</label></li>
+<li><label><input type="checkbox"></input>If the module’s output is not a
+plotly graph, give it a <code>vector_svg</code> and a
+<code>raster_png</code> function of <code>(width, height, res)</code> so
+its panels appear in the Figure Builder’s SVG export and its source
+download carries images; <code>draw_to_svg()</code> and
+<code>draw_to_png()</code> build them from any grid or base drawing. Put
+them on the summary list the server’s reactive returns (the source
+download reads them there), and attach <code>vector_svg</code> to the
+reactive as an attribute as well (the Figure Builder’s canvas export
+reads it there). See
+<code>ComplexHeatmap_HeatmapServer()</code>.</label></li>
 </ul>
 </div>
 <div id="review-before-submitting" class="section level2">
@@ -945,6 +1068,11 @@ and ensure tests pass locally.</label></li>
 missing or altered plot features.</label></li>
 <li><label><input type="checkbox"></input>Verify both module instances in the
 example app work independently (namespacing correct).</label></li>
+<li><label><input type="checkbox"></input>If you added CSS, render the module
+beside a stock <code>selectInput()</code>, <code>sidebarPanel()</code>
+and <code>DT::datatable()</code> and confirm none of them changed (see
+<a href="#styling-and-css-containment">Styling and CSS
+Containment</a>).</label></li>
 </ul>
 </div>
 <div id="style-guide" class="section level2">
@@ -979,10 +1107,10 @@ column with tens of thousands of distinct values stays usable. A search
 box appears automatically once there are more than ten choices.</p>
 <p>An empty-string choice still means “no selection”; it is displayed as
 <code>(none)</code> so users can see and pick it.</p>
-<div class="sourceCode" id="cb15"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb15-1"><a href="#cb15-1" tabindex="-1"></a><span class="fu">viz_select_input</span>(<span class="fu">ns</span>(<span class="st">&quot;group.by&quot;</span>), <span class="st">&quot;Group By&quot;</span>,</span>
-<span id="cb15-2"><a href="#cb15-2" tabindex="-1"></a>    <span class="at">choices =</span> cat.choices,</span>
-<span id="cb15-3"><a href="#cb15-3" tabindex="-1"></a>    <span class="at">selected =</span> <span class="fu">get_default</span>(defaults, <span class="st">&quot;group.by&quot;</span>, <span class="st">&quot;&quot;</span>, <span class="cf">function</span>(x) x <span class="sc">%in%</span> cat.choices)</span>
-<span id="cb15-4"><a href="#cb15-4" tabindex="-1"></a>)</span></code></pre></div>
+<div class="sourceCode" id="cb16"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb16-1"><a href="#cb16-1" tabindex="-1"></a><span class="fu">viz_select_input</span>(<span class="fu">ns</span>(<span class="st">&quot;group.by&quot;</span>), <span class="st">&quot;Group By&quot;</span>,</span>
+<span id="cb16-2"><a href="#cb16-2" tabindex="-1"></a>    <span class="at">choices =</span> cat.choices,</span>
+<span id="cb16-3"><a href="#cb16-3" tabindex="-1"></a>    <span class="at">selected =</span> <span class="fu">get_default</span>(defaults, <span class="st">&quot;group.by&quot;</span>, <span class="st">&quot;&quot;</span>, <span class="cf">function</span>(x) x <span class="sc">%in%</span> cat.choices)</span>
+<span id="cb16-4"><a href="#cb16-4" tabindex="-1"></a>)</span></code></pre></div>
 </div>
 <div id="tooltips-with-tipify" class="section level3">
 <h3>Tooltips with <code>tipify</code></h3>
@@ -1002,17 +1130,17 @@ correction methods, bracket inset).</li>
 <p>Standard pattern — always use <code>placement = &quot;top&quot;</code> and
 <code>options = list(container = &quot;body&quot;)</code> so tooltips render
 correctly inside sidebar panels:</p>
-<div class="sourceCode" id="cb16"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb16-1"><a href="#cb16-1" tabindex="-1"></a><span class="fu">tipify</span>(</span>
-<span id="cb16-2"><a href="#cb16-2" tabindex="-1"></a>    <span class="fu">textInput</span>(<span class="fu">ns</span>(<span class="st">&quot;hline.intercepts&quot;</span>), <span class="st">&quot;Y-intercepts&quot;</span>,</span>
-<span id="cb16-3"><a href="#cb16-3" tabindex="-1"></a>        <span class="at">placeholder =</span> <span class="st">&quot;e.g. 2, -2&quot;</span>,</span>
-<span id="cb16-4"><a href="#cb16-4" tabindex="-1"></a>        <span class="at">value =</span> <span class="fu">get_default</span>(defaults, <span class="st">&quot;hline.intercepts&quot;</span>, <span class="st">&quot;&quot;</span>)</span>
-<span id="cb16-5"><a href="#cb16-5" tabindex="-1"></a>    ),</span>
-<span id="cb16-6"><a href="#cb16-6" tabindex="-1"></a>    <span class="fu">paste</span>(</span>
-<span id="cb16-7"><a href="#cb16-7" tabindex="-1"></a>        <span class="st">&quot;For categorical or factor axes, enter the index (position) of the&quot;</span>,</span>
-<span id="cb16-8"><a href="#cb16-8" tabindex="-1"></a>        <span class="st">&quot;category rather than its name.&quot;</span></span>
-<span id="cb16-9"><a href="#cb16-9" tabindex="-1"></a>    ),</span>
-<span id="cb16-10"><a href="#cb16-10" tabindex="-1"></a>    <span class="at">placement =</span> <span class="st">&quot;top&quot;</span>, <span class="at">options =</span> <span class="fu">list</span>(<span class="at">container =</span> <span class="st">&quot;body&quot;</span>)</span>
-<span id="cb16-11"><a href="#cb16-11" tabindex="-1"></a>)</span></code></pre></div>
+<div class="sourceCode" id="cb17"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb17-1"><a href="#cb17-1" tabindex="-1"></a><span class="fu">tipify</span>(</span>
+<span id="cb17-2"><a href="#cb17-2" tabindex="-1"></a>    <span class="fu">textInput</span>(<span class="fu">ns</span>(<span class="st">&quot;hline.intercepts&quot;</span>), <span class="st">&quot;Y-intercepts&quot;</span>,</span>
+<span id="cb17-3"><a href="#cb17-3" tabindex="-1"></a>        <span class="at">placeholder =</span> <span class="st">&quot;e.g. 2, -2&quot;</span>,</span>
+<span id="cb17-4"><a href="#cb17-4" tabindex="-1"></a>        <span class="at">value =</span> <span class="fu">get_default</span>(defaults, <span class="st">&quot;hline.intercepts&quot;</span>, <span class="st">&quot;&quot;</span>)</span>
+<span id="cb17-5"><a href="#cb17-5" tabindex="-1"></a>    ),</span>
+<span id="cb17-6"><a href="#cb17-6" tabindex="-1"></a>    <span class="fu">paste</span>(</span>
+<span id="cb17-7"><a href="#cb17-7" tabindex="-1"></a>        <span class="st">&quot;For categorical or factor axes, enter the index (position) of the&quot;</span>,</span>
+<span id="cb17-8"><a href="#cb17-8" tabindex="-1"></a>        <span class="st">&quot;category rather than its name.&quot;</span></span>
+<span id="cb17-9"><a href="#cb17-9" tabindex="-1"></a>    ),</span>
+<span id="cb17-10"><a href="#cb17-10" tabindex="-1"></a>    <span class="at">placement =</span> <span class="st">&quot;top&quot;</span>, <span class="at">options =</span> <span class="fu">list</span>(<span class="at">container =</span> <span class="st">&quot;body&quot;</span>)</span>
+<span id="cb17-11"><a href="#cb17-11" tabindex="-1"></a>)</span></code></pre></div>
 <p>Inputs that are self-explanatory from their label (e.g.,
 <code>&quot;Plot Title&quot;</code>, <code>&quot;X-axis Variable&quot;</code>) do not need a
 tooltip.</p>
@@ -1055,7 +1183,8 @@ styling</td>
 </tr>
 <tr class="odd">
 <td><code>uniform_legend_inputs_ui()</code></td>
-<td>Legend title and entry label font sizes</td>
+<td>Legend visibility, font family and colour, and title and entry label
+font sizes</td>
 </tr>
 <tr class="even">
 <td><code>uniform_annotation_inputs_ui()</code></td>
@@ -1112,6 +1241,129 @@ block or vignette where the full qualified name aids readability.</p>
 </ul>
 </div>
 </div>
+<div id="styling-and-css-containment" class="section level2">
+<h2>Styling and CSS Containment</h2>
+<p><strong>Every stylesheet a module loads is injected into the host
+app’s document.</strong> There is no shadow DOM and no automatic
+scoping: a rule you write for your widget applies to the whole page.
+Because each plot module pulls in a colour picker, attaching
+<em>any</em> module to a page brings the package’s stylesheets with it —
+so a careless selector silently restyles an app that merely embedded one
+plot.</p>
+<p>This has bitten the package three times (#355), and every case was
+the same mistake: styling a class the package does not own.</p>
+<div id="only-ever-style-classes-this-package-created" class="section level3">
+<h3>Only ever style classes this package created</h3>
+<p>Anchor every selector on a package-owned prefix —
+<code>.multi-color-picker</code>, <code>.mc-</code>, <code>.mdi-</code>,
+<code>.vizmodules-</code>, <code>.viz-</code>, <code>.pb-</code>. Never
+write a bare rule against a class that belongs to Bootstrap, Shiny,
+selectize, DT or any other library:</p>
+<div class="sourceCode" id="cb18"><pre class="sourceCode css"><code class="sourceCode css"><span id="cb18-1"><a href="#cb18-1" tabindex="-1"></a><span class="co">/* WRONG — restyles every dropdown, well and tab strip in the host app */</span></span>
+<span id="cb18-2"><a href="#cb18-2" tabindex="-1"></a><span class="fu">.selectize-dropdown</span> <span class="fu">.option</span> { <span class="kw">padding</span><span class="ch">:</span> <span class="dv">0</span> <span class="at">!important</span><span class="op">;</span> }</span>
+<span id="cb18-3"><a href="#cb18-3" tabindex="-1"></a><span class="fu">.well</span> <span class="fu">.btn</span> { <span class="kw">padding</span><span class="ch">:</span> <span class="dv">4</span><span class="dt">px</span> <span class="dv">10</span><span class="dt">px</span><span class="op">;</span> }</span>
+<span id="cb18-4"><a href="#cb18-4" tabindex="-1"></a><span class="fu">.nav-tabs</span> { <span class="kw">flex-wrap</span><span class="ch">:</span> <span class="dv">wrap</span><span class="op">;</span> }</span>
+<span id="cb18-5"><a href="#cb18-5" tabindex="-1"></a></span>
+<span id="cb18-6"><a href="#cb18-6" tabindex="-1"></a><span class="co">/* RIGHT — reaches only markup this package rendered */</span></span>
+<span id="cb18-7"><a href="#cb18-7" tabindex="-1"></a><span class="fu">.mc-palette-dropdown</span> <span class="fu">.option</span> { <span class="kw">padding</span><span class="ch">:</span> <span class="dv">0</span> <span class="at">!important</span><span class="op">;</span> }</span>
+<span id="cb18-8"><a href="#cb18-8" tabindex="-1"></a><span class="fu">.pb-app</span> <span class="fu">.well</span> <span class="fu">.btn</span> { <span class="kw">padding</span><span class="ch">:</span> <span class="dv">4</span><span class="dt">px</span> <span class="dv">10</span><span class="dt">px</span><span class="op">;</span> }</span>
+<span id="cb18-9"><a href="#cb18-9" tabindex="-1"></a><span class="fu">.vizmodules-input-tabs</span> <span class="op">&gt;</span> <span class="fu">.nav-tabs</span> { <span class="kw">flex-wrap</span><span class="ch">:</span> <span class="dv">wrap</span><span class="op">;</span> }</span></code></pre></div>
+<p>The trap is that these rules <em>look</em> scoped.
+<code>.well .btn</code> reads like “the buttons in my well” — but
+<code>.well</code> is what <code>shiny::sidebarPanel()</code> renders,
+so it is every sidebar on the page. If a selector’s leftmost class is
+not one you invented, it is not scoped.</p>
+<p><code>tests/testthat/test-ui_utils.R</code> enforces this: it parses
+every selector in every bundled and inline stylesheet and fails on
+anything not anchored to a package prefix. Add your widget’s prefix
+there if you introduce one.</p>
+</div>
+<div id="a-dropdown-or-popover-parented-to-body-needs-its-own-marker-class" class="section level3">
+<h3>A dropdown or popover parented to <code>&lt;body&gt;</code> needs
+its own marker class</h3>
+<p>Anything that escapes its container to avoid clipping — selectize’s
+<code>dropdownParent: &quot;body&quot;</code>, a tooltip, a popper — can no longer
+be reached by a <code>.my-widget .thing</code> selector, which is
+exactly why the leaking rules were written unscoped in the first place.
+Give the escaped element a class of its own instead:</p>
+<div class="sourceCode" id="cb19"><pre class="sourceCode js"><code class="sourceCode javascript"><span id="cb19-1"><a href="#cb19-1" tabindex="-1"></a><span class="fu">$</span>(select)<span class="op">.</span><span class="fu">selectize</span>({</span>
+<span id="cb19-2"><a href="#cb19-2" tabindex="-1"></a>  <span class="dt">dropdownParent</span><span class="op">:</span> <span class="st">&quot;body&quot;</span><span class="op">,</span></span>
+<span id="cb19-3"><a href="#cb19-3" tabindex="-1"></a>  <span class="co">// Selectize replaces its default dropdownClass wholesale, so its own class</span></span>
+<span id="cb19-4"><a href="#cb19-4" tabindex="-1"></a>  <span class="co">// has to be restated alongside ours.</span></span>
+<span id="cb19-5"><a href="#cb19-5" tabindex="-1"></a>  <span class="dt">dropdownClass</span><span class="op">:</span> <span class="st">&quot;selectize-dropdown mc-palette-dropdown&quot;</span><span class="op">,</span></span>
+<span id="cb19-6"><a href="#cb19-6" tabindex="-1"></a>  <span class="op">...</span></span>
+<span id="cb19-7"><a href="#cb19-7" tabindex="-1"></a>})<span class="op">;</span></span></code></pre></div>
+</div>
+<div id="check-that-the-rule-matches-what-you-think-it-does" class="section level3">
+<h3>Check that the rule matches what you think it does</h3>
+<p><code>.selectize-dropdown .option</code> never matched the colour
+picker’s own options at all — its custom <code>render.option</code>
+emits <code>.mc-palette-option</code>, and selectize does not add
+<code>.option</code> to that. The rule’s <em>only</em> effect was on
+other people’s dropdowns: a selector that misses everything you own and
+hits everything you don’t. Open the widget, inspect the element, and
+confirm the class you are targeting is actually on it.</p>
+</div>
+<div id="keep-layout-out-of-inline-styles" class="section level3">
+<h3>Keep layout out of inline styles</h3>
+<p>An inline <code>style=</code> attribute can only be overridden with
+<code>!important</code>, which makes a host app fight your widget rather
+than theme it. Put layout in a stylesheet and pass only the values that
+vary per instance, as CSS custom properties:</p>
+<div class="sourceCode" id="cb20"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb20-1"><a href="#cb20-1" tabindex="-1"></a><span class="co"># organize_inputs() emits just the column count; the rest lives in vizModules.css</span></span>
+<span id="cb20-2"><a href="#cb20-2" tabindex="-1"></a><span class="fu">div</span>(</span>
+<span id="cb20-3"><a href="#cb20-3" tabindex="-1"></a>    <span class="at">class =</span> <span class="st">&quot;vizmodules-input-grid&quot;</span>,</span>
+<span id="cb20-4"><a href="#cb20-4" tabindex="-1"></a>    <span class="at">style =</span> <span class="fu">paste0</span>(<span class="st">&quot;--viz-input-columns: &quot;</span>, columns, <span class="st">&quot;;&quot;</span>),</span>
+<span id="cb20-5"><a href="#cb20-5" tabindex="-1"></a>    <span class="fu">lapply</span>(cells, <span class="cf">function</span>(x) <span class="fu">div</span>(<span class="at">class =</span> <span class="st">&quot;vizmodules-input-cell&quot;</span>, x))</span>
+<span id="cb20-6"><a href="#cb20-6" tabindex="-1"></a>)</span></code></pre></div>
+</div>
+<div id="do-not-assume-anything-about-the-parent" class="section level3">
+<h3>Do not assume anything about the parent</h3>
+<p>The control grid used Bootstrap’s negative-margin row idiom
+(<code>margin-left: -15px</code> on the row, matching padding on each
+cell), which assumes a parent with at least that much horizontal padding
+to absorb it. Dropped into a <code>bslib::sidebar()</code> with less,
+the grid overhung on both sides and the sidebar grew a horizontal
+scrollbar. Use <code>gap</code> instead — it needs nothing from the
+parent.</p>
+<p>Give flex children <code>min-width: 0</code> as well. Without it a
+long select or label refuses to shrink below its intrinsic width and
+pushes the container wider — the same overflow by a different route.</p>
+</div>
+<div id="shipping-a-stylesheet" class="section level3">
+<h3>Shipping a stylesheet</h3>
+<p>Put it in <code>inst/src/</code>, serve it through an
+<code>htmlDependency()</code>, and attach it to the UI that needs it
+rather than to the app as a whole:</p>
+<div class="sourceCode" id="cb21"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb21-1"><a href="#cb21-1" tabindex="-1"></a>.viz_modules_dependency <span class="ot">&lt;-</span> <span class="cf">function</span>() {</span>
+<span id="cb21-2"><a href="#cb21-2" tabindex="-1"></a>    <span class="fu">htmlDependency</span>(</span>
+<span id="cb21-3"><a href="#cb21-3" tabindex="-1"></a>        <span class="at">name =</span> <span class="st">&quot;viz-modules&quot;</span>,</span>
+<span id="cb21-4"><a href="#cb21-4" tabindex="-1"></a>        <span class="at">version =</span> <span class="fu">as.character</span>(utils<span class="sc">::</span><span class="fu">packageVersion</span>(<span class="st">&quot;VizModules&quot;</span>)),</span>
+<span id="cb21-5"><a href="#cb21-5" tabindex="-1"></a>        <span class="at">src =</span> <span class="st">&quot;src&quot;</span>, <span class="at">package =</span> <span class="st">&quot;VizModules&quot;</span>,</span>
+<span id="cb21-6"><a href="#cb21-6" tabindex="-1"></a>        <span class="at">stylesheet =</span> <span class="st">&quot;vizModules.css&quot;</span></span>
+<span id="cb21-7"><a href="#cb21-7" tabindex="-1"></a>    )</span>
+<span id="cb21-8"><a href="#cb21-8" tabindex="-1"></a>}</span></code></pre></div>
+<p>Attaching it with
+<code>htmltools::attachDependencies(ui, dep, append = TRUE)</code> means
+the styles travel with the markup — including through a runtime
+<code>insertUI()</code>, which the Figure Builder relies on when it
+injects a panel’s controls.</p>
+</div>
+<div id="verifying-containment" class="section level3">
+<h3>Verifying containment</h3>
+<p>Automated checks catch an unscoped <em>selector</em>, but not whether
+your rule actually changed anything. To see the real effect, load the
+widget beside a stock <code>selectInput()</code>,
+<code>sidebarPanel()</code> and <code>DT::datatable()</code>, then
+disable just your stylesheet in the browser and re-measure:</p>
+<div class="sourceCode" id="cb22"><pre class="sourceCode js"><code class="sourceCode javascript"><span id="cb22-1"><a href="#cb22-1" tabindex="-1"></a><span class="bu">document</span><span class="op">.</span><span class="fu">querySelectorAll</span>(<span class="st">&#39;link[rel=stylesheet]&#39;</span>)<span class="op">.</span><span class="fu">forEach</span>(<span class="kw">function</span> (l) {</span>
+<span id="cb22-2"><a href="#cb22-2" tabindex="-1"></a>  <span class="cf">if</span> (l<span class="op">.</span><span class="at">href</span><span class="op">.</span><span class="fu">indexOf</span>(<span class="st">&#39;yourFile.css&#39;</span>) <span class="op">!==</span> <span class="op">-</span><span class="dv">1</span>) { l<span class="op">.</span><span class="at">disabled</span> <span class="op">=</span> <span class="kw">true</span><span class="op">;</span> }</span>
+<span id="cb22-3"><a href="#cb22-3" tabindex="-1"></a>})<span class="op">;</span></span></code></pre></div>
+<p>If a computed style on the host’s own controls changes, your CSS is
+leaking. If nothing in your widget changes, your rule was never matching
+in the first place.</p>
+</div>
+</div>
 <div id="sanitizing-user-provided-expressions" class="section level2">
 <h2>Sanitizing User-Provided Expressions</h2>
 <p><strong>Never use <code>eval(str2expression())</code> or
@@ -1129,8 +1381,8 @@ expression is parsed, its AST is walked to ensure only allowed
 operations are present (comparisons, logical operators, column
 references, and literals), and then it is evaluated in a restricted
 environment containing only the data frame’s columns.</p>
-<div class="sourceCode" id="cb17"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb17-1"><a href="#cb17-1" tabindex="-1"></a><span class="co"># In a module server — filtering rows by a textInput:</span></span>
-<span id="cb17-2"><a href="#cb17-2" tabindex="-1"></a>rows.use <span class="ot">=</span> <span class="fu">safe_eval_filter</span>(<span class="fu">isolate_fn</span>(input<span class="sc">$</span>rows.use), <span class="fu">data</span>())</span></code></pre></div>
+<div class="sourceCode" id="cb23"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb23-1"><a href="#cb23-1" tabindex="-1"></a><span class="co"># In a module server — filtering rows by a textInput:</span></span>
+<span id="cb23-2"><a href="#cb23-2" tabindex="-1"></a>rows.use <span class="ot">=</span> <span class="fu">safe_eval_filter</span>(<span class="fu">isolate_fn</span>(input<span class="sc">$</span>rows.use), <span class="fu">data</span>())</span></code></pre></div>
 <p>Returns a logical vector (same length as <code>nrow(data)</code>), or
 <code>NULL</code> if the input is empty, unparseable, or contains
 disallowed operations.</p>
@@ -1141,8 +1393,8 @@ disallowed operations.</p>
 string through to a downstream plotting function that will evaluate it
 internally (e.g., <code>plotthis::BoxPlot(highlight = ...)</code>). The
 string is validated but not executed.</p>
-<div class="sourceCode" id="cb18"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb18-1"><a href="#cb18-1" tabindex="-1"></a><span class="co"># In a module server — passing a highlight expression to plotthis:</span></span>
-<span id="cb18-2"><a href="#cb18-2" tabindex="-1"></a>highlight <span class="ot">&lt;-</span> <span class="fu">validate_expression</span>(<span class="fu">isolate_fn</span>(input<span class="sc">$</span>highlight), <span class="fu">names</span>(<span class="fu">data</span>()))</span></code></pre></div>
+<div class="sourceCode" id="cb24"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb24-1"><a href="#cb24-1" tabindex="-1"></a><span class="co"># In a module server — passing a highlight expression to plotthis:</span></span>
+<span id="cb24-2"><a href="#cb24-2" tabindex="-1"></a>highlight <span class="ot">&lt;-</span> <span class="fu">validate_expression</span>(<span class="fu">isolate_fn</span>(input<span class="sc">$</span>highlight), <span class="fu">names</span>(<span class="fu">data</span>()))</span></code></pre></div>
 <p>Returns the original string if safe, or <code>NULL</code>.</p>
 </div>
 <div id="safe_resolve_adj_fxnfn_name" class="section level3">
@@ -1154,25 +1406,32 @@ the allowed list (<code>&quot;log2&quot;</code>, <code>&quot;log&quot;</code>,
 <code>&quot;log10&quot;</code>, <code>&quot;neg_log10&quot;</code>, <code>&quot;log1p&quot;</code>,
 <code>&quot;as.factor&quot;</code>, <code>&quot;abs&quot;</code>, <code>&quot;sqrt&quot;</code>) are
 accepted.</p>
-<div class="sourceCode" id="cb19"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb19-1"><a href="#cb19-1" tabindex="-1"></a><span class="co"># In a module server — resolving an adjustment function:</span></span>
-<span id="cb19-2"><a href="#cb19-2" tabindex="-1"></a>x.adj.fxn <span class="ot">=</span> <span class="fu">safe_resolve_adj_fxn</span>(<span class="fu">isolate_fn</span>(input<span class="sc">$</span>x.adj.fxn))</span></code></pre></div>
+<div class="sourceCode" id="cb25"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb25-1"><a href="#cb25-1" tabindex="-1"></a><span class="co"># In a module server — resolving an adjustment function:</span></span>
+<span id="cb25-2"><a href="#cb25-2" tabindex="-1"></a>x.adj.fxn <span class="ot">=</span> <span class="fu">safe_resolve_adj_fxn</span>(<span class="fu">isolate_fn</span>(input<span class="sc">$</span>x.adj.fxn))</span></code></pre></div>
 <p>Returns the function, or <code>NULL</code> if the name is empty or
 not in the allowed list.</p>
 </div>
 <div id="what-counts-as-allowed" class="section level3">
 <h3>What counts as “allowed”?</h3>
-<p>All three helpers share the same whitelist of safe AST nodes:</p>
+<p><code>safe_eval_filter()</code> and
+<code>validate_expression()</code> share one whitelist of safe AST
+nodes:</p>
 <ul>
 <li><strong>Comparisons:</strong> <code>&lt;</code>, <code>&gt;</code>,
 <code>&lt;=</code>, <code>&gt;=</code>, <code>==</code>,
 <code>!=</code></li>
 <li><strong>Logical operators:</strong> <code>&amp;</code>,
 <code>&amp;&amp;</code>, <code>|</code>, <code>||</code>,
-<code>!</code></li>
+<code>!</code>, <code>xor()</code></li>
 <li><strong>Utilities:</strong> <code>%in%</code>, <code>c()</code>,
 <code>is.na()</code>, <code>is.null()</code></li>
 <li><strong>Arithmetic:</strong> <code>-</code>, <code>+</code>,
-<code>*</code>, <code>/</code>, <code>:</code>, <code>%%</code></li>
+<code>*</code>, <code>/</code>, <code>:</code>, <code>%%</code>,
+<code>abs()</code>, <code>round()</code></li>
+<li><strong>Strings and patterns:</strong> <code>grepl()</code>,
+<code>startsWith()</code>, <code>endsWith()</code>,
+<code>substr()</code>, <code>nchar()</code>, <code>toupper()</code>,
+<code>tolower()</code>, <code>trimws()</code></li>
 <li><strong>Grouping:</strong> <code>()</code></li>
 <li><strong>Column names</strong> from the data</li>
 <li><strong>Literals:</strong> numbers, strings, <code>TRUE</code>,
@@ -1181,7 +1440,25 @@ not in the allowed list.</p>
 </ul>
 <p>Anything outside this list (including function calls like
 <code>system()</code>, <code>file.remove()</code>,
-<code>library()</code>, etc.) is rejected and a warning is issued.</p>
+<code>library()</code>, etc.) is rejected and a warning is issued. So is
+a namespaced or extracted call such as <code>base::log(x)</code>, which
+would otherwise slip past a name-based check.</p>
+<p>The expression must also be a <strong>single statement</strong>:
+anything after a <code>;</code> or a newline is rejected rather than
+silently ignored.</p>
+<p><code>safe_resolve_adj_fxn()</code> is the exception — it does not
+walk an AST at all. It matches the whole input against its own short
+list of numeric transforms (<code>log2</code>, <code>log</code>,
+<code>log10</code>, <code>neg_log10</code>, <code>log1p</code>,
+<code>as.factor</code>, <code>abs</code>, <code>sqrt</code>) and
+resolves it with <code>match.fun()</code>.</p>
+<p>Model formulas (<code>.safe_build_model()</code>, behind the custom
+fit lines) reuse the same walker with a formula-specific vocabulary:
+<code>~</code>, <code>+</code>, <code>-</code>, <code>*</code>,
+<code>/</code>, <code>^</code>, <code>(</code>, <code>:</code>,
+<code>I()</code>, and the transforms <code>log()</code>,
+<code>log2()</code>, <code>log10()</code>, <code>sqrt()</code>,
+<code>exp()</code>, <code>poly()</code>.</p>
 </div>
 </div>
 

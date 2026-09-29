@@ -349,6 +349,16 @@ custom logic such as data filtering, transformations, or additional UI
 controls while reusing the full functionality of the base modules.</p>
 <p>This vignette demonstrates how to create a custom module by building
 on top of the <code>scatterPlot</code> module.</p>
+<p>If you are working with an AI coding agent, the package ships an <a href="https://agentskills.io">Agent Skill</a> covering exactly this
+material - <strong><code>vizmodules-custom-module</code></strong> -
+along with the namespace contract, reactive <code>defaults</code>,
+avoiding double renders, manual-edit persistence, and model-line
+backends. Install it (and its two siblings) into your project with
+<code>VizModules::use_vizmodules_skills(&quot;.&quot;)</code>, or pass
+<code>client = &quot;copilot&quot;</code> / <code>client = &quot;claude&quot;</code> to
+write to <code>.github/skills/</code> or <code>.claude/skills/</code>
+instead of the default <code>.agents/skills/</code>. See the README for
+details.</p>
 </div>
 <div id="the-pattern" class="section level2">
 <h2>The Pattern</h2>
@@ -538,6 +548,30 @@ these helpers, but this is pretty much all you need to do.</p>
 </div>
 <div id="best-practices" class="section level2">
 <h2>Best Practices</h2>
+<p>When you add a free-text control of your own, debounce it.
+<code>textInput()</code> reports on every keystroke, so a base module
+reading it directly is rebuilt once per character — and if the text is
+an expression, most of those characters describe something that cannot
+parse yet:</p>
+<div class="sourceCode" id="cb7"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" tabindex="-1"></a>myModuleServer <span class="ot">&lt;-</span> <span class="cf">function</span>(id, data) {</span>
+<span id="cb7-2"><a href="#cb7-2" tabindex="-1"></a>    filtered <span class="ot">&lt;-</span> <span class="fu">moduleServer</span>(id, <span class="cf">function</span>(input, output, session) {</span>
+<span id="cb7-3"><a href="#cb7-3" tabindex="-1"></a>        <span class="co"># Once, in the moduleServer body (where the wrapper&#39;s own input lives),</span></span>
+<span id="cb7-4"><a href="#cb7-4" tabindex="-1"></a>        <span class="co"># not inside the reactive below. 500-800ms is a good range.</span></span>
+<span id="cb7-5"><a href="#cb7-5" tabindex="-1"></a>        query <span class="ot">&lt;-</span> <span class="fu">debounce</span>(<span class="fu">reactive</span>(input<span class="sc">$</span>query), <span class="dv">700</span>)</span>
+<span id="cb7-6"><a href="#cb7-6" tabindex="-1"></a></span>
+<span id="cb7-7"><a href="#cb7-7" tabindex="-1"></a>        <span class="fu">reactive</span>({</span>
+<span id="cb7-8"><a href="#cb7-8" tabindex="-1"></a>            keep <span class="ot">&lt;-</span> <span class="fu">safe_eval_filter</span>(<span class="fu">query</span>(), <span class="fu">data</span>())</span>
+<span id="cb7-9"><a href="#cb7-9" tabindex="-1"></a>            <span class="cf">if</span> (<span class="fu">is.null</span>(keep)) <span class="fu">data</span>() <span class="cf">else</span> <span class="fu">data</span>()[keep, , drop <span class="ot">=</span> <span class="cn">FALSE</span>]</span>
+<span id="cb7-10"><a href="#cb7-10" tabindex="-1"></a>        })</span>
+<span id="cb7-11"><a href="#cb7-11" tabindex="-1"></a>    })</span>
+<span id="cb7-12"><a href="#cb7-12" tabindex="-1"></a></span>
+<span id="cb7-13"><a href="#cb7-13" tabindex="-1"></a>    <span class="fu">dittoViz_scatterPlotServer</span>(id, filtered)</span>
+<span id="cb7-14"><a href="#cb7-14" tabindex="-1"></a>}</span></code></pre></div>
+<p>Select, numeric, and checkbox inputs need no such treatment — they
+report discrete choices, not keystrokes. See the “Debouncing Free-Text
+Inputs” section of
+<code>vignette(&quot;adding-a-new-module&quot;, package = &quot;VizModules&quot;)</code> for
+the full rationale.</p>
 <ol style="list-style-type: decimal">
 <li><p><strong>Keep wrapper logic focused</strong>: Each wrapper should
 add a cohesive set of related functionality.</p></li>

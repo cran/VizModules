@@ -9,6 +9,7 @@ ComplexHeatmap_HeatmapSubOutputUI(
   title = NULL,
   width = 400,
   height = 350,
+  fit.width = TRUE,
   ...
 )
 }
@@ -20,6 +21,11 @@ heatmap.}
 \item{title}{Optional panel title. \code{NULL} (the default) omits the title.}
 
 \item{width, height}{Panel dimensions in pixels.}
+
+\item{fit.width}{Logical; when \code{TRUE} (the default) the panel is scaled once
+on load to fit the width of its container, making \code{width} a starting
+proportion rather than an absolute size. See
+\code{\link[=ComplexHeatmap_HeatmapOutputUI]{ComplexHeatmap_HeatmapOutputUI()}}.}
 
 \item{...}{Additional arguments passed to
 \code{\link[InteractiveComplexHeatmap:subHeatmapOutput]{InteractiveComplexHeatmap::subHeatmapOutput()}}.}
@@ -35,7 +41,9 @@ pieces fit together.
 }
 \examples{
 library(VizModules)
-ComplexHeatmap_HeatmapSubOutputUI("heatmap", title = "Selected region")
+if (requireNamespace("InteractiveComplexHeatmap", quietly = TRUE)) {
+    ComplexHeatmap_HeatmapSubOutputUI("heatmap", title = "Selected region")
+}
 }
 \seealso{
 \code{\link[InteractiveComplexHeatmap:subHeatmapOutput]{InteractiveComplexHeatmap::subHeatmapOutput()}},

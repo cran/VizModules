@@ -13,7 +13,9 @@
   title.size = NULL,
   text.size = NULL,
   start_y = 0.95,
-  start_x = 1.02
+  start_x = 1.02,
+  font.family = NULL,
+  font.color = NULL
 )
 }
 \arguments{
@@ -55,6 +57,12 @@ color/shape legend. Invalid values fall back to the default. Defaults to
 the legend to the right of the plot area; nudge it lower to pull the whole
 set inward when it would otherwise overflow a narrow plot, or higher to push
 it further out. Defaults to \code{1.02}.}
+
+\item{font.family}{Character, or \code{NULL}. Font family of the title and label
+annotations. When \code{NULL}, plotly's default is used.}
+
+\item{font.color}{Character, or \code{NULL}. Font color of the title and label
+annotations. Defaults to \code{"#000000"} when \code{NULL}. The circles stay black.}
 }
 \value{
 The plotly figure with size-legend annotations appended, or the

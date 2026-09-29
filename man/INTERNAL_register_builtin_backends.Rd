@@ -2,7 +2,7 @@
 % Please edit documentation in R/plot_fit_lines.R
 \name{.register_builtin_backends}
 \alias{.register_builtin_backends}
-\title{Called from \code{.onLoad()} to seed the registry with the four standard backends.}
+\title{Called from \code{.onLoad()} to seed the registry with the three standard backends.}
 \usage{
 .register_builtin_backends()
 }
@@ -10,7 +10,7 @@
 Invisibly returns \code{NULL}.
 }
 \description{
-Called from \code{.onLoad()} to seed the registry with the four standard backends.
+Called from \code{.onLoad()} to seed the registry with the three standard backends.
 }
 \author{
 Jacob Martin

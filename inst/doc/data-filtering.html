@@ -448,9 +448,11 @@ filtered data can drive one plot or several.</p>
 <p>Wide data frames make for a busy table and a wall of filter boxes.
 Pass the columns you don’t want on screen to <code>hide.columns</code>
 and the table is drawn without them – no column, no filter box:</p>
-<div class="sourceCode" id="cb2"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" tabindex="-1"></a>filtered <span class="ot">&lt;-</span> <span class="fu">dataFilterServer</span>(<span class="st">&quot;filter&quot;</span>, <span class="fu">reactive</span>(example_bar),</span>
-<span id="cb2-2"><a href="#cb2-2" tabindex="-1"></a>    <span class="at">hide.columns =</span> <span class="fu">c</span>(<span class="st">&quot;internal_id&quot;</span>, <span class="st">&quot;batch&quot;</span>)</span>
-<span id="cb2-3"><a href="#cb2-3" tabindex="-1"></a>)</span></code></pre></div>
+<div class="sourceCode" id="cb2"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" tabindex="-1"></a>server <span class="ot">&lt;-</span> <span class="cf">function</span>(input, output, session) {</span>
+<span id="cb2-2"><a href="#cb2-2" tabindex="-1"></a>    filtered <span class="ot">&lt;-</span> <span class="fu">dataFilterServer</span>(<span class="st">&quot;filter&quot;</span>, <span class="fu">reactive</span>(example_sales),</span>
+<span id="cb2-3"><a href="#cb2-3" tabindex="-1"></a>        <span class="at">hide.columns =</span> <span class="fu">c</span>(<span class="st">&quot;sale_id&quot;</span>, <span class="st">&quot;profit&quot;</span>)</span>
+<span id="cb2-4"><a href="#cb2-4" tabindex="-1"></a>    )</span>
+<span id="cb2-5"><a href="#cb2-5" tabindex="-1"></a>}</span></code></pre></div>
 <p>Two things to keep in mind:</p>
 <ul>
 <li><strong>Hiding is display-only.</strong> The returned reactive still
@@ -461,10 +463,12 @@ an aesthetic even though users never see it in the table.</li>
 lets users switch any column – including the ones you hid – back
 on.</li>
 </ul>
-<div class="sourceCode" id="cb3"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" tabindex="-1"></a>filtered <span class="ot">&lt;-</span> <span class="fu">dataFilterServer</span>(<span class="st">&quot;filter&quot;</span>, <span class="fu">reactive</span>(example_bar),</span>
-<span id="cb3-2"><a href="#cb3-2" tabindex="-1"></a>    <span class="at">hide.columns =</span> <span class="fu">c</span>(<span class="st">&quot;internal_id&quot;</span>, <span class="st">&quot;batch&quot;</span>),</span>
-<span id="cb3-3"><a href="#cb3-3" tabindex="-1"></a>    <span class="at">col.visibility =</span> <span class="cn">TRUE</span></span>
-<span id="cb3-4"><a href="#cb3-4" tabindex="-1"></a>)</span></code></pre></div>
+<div class="sourceCode" id="cb3"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" tabindex="-1"></a>server <span class="ot">&lt;-</span> <span class="cf">function</span>(input, output, session) {</span>
+<span id="cb3-2"><a href="#cb3-2" tabindex="-1"></a>    filtered <span class="ot">&lt;-</span> <span class="fu">dataFilterServer</span>(<span class="st">&quot;filter&quot;</span>, <span class="fu">reactive</span>(example_sales),</span>
+<span id="cb3-3"><a href="#cb3-3" tabindex="-1"></a>        <span class="at">hide.columns =</span> <span class="fu">c</span>(<span class="st">&quot;sale_id&quot;</span>, <span class="st">&quot;profit&quot;</span>),</span>
+<span id="cb3-4"><a href="#cb3-4" tabindex="-1"></a>        <span class="at">col.visibility =</span> <span class="cn">TRUE</span></span>
+<span id="cb3-5"><a href="#cb3-5" tabindex="-1"></a>    )</span>
+<span id="cb3-6"><a href="#cb3-6" tabindex="-1"></a>}</span></code></pre></div>
 <p>The name-to-position lookup behind <code>hide.columns</code> is
 exported as <code>resolve_column_targets()</code>, so you can reach for
 it in your own tables too. DataTables addresses columns in
@@ -474,12 +478,12 @@ shows a row-names column, which shifts everything over by one). Hiding
 is just one use - the same targets drive <code>width</code>,
 <code>orderable</code>, <code>className</code>, and friends:</p>
 <div class="sourceCode" id="cb4"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" tabindex="-1"></a>DT<span class="sc">::</span><span class="fu">datatable</span>(</span>
-<span id="cb4-2"><a href="#cb4-2" tabindex="-1"></a>    example_bar,</span>
+<span id="cb4-2"><a href="#cb4-2" tabindex="-1"></a>    example_sales,</span>
 <span id="cb4-3"><a href="#cb4-3" tabindex="-1"></a>    <span class="at">rownames =</span> <span class="cn">FALSE</span>,</span>
 <span id="cb4-4"><a href="#cb4-4" tabindex="-1"></a>    <span class="at">options =</span> <span class="fu">list</span>(</span>
 <span id="cb4-5"><a href="#cb4-5" tabindex="-1"></a>        <span class="at">columnDefs =</span> <span class="fu">list</span>(<span class="fu">list</span>(</span>
 <span id="cb4-6"><a href="#cb4-6" tabindex="-1"></a>            <span class="at">visible =</span> <span class="cn">FALSE</span>,</span>
-<span id="cb4-7"><a href="#cb4-7" tabindex="-1"></a>            <span class="at">targets =</span> <span class="fu">resolve_column_targets</span>(example_bar, <span class="fu">c</span>(<span class="st">&quot;internal_id&quot;</span>, <span class="st">&quot;batch&quot;</span>))</span>
+<span id="cb4-7"><a href="#cb4-7" tabindex="-1"></a>            <span class="at">targets =</span> <span class="fu">resolve_column_targets</span>(example_sales, <span class="fu">c</span>(<span class="st">&quot;sale_id&quot;</span>, <span class="st">&quot;profit&quot;</span>))</span>
 <span id="cb4-8"><a href="#cb4-8" tabindex="-1"></a>        ))</span>
 <span id="cb4-9"><a href="#cb4-9" tabindex="-1"></a>    )</span>
 <span id="cb4-10"><a href="#cb4-10" tabindex="-1"></a>)</span></code></pre></div>
@@ -551,10 +555,6 @@ module’s <code>InputsUI</code>, <code>OutputUI</code>, and
 <code>id</code></strong> (<code>&quot;bar&quot;</code> and <code>&quot;box&quot;</code>
 above). Nothing wraps the module servers, so their ids resolve to the
 top-level namespace where their UI lives, and everything connects.</p>
-<p>A ready-to-run version of this app ships with the package:</p>
-<div class="sourceCode" id="cb7"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" tabindex="-1"></a>shiny<span class="sc">::</span><span class="fu">runApp</span>(</span>
-<span id="cb7-2"><a href="#cb7-2" tabindex="-1"></a>    <span class="fu">system.file</span>(<span class="st">&quot;examples&quot;</span>, <span class="st">&quot;linked-filter&quot;</span>, <span class="at">package =</span> <span class="st">&quot;VizModules&quot;</span>)</span>
-<span id="cb7-3"><a href="#cb7-3" tabindex="-1"></a>)</span></code></pre></div>
 </div>
 <div id="how-it-compares-to-createmoduleapp" class="section level2">
 <h2>How it compares to <code>createModuleApp()</code></h2>

@@ -4,13 +4,17 @@
 \alias{.reset_stats_inputs}
 \title{Reset uniform stats inputs to defaults}
 \usage{
-.reset_stats_inputs(session, defaults = NULL)
+.reset_stats_inputs(session, defaults = NULL, pair_strings = NULL)
 }
 \arguments{
 \item{session}{The Shiny session object (from \code{moduleServer}).}
 
 \item{defaults}{A named list of default values to reset to, or NULL to use
 hardcoded fallbacks. Typically the same list passed to the UI function.}
+
+\item{pair_strings}{Character vector of the comparisons currently on offer
+in the Comparisons selector. Those named by \code{defaults$stat.pairs} are
+reselected (see \code{\link[=.default_stat_pairs]{.default_stat_pairs()}}); \code{NULL} clears the selection.}
 }
 \value{
 Called for side effects; returns \code{invisible(NULL)}.

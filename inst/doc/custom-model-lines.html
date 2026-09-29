@@ -343,10 +343,10 @@ code > span.er { color: #a61717; background-color: #e3d2d2; }
 
 <p>The <code>dittoViz_scatterPlot</code> module lets users overlay
 fitted model lines on their data. Out of the box it supports
-<code>lm</code>, <code>glm</code>, <code>loess</code>, and
-<code>nls</code>. This vignette explains how the system works, how to
-set defaults, and how to add support for any modelling package
-(e.g. <code>drc</code>, <code>mgcv</code>, <code>brms</code>).</p>
+<code>lm</code>, <code>glm</code>, and <code>loess</code>. This vignette
+explains how the system works, how to set defaults, and how to add
+support for any modelling package (e.g. <code>drc</code>,
+<code>mgcv</code>, <code>brms</code>).</p>
 <div id="how-it-works" class="section level2">
 <h2>How It Works</h2>
 <p>The custom model line system has three layers:</p>
@@ -379,9 +379,22 @@ Lines</strong> on.</li>
 <li>Click <strong>+ Add</strong> to create a model row.</li>
 <li>Select a model type, enter a formula using your data’s column names
 (e.g. <code>revenue ~ poly(units, 2)</code>), pick line colour and
-width.</li>
+width. Write it as <code>&lt;y column&gt; ~ &lt;x column&gt;</code>: the
+line is the formula’s prediction across the X axis’s range, drawn
+against the Y axis, and any other column in the formula is held at its
+median (or first level).</li>
 <li>The fitted line appears on the plot.</li>
 </ol>
+<p>The model is fit to the values as plotted. With an X or Y adjustment
+on the <strong>Adjustments</strong> tab (a z-score, <code>log10</code>,
+…), <code>revenue ~ units</code> models the adjusted revenue against the
+adjusted units, so the line runs through the points you see. Don’t
+repeat the adjustment inside the formula:
+<code>log10(revenue) ~ units</code> on a <code>log10</code> Y axis would
+take the log twice. No model lines are drawn while
+<code>as.factor</code> makes an axis categorical. The same goes for the
+<strong>Linear model line</strong> and <strong>Line of best fit</strong>
+toggles.</p>
 <p>You can add multiple rows — each draws its own line with independent
 settings.</p>
 </div>
@@ -394,8 +407,8 @@ settings.</p>
 <span id="cb2-3"><a href="#cb2-3" tabindex="-1"></a><span class="fu">dittoViz_scatterPlotApp</span>(</span>
 <span id="cb2-4"><a href="#cb2-4" tabindex="-1"></a>    <span class="at">data_list =</span> <span class="fu">list</span>(<span class="st">&quot;sales&quot;</span> <span class="ot">=</span> example_sales),</span>
 <span id="cb2-5"><a href="#cb2-5" tabindex="-1"></a>    <span class="at">defaults =</span> <span class="fu">list</span>(</span>
-<span id="cb2-6"><a href="#cb2-6" tabindex="-1"></a>        <span class="at">x.by =</span> <span class="st">&quot;revenue&quot;</span>,</span>
-<span id="cb2-7"><a href="#cb2-7" tabindex="-1"></a>        <span class="at">y.by =</span> <span class="st">&quot;units&quot;</span>,</span>
+<span id="cb2-6"><a href="#cb2-6" tabindex="-1"></a>        <span class="at">x.by =</span> <span class="st">&quot;units&quot;</span>,</span>
+<span id="cb2-7"><a href="#cb2-7" tabindex="-1"></a>        <span class="at">y.by =</span> <span class="st">&quot;revenue&quot;</span>,</span>
 <span id="cb2-8"><a href="#cb2-8" tabindex="-1"></a>        <span class="at">custom.model.enable =</span> <span class="cn">TRUE</span>,</span>
 <span id="cb2-9"><a href="#cb2-9" tabindex="-1"></a>        <span class="at">custom.models =</span> <span class="fu">list</span>(</span>
 <span id="cb2-10"><a href="#cb2-10" tabindex="-1"></a>            <span class="at">models1 =</span> <span class="fu">list</span>(</span>
@@ -423,9 +436,9 @@ list.</p>
 <div id="adding-a-custom-model-backend" class="section level2">
 <h2>Adding a Custom Model Backend</h2>
 <p>The built-in types (<code>lm</code>, <code>glm</code>,
-<code>loess</code>, <code>nls</code>) are registered automatically. To
-add support for another modelling package, call
-<code>register_model_backend()</code> before the app runs.</p>
+<code>loess</code>) are registered automatically. To add support for
+another modelling package, call <code>register_model_backend()</code>
+before the app runs.</p>
 <div id="backend-spec" class="section level3">
 <h3>Backend Spec</h3>
 <p>A backend is a named list with:</p>
@@ -520,8 +533,8 @@ function as the <code>drc_fct</code> argument.</p>
 <p>No <code>fields</code> needed here because GAM complexity is
 expressed in the formula itself (<code>s()</code>, <code>te()</code>,
 etc.). Note: you’d need to add <code>&quot;s&quot;</code>, <code>&quot;te&quot;</code>, etc.
-to the formula whitelist in <code>.safe_build_model()</code> for this to
-work.</p>
+to the formula whitelist, <code>.formula_allowed_calls()</code> in
+<code>R/parse_utils.R</code>, for this to work.</p>
 </div>
 </div>
 <div id="where-to-register-backends" class="section level2">
@@ -541,7 +554,7 @@ work.</p>
 <tr class="odd">
 <td>Built into VizModules</td>
 <td>Add to <code>.register_builtin_backends()</code> in
-<code>R/model_backends.R</code></td>
+<code>R/plot_fit_lines.R</code></td>
 </tr>
 <tr class="even">
 <td>Extension package</td>

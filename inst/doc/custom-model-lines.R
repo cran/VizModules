@@ -11,8 +11,8 @@ knitr::opts_chunk$set(
 # dittoViz_scatterPlotApp(
 #     data_list = list("sales" = example_sales),
 #     defaults = list(
-#         x.by = "revenue",
-#         y.by = "units",
+#         x.by = "units",
+#         y.by = "revenue",
 #         custom.model.enable = TRUE,
 #         custom.models = list(
 #             models1 = list(

@@ -6,24 +6,28 @@ knitr::opts_chunk$set(
 )
 
 ## ----hide-columns-------------------------------------------------------------
-# filtered <- dataFilterServer("filter", reactive(example_bar),
-#     hide.columns = c("internal_id", "batch")
-# )
+# server <- function(input, output, session) {
+#     filtered <- dataFilterServer("filter", reactive(example_sales),
+#         hide.columns = c("sale_id", "profit")
+#     )
+# }
 
 ## ----hide-columns-toggle------------------------------------------------------
-# filtered <- dataFilterServer("filter", reactive(example_bar),
-#     hide.columns = c("internal_id", "batch"),
-#     col.visibility = TRUE
-# )
+# server <- function(input, output, session) {
+#     filtered <- dataFilterServer("filter", reactive(example_sales),
+#         hide.columns = c("sale_id", "profit"),
+#         col.visibility = TRUE
+#     )
+# }
 
 ## ----resolve-helper-----------------------------------------------------------
 # DT::datatable(
-#     example_bar,
+#     example_sales,
 #     rownames = FALSE,
 #     options = list(
 #         columnDefs = list(list(
 #             visible = FALSE,
-#             targets = resolve_column_targets(example_bar, c("internal_id", "batch"))
+#             targets = resolve_column_targets(example_sales, c("sale_id", "profit"))
 #         ))
 #     )
 # )
@@ -75,9 +79,4 @@ knitr::opts_chunk$set(
 # }
 # 
 # if (interactive()) shinyApp(ui, server)
-
-## ----run-example--------------------------------------------------------------
-# shiny::runApp(
-#     system.file("examples", "linked-filter", package = "VizModules")
-# )
 

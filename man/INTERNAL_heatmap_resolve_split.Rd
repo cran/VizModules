@@ -4,18 +4,24 @@
 \alias{.heatmap_resolve_split}
 \title{Resolve a single row/column split method + count into Heatmap() arguments}
 \usage{
-.heatmap_resolve_split(method, n, dim_n)
+.heatmap_resolve_split(method, n, dim_n, split_values = NULL)
 }
 \arguments{
-\item{method}{One of \code{"None"}, \code{"K-means"}, or \code{"Hierarchical"} (case-sensitive,
-matching the UI's \code{viz_select_input} choices). Anything else is treated as
-\code{"None"}.}
+\item{method}{One of \code{"None"}, \code{"K-means"}, \code{"Hierarchical"}, or
+\code{"Annotation"} (case-sensitive, matching the UI's \code{viz_select_input}
+choices). Anything else is treated as \code{"None"}.}
 
 \item{n}{The requested number of groups. \code{NA}/\code{NULL}/non-numeric or \verb{< 2} is
-treated as "no split" regardless of \code{method}.}
+treated as "no split" regardless of \code{method}. Ignored for \code{"Annotation"},
+whose group count comes from the data.}
 
 \item{dim_n}{The size of the dimension being split (\code{nrow(mat)} or
 \code{ncol(mat)}), used to clamp \code{n}.}
+
+\item{split_values}{For \code{method = "Annotation"}, a data frame of annotation
+values with \code{dim_n} rows (one column per split column). Ignored otherwise.
+A grouping that puts every row in its own slice conveys nothing and costs
+a slice label per row, so it falls back to no split.}
 }
 \value{
 A list with \code{km} (integer, \code{1L} when unused) and \code{split} (integer or
@@ -38,6 +44,14 @@ confirmed empirically that \code{row_km == nrow(mat)} reliably errors
 while \code{row_km == nrow(mat) - 1} does not. A bare
 hierarchical \code{row_split} count, by contrast, tolerates being equal to (or
 even greater than) the dimension without erroring.
+
+A third method, \code{"Annotation"}, splits on the values of one or more
+annotation columns instead of on a derived grouping, letting rows or columns
+be grouped by what they \emph{are} (pathway, condition) rather than by how they
+cluster. It also makes drawing cheap when no clustering is wanted: the
+grouping needs no distance matrix. Several columns give nested slices, one
+per observed combination. It routes through \code{row_split} like the
+hierarchical method, so the never-both invariant above still holds.
 }
 \author{
 Jared Andrews
