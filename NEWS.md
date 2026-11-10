@@ -1,4 +1,146 @@
-# VizModules 0.5.0.9000
+# VizModules 0.6.0
+
+The one where we fix all the wonkiness with extending modules (i.e. building `sciVizModules`).
+
+## Improved/New Functionality
+
+### All modules
+
+* Plots respond much faster. Changing an input that only styles the plot (titles, fonts, ticks, gridlines, reference lines, the legend's fonts, the download format) now restyles it without redrawing it, which takes a 20,000-point scatter plot from about 4.4 s to 0.4 s, and going back to settings already drawn, such as toggling an option back or pressing **Reset**, re-uses the plot drawn for them. A plot is drawn once at startup, where some modules drew it up to 12 times, and once when a column changes rather than twice. Settings panels build in about a third of the time.
+  * Plots now update in place wherever possible instead of being redrawn. Changing what is plotted still resets the view. This results in much snappier performance for styling changes.
+  * Under the hood, each module draws its plot in a cached step keyed on the data and the inputs it reads, and applies the styling inputs to it in a second step; the adding-a-new-module vignette describes this pattern.
+
+* The Axes tab has new **X Axis Padding** and **Y Axis Padding** inputs that set the space between the data and the edges of the plot area, as a fraction of the data's extent at each end, so `0` makes an area or line plot fill it (#377). Blank keeps each plot's own padding, and an axis with its own limit inputs (the value axis of `BarPlot`, `BoxPlot`, `freqPlot`, `yPlot`, and `SplitBarPlot`) gets none. Changing it restyles the plot without redrawing it.
+* Tick labels no longer switch to scientific notation (`1e+05`) depending on which breaks an axis gets, and a new **Scientific Notation Ticks** switch in the Axes tab writes them as powers of ten when wanted (#379).
+
+* Colour, shape, group, and fill selectors no longer offer categorical columns with 50 or more levels (the `facet_check()` cap), such as IDs or gene names, which asked for one colour, shape, or group per row and would generally just break things (sciVizModules#16). Numeric columns stay where a selector draws them as a gradient, logical columns stay, and a column named in `defaults` is always offered. This covers the scatter plot's Color By, Shape By and Trajectory Group By; the yPlot's Group, Color and Shape By; `linePlot` and the `plotthis` Area, Bar, Box, Density and Histogram Group By; the Bar and SplitBar Fill By; `parallelCoordinatesPlot` Color By; and `radarPlot` Group. The new `discrete_choices()` builds these choices.
+
+### `BarPlot`, `BoxPlot`, `freqPlot`, and `yPlot`
+
+* New drag-and-drop **X Order** (**Group Order** for `freqPlot` and `yPlot`) input in the Data tab sets the order of the x-axis categories, with significance brackets following it. Set it in `defaults` as `x.order`, a character vector of levels; any left out follow in their default order. It is not shown for a column with more than 20 levels, and in `BoxPlot` a **Sort X By** key takes precedence over it.
+
+### `BoxPlot`, `DotPlot`, `freqPlot`, and `yPlot`
+
+* New **Plot with WebGL** toggle, on by default, draws the points with WebGL once a plot has 5,000 or more of them (`options(VizModules.webgl.threshold = )`), so tens of thousands of jitter points draw several times faster. Boxes, violins, and lines stay SVG. WebGL points are an embedded image in SVG downloads, so turn it off for a fully vector file.
+
+### `dataFilter`
+
+* Sorting the data table no longer reorders or redraws the plots fed by it: `dataFilterServer()` only passes on a change to which rows are shown, and keeps them in their original order. A table's first report of its rows no longer redraws them either.
+
+### `DotPlot` and `scatterPlot`
+
+* New **Size Scale Min** and **Size Scale Max** inputs set the **Size By** values drawn at the smallest and largest sizes, so the size legend can run over round numbers such as 0 to 100 rather than the data's own range (#359, #364). Blank keeps the data's range, values beyond a limit are drawn at that end's size, and both show only while **Size By** is set.
+
+### `linePlot`
+
+* Error intervals can now be drawn as a shaded band (#371). The new **Error Ribbon** switch (`error.ribbon` in `linePlot()`) draws the interval behind each line, in that line's colour, on its own or alongside the error bars. **Ribbon Opacity** sets its fill, and a point without an interval leaves a gap in the band. The module gallery's line plot now opens on 95% CI ribbons.
+  * **Error Bar Type**, now **Error Type**, gained **From columns**, which reads each point's interval from the **Lower Bound** and **Upper Bound** columns (`error.type = "columns"`, `error.lower`, `error.upper`). It suits intervals worked out beforehand, such as a model's confidence interval, a forecast range or a min/max range. Unlike SD, SEM and CI, it works with a numeric X, and its bars can be asymmetric.
+
+### `scatterPlot`
+
+* New **Marginals** tab draws the distribution of X above the plot and of Y to its right (#113). Each side can show any of a density, a histogram, and a rug plot, with one per **Color By** group.
+  * Marginals are drawn from the plotted values, after any adjustment.
+  * Marginals are not drawn on a split plot because that'd be a mess.
+  * **Show Marginal Axes** (off by default) shows the density or count axis of the density and histogram marginals (#378).
+* New **Min Point Size** and **Max Point Size** inputs set the size range a **Size By** column maps onto (#364). They replace **Point Size**, which a size column overrides, while one is set.
+* Trajectories are now picked rather than typed (#231). The Trajectory tab's **Trajectories** list takes one row per trajectory, each choosing, in order, the **Trajectory Group By** groups its path visits. In `defaults`, `add.trajectory.by.groups` takes a list of character vectors as dittoViz does, e.g. `list(c("A", "B"))`, and the old `"[A,B]"` text still works. **Trajectory Arrow Size** now defaults to 0.1.
+* New **Model Lines in Legend** switch in the Lines tab lists the linear model, best fit, and custom model lines in the legend. It is off by default. While it is off, a line drawn for a **Color By** group hides and shows with that group's legend entry on click.
+* `dittoViz_scatterPlotServer()` takes an optional `fig.fn`, a `function(fig, input, isolate_fn)` that a wrapper module uses to add layers or annotations to the scatter figure, or to set axis title text, before the figure is finalised. What it adds reaches the rendered plot, manual-edit persistence, and the source download (e.g. sciVizModules' PCA biplot draws its loading arrows and % variance axis titles this way).
+
+### Helpers and exported functions
+
+* New `uniform_colorscale_inputs_ui()`, `reset_colorscale_inputs()`, and `resolve_colorscale()` give a figure with a colorbar, such as a plotly heatmap, the same controls everywhere: five colour stops with continuous presets, reverse, limits and a midpoint, and the colorbar title. A scale set on `layout.coloraxis` changes without redrawing the plot.
+* New `mark_overlay_axes()` exempts the axes of panels drawn beside a plot (annotation strips, gene tracks) from the shared styling, so a custom figure with hand-set domains can use `apply_uniform_styling()`.
+* New `apply_uniform_styling()` applies the uniform styling inputs (titles, axes, reference lines, the modebar, shape drawing, and the legend) to a module's figure in one call, the second of the modules' two steps. A wrapper's `fig.fn` can run in it. Its `ggplot.axis.styling` and `legend.position` arguments suit a figure not built from ggplot, and `apply_legend_inputs()` takes a `position`.
+* New `cached_structure()` caches a module's plot step, keyed on the data and the inputs it reads, so a custom module can split drawing from styling as the built-in modules do.
+* New `auto_webgl()` and its `webgl_input()` toggle draw a plot's points with WebGL once there are enough of them. With `overlays = TRUE`, unfilled line traces switch too, so lines drawn over the points stay on top.
+* New `split_color_shape_legend()` gives a ggplot's colour and shape their own legend sections.
+* `setup_auto_update_logic()` takes a `track` function, called with the id of every input read through the wrapper it returns. The modules' cached plot step keys its cache on those ids.
+* `finalize_manual_edits()` sends the browser only the new layout when nothing else about the figure, including its `layout.uirevision`, changed since the last render, and cancels the render, so it must be the last call in `renderPlotly()`. `options(VizModules.layout.updates = FALSE)` always sends the whole figure.
+* `get_documentation()` reads each package's help pages once per session from the Rd database, rather than re-parsing them through roxygen2 for every parameter, which took most of the time a module's settings panel took to build. Rd markup becomes plain text, and co-documented parameters (`y_min` and `y_max`, say) now get their description. The roclang dependency is gone.
+* `dittoViz_scatterPlotServer()`'s `fig.fn` now runs in the figure's styling step, still after the legend is styled and before the axis titles become annotations. The plot under it is cached but this step is not, so `fig.fn` can read any of a wrapper's reactives.
+
+* `multiDynamicInput()` select fields can take `multiple = TRUE`, and report a character vector of their items in the order they were picked. The scatter module's **Trajectories** list uses one per row (#231).
+
+* Exported many helpers for custom module use (#369):
+  * Facet titles and spacing: `toggle_facet_title_inputs()` (with `main_title_input_ids`) swaps the main-title inputs for the `facet.title.*` inputs while a plot is faceted, and `uniform_subplot_spacing_inputs_ui()` (with `subplot_spacing_defaults()`) provides the subplot spacing controls that `reset_plotly_inputs()` and `apply_facet_subplot_spacing()` already expect.
+  * Group ordering: `level_order_input()`, `level_order_choices()`, `apply_level_order()` and `setup_level_order()` add the same drag-and-drop category ordering to a custom module.
+  * Group colours: `default_group_colors()` validates and hex-normalises a colour mapping in `defaults`, and `reset_group_colors()` restores a group colour picker to it on Reset.
+  * Stats tab: `uniform_stats_inputs_ui()`, `reset_stats_inputs()`, `default_stat_pairs()`, `stat_bracket_headroom()`, and `note_brackets_skipped()`.
+  * Module server boilerplate: `require_data_frame()`, `nz_value()`, `blank_to_null()`, `na_to_null()`, `facet_check()`, `flatten_palette_options()`, `reset_manual_edits()` and `with_stable_seed()`, which keeps jitter from jumping on every rebuild.
+  * Drawn values: `as_plotted()`, `adjusted_values()`, and `adjustment_fn()`, for anything drawn over an adjusted plot.
+  * Point highlighting and labelling: `apply_highlight_styling()`, `create_highlight_annotations()`, `create_selected_annotations()`, `merge_annotation_sets()` and `parse_highlight_values()`.
+  * Error intervals: `error_bar_halfwidth()` works out the SD, SEM or 95% CI half-width `linePlot()` draws around a group's mean, so a module that summarises its own groups (over a numeric x, which linePlot's own summaries do not cover) can hand `linePlot()` matching bounds through `error.type = "columns"` (sciVizModules' pkConcentrationTime uses it; #371).
+  * Size legend: `add_size_legend()` draws the circle size legend the DotPlot and scatter modules show in place of the one plotly drops (sciVizModules' dittoDotPlot uses it). It takes a `title` and rounds its labels to `digits`. Given the size scale's `limits` and `size.range`, its breaks span those limits and each circle is drawn at the size the scale gives it; otherwise the circles are read from the figure's markers. `breaks` picks the values to draw a circle for, such as round numbers, or leaves out the lower limit of a scale starting at size 0, whose circle would be empty. Its title sits just above the first circle, so a title of several lines no longer runs into a small one.
+
+* New `add_marginal_plots()` adds density, histogram and rug marginals to a single-panel plotly figure, given the plotted X and Y values and their groups, and with `show.axes = TRUE` shows their density or count axes. The scatter module's **Marginals** tab uses it (#113).
+
+* New `apply_axis_padding()` sets each axis' range to the extent of the data its traces draw, widened by a fraction at each end, and `apply_tick_notation()` sets whether numeric tick labels, including those ggplotly writes as fixed text, use scientific notation (#377, #379). `apply_uniform_styling()` applies both from the Axes tab, with `padding.axes` (and `include.padding` in `uniform_axes_inputs_ui()`) leaving out an axis that has its own limits.
+
+* `facet_check()` takes `max.levels` (default 50), so the cap on how many distinct values a facet or grouping column may have can be moved. The new `discrete_choices()` applies the same cap to a colour, shape, group or fill selector, adding logical columns and any column a caller names in `keep` (such as its `defaults` entry), as the built-in modules do.
+
+* `collect_source_data()` accepts a named list of statistics tables, and the source download writes each to its own `<name>_stats_<table>.csv`, for a plot with more than one table (sciVizModules' survival curve exports its per-group summary and its pairwise comparisons this way). A single table is still written to `<name>_stats_data.csv`.
+
+## Bug Fixes
+
+### All modules
+
+* **Reset** now redraws the plot for a multi-select it changes, such as **Split By**, **Hover Data** or the scatter plot's marginals. The control showed the reset value, but `viz_select_input()` multi-selects only report when their dropdown closes, so the plot kept the old selection.
+* A plot whose annotation text is a factor (for instance a label column factored by the data filter) no longer stops with "'nzchar()' requires a character vector" when it is zoomed or resized (sciVizModules#17).
+
+### `AreaPlot`
+
+* **Facet By** keeps its `facet_check()` limit when X changes.
+
+### `BarPlot` and `SplitBarPlot`
+
+* The value axis now fits the bars as drawn on load and when the columns change, rather than leaving a lot of empty space due to improve pre-grouping addition & range-finding (#375). 
+
+### `BoxPlot`
+
+* **Sort X By** now works on a faceted plot, ordering every panel by one order computed over all the data, where faceting used to clear it (#372). Significance brackets are now drawn over the sorted order rather than the data's level order, which put them over the wrong boxes.
+
+### `ComplexHeatmap`
+
+* **Security:** A **Row Title** or **Column Title** containing `{...}` or `@{...}` is now drawn as typed. On a split axis, `ComplexHeatmap::Heatmap()` ran it as R code on the server.
+* The heatmap opens faster, and no longer slows down the longer an app runs. Each heatmap kept a reference to the whole Shiny session, which was pretty stupid in hindsight. It also drew the heatmap 4 to 6 times on opening, as each input and colour picker reported the value already in use.
+* The `ComplexHeatmap_HeatmapApp()` example no longer fails where `ComplexHeatmap`, `InteractiveComplexHeatmap`, or `circlize` is not installed, as on CRAN's r-oldrel macOS check machines.
+
+### `dumbbellPlot` and `linePlot`
+
+* The plotly toolbar now has the shape drawing tools. Both modules already had the **Shape** styling inputs, but no way to draw a shape for them to style (#316).
+
+### `linePlot`
+
+* A line with no **Group By** now takes its colour from the **Plot colors** picker, as do its error bars. It was always drawn in plotly's default blue, because plotly applies a palette only to a mapped colour.
+
+### `scatterPlot`
+
+* Trajectories now end in an arrowhead, which ggplotly dropped, and no longer stop the plot with an error while an axis adjustment is set (#231). The module now draws them itself, through the group medians of the plotted values, after any adjustment. On a split plot, each panel's path runs through that panel's own medians rather than repeating the whole data's.
+* With a **Size By** column, the colour and shape legend entries are now all one size, rather than each drawn at the size of its group's first point (#378).
+* Groups are coloured by name, so a factor level with no points (left by filtering the data table, or one a wrapper keeps for its colour picker) no longer shifts the colours of the levels after it.
+
+### `scatterPlot` and `yPlot`
+
+* With both a colour and a **Shape By** column, the legend now has a section for each, as ggplot2 draws it, instead of ggplotly's one entry per combination ("(Gadgets,North)", ...). Clicking an entry hides every point of that level, and double-clicking one shows only its level. The legend's title inputs style the section titles too.
+
+### `SplitBarPlot`
+
+* The **Category Label Position** slider now runs in round steps of at most three decimals, rather than showing values with many decimals that make it look like nonsense.
+
+### Helpers and exported functions
+
+* `multiColorPicker()` no longer fails to set a colour for a group name containing an apostrophe.
+* `updateMultiDynamicInput()` now sets rows given as a named list, the shape `multiDynamicInput()` itself reports. It sent them as a JSON object the browser could not read, which emptied the input and left the server on its old value. This is what **Reset** does for the scatter plot's default trajectories and for a `ComplexHeatmap` `row_annotations` default.
+* `apply_highlight_styling()`, `create_highlight_annotations()`, and `create_selected_annotations()` now find their points in a `ggplotly(tooltip = "text")` figure, whose hover text breaks its lines with `<br />` and can be one string for a whole trace.
+
+## Documentation
+
+* "Building Custom Modules" shows the newly exported helpers in use and adds the scatter module's `fig.fn` hook, "Adding a New Module" lists the helpers, and "Custom Shiny Inputs" covers `multiple = TRUE` select fields and the category order control.
+* "Custom Model Lines" no longer suggests editing package internals to allow GAM smooth terms, which the formula allowlist does not include.
+* The bundled agent skills cover the new inputs (marginals, size scales, trajectories, `linePlot` intervals, category order and `x.order`) and exported helpers. The new-module template builds its Group By choices with `discrete_choices()`, and its test template now gives `testServer()` the full set of inputs a figure needs, without which its figure test failed.
+
+# VizModules 0.5.0
 
 The one where we make the heatmap module not suck and stop accidentally butchering app CSS.
 

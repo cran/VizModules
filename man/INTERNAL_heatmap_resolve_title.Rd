@@ -4,7 +4,7 @@
 \alias{.heatmap_resolve_title}
 \title{Resolve a row/column title box + slice-title toggle into a Heatmap() title}
 \usage{
-.heatmap_resolve_title(text, show_slice_titles = TRUE)
+.heatmap_resolve_title(text, show_slice_titles = TRUE, n_slices = 1L)
 }
 \arguments{
 \item{text}{The title box's value. \code{NULL} (an input that has not reported
@@ -12,11 +12,15 @@ yet) is treated as blank.}
 
 \item{show_slice_titles}{Whether a split axis is titled with its group names
 when \code{text} is blank. Anything but \code{TRUE} counts as \code{FALSE}.}
+
+\item{n_slices}{The number of slices the axis is split into (see
+\code{\link[=.heatmap_slice_count]{.heatmap_slice_count()}}); \code{1} when it is not split.}
 }
 \value{
-\code{text} when it is non-blank; otherwise \code{character(0)} (group names
-shown, which is also no title at all when the axis is not split) or \code{NULL}
-(no title). Suitable for \code{Heatmap(row_title = , column_title = )}.
+\code{text} when it is non-blank (repeated once per slice when it would be
+evaluated otherwise); otherwise \code{character(0)} (group names shown, which is
+also no title at all when the axis is not split) or \code{NULL} (no title).
+Suitable for \code{Heatmap(row_title = , column_title = )}.
 }
 \description{
 \code{\link[ComplexHeatmap:Heatmap]{ComplexHeatmap::Heatmap()}} treats \code{""}, \code{NA} and \code{character(0)} alike: no
@@ -30,6 +34,11 @@ what the "Show Row/Column Slice Titles" checkboxes are for.
 Typed text always wins: \code{Heatmap()} cannot draw a spanning title and slice
 titles at once, so the text replaces the group names (a single string spans
 every slice; a \verb{\%s} in it is filled in with each group's name).
+
+Typed text is always drawn as typed. On a split axis, \code{Heatmap()} evaluates a
+single title holding \code{{...}} or \verb{@\{...\}} as R code (with \code{glue::glue()} and
+\code{GetoptLong::qq()}), so such a title is passed once per slice instead, which
+it draws as given.
 }
 \author{
 Jared Andrews

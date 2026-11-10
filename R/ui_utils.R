@@ -248,12 +248,20 @@ show_input <- function(session, ids) {
 #'
 #' @return `NULL`, invisibly. Called for its side effect.
 #'
+#' @seealso [main_title_input_ids], [hide_input()], [show_input()], [add_plot_config()]
+#'
+#' @export
 #' @author Jared Andrews
-#' @rdname INTERNAL_toggle_facet_title_inputs
-#' @keywords internal
-.toggle_facet_title_inputs <- function(session, faceted, extra = NULL, hidden = NULL) {
+#' @examples
+#' \dontrun{
+#' # Inside a module server, whenever the facet choice changes:
+#' observe({
+#'     toggle_facet_title_inputs(session, faceted = nz_value(input$facet.by), hidden = hide.inputs)
+#' })
+#' }
+toggle_facet_title_inputs <- function(session, faceted, extra = NULL, hidden = NULL) {
     facet_ids <- c("facet.title.font.size", "facet.title.font.color", "facet.title.font.family", extra)
-    main_ids <- .main_title_input_ids
+    main_ids <- main_title_input_ids
 
     shown <- if (isTRUE(faceted)) facet_ids else main_ids
     hide_input(session, if (isTRUE(faceted)) main_ids else facet_ids)
@@ -262,8 +270,20 @@ show_input <- function(session, ids) {
     invisible(NULL)
 }
 
-# Inputs styling the main plot title, which a faceted plot does not draw.
-.main_title_input_ids <- c(
+#' Input IDs that style the main plot title
+#'
+#' The inputs a faceted plot has no use for, since [add_plot_config()] disables its
+#' main title. [toggle_facet_title_inputs()] hides them while a plot is faceted.
+#'
+#' @format A character vector of input IDs (without namespacing).
+#'
+#' @seealso [toggle_facet_title_inputs()]
+#'
+#' @export
+#' @author Jared Andrews
+#' @examples
+#' main_title_input_ids
+main_title_input_ids <- c(
     "title.font.family", "title.font.color", "title.font.size", "axis.title.horizontal.position"
 )
 
@@ -433,4 +453,39 @@ module_tack_ui <- function(ns, defaults = NULL) {
     # Carried on the tack rather than the module's UI as a whole, so a module
     # inserted into the Figure Builder at runtime brings the script with it.
     attachDependencies(ui, .source_export_dependency(), append = TRUE)
+}
+
+
+#' The "Plot with WebGL" toggle for a module's point layers
+#'
+#' On (the default), the plot's points switch to WebGL once there are enough of
+#' them (see [auto_webgl()]); off, they always stay SVG, so SVG downloads stay
+#' fully vector. Read it in the module's plot step with
+#' `!isFALSE(isolate_fn(input$webgl))`, so a client that has not reported it yet
+#' counts as on.
+#'
+#' @param ns The module's namespace function.
+#' @param defaults The module's `defaults`, whose `webgl` entry sets the value.
+#'
+#' @return A tooltipped checkbox input with id `webgl`.
+#'
+#' @seealso [auto_webgl()]
+#' @author Jared Andrews
+#' @export
+#' @examples
+#' webgl_input(shiny::NS("plot"))
+#' webgl_input(shiny::NS("plot"), defaults = list(webgl = FALSE))
+webgl_input <- function(ns, defaults = NULL) {
+    threshold <- format(.webgl_threshold(), big.mark = ",", scientific = FALSE)
+    tipify(
+        checkboxInput(ns("webgl"), "Plot with WebGL",
+            value = get_default(defaults, "webgl", TRUE, is.logical)
+        ),
+        paste0(
+            "Draw the points with WebGL once the plot has ", threshold, " or more, which is much ",
+            "faster with large data. In SVG downloads, WebGL points are an embedded image rather ",
+            "than vector shapes; turn this off for a fully vector file."
+        ),
+        placement = "top", options = list(container = "body")
+    )
 }

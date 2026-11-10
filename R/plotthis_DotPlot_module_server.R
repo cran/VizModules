@@ -29,7 +29,7 @@
 #' @author Jacob Martin, Jared Andrews
 plotthis_DotPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs = NULL, defaults = NULL) {
     stopifnot(is.reactive(data))
-    data <- .require_data_frame(data)
+    data <- require_data_frame(data)
 
 
     moduleServer(id, function(input, output, session) {
@@ -58,9 +58,10 @@ plotthis_DotPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs = NUL
         if (is.null(defaults[["margin.r"]])) defaults[["margin.r"]] <- 140
         # Reset functionality
         observeEvent(input$reset, {
+            updateCheckboxInput(session, "webgl", value = get_default(defaults, "webgl", TRUE, is.logical))
             char.choices <- c("", names(data())[vapply(data(), function(x) !is.numeric(x), logical(1))])
             num.choices <- c("", names(data())[vapply(data(), is.numeric, logical(1))])
-            palette_names <- names(.flatten_palette_options(default_palettes()[["choices"]]))
+            palette_names <- names(flatten_palette_options(default_palettes()[["choices"]]))
 
             # Data
             update_viz_select(session, "x.data",
@@ -141,46 +142,65 @@ plotthis_DotPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs = NUL
             reset_legend_inputs(session, defaults)
             updateNumericInput(session, "size.min", value = get_default(defaults, "size.min", 1, is.numeric))
             updateNumericInput(session, "size.max", value = get_default(defaults, "size.max", 6, is.numeric))
+            updateNumericInput(session, "size.scale.min",
+                value = get_default(defaults, "size.scale.min", NA, is.numeric)
+            )
+            updateNumericInput(session, "size.scale.max",
+                value = get_default(defaults, "size.scale.max", NA, is.numeric)
+            )
 
             # Plotly
             reset_plotly_inputs(session, defaults)
-            .reset_manual_edits(edit_store)
+            reset_manual_edits(edit_store)
 
             # Lines
             reset_lines_inputs(session, defaults = defaults)
         })
 
         observeEvent(input$facet.by, {
-            .toggle_facet_title_inputs(session, .nz_value(input$facet.by), hidden = hide.inputs)
+            toggle_facet_title_inputs(session, nz_value(input$facet.by), hidden = hide.inputs)
         })
 
         # The color-scale trimming controls only affect the continuous fill gradient,
         # so only expose them when a fill column is selected.
         observeEvent(input$fill.by, {
             fill.scale.inputs <- c("lower.quantile", "upper.quantile", "lower.cutoff", "upper.cutoff")
-            if (.nz_value(input$fill.by)) {
+            if (nz_value(input$fill.by)) {
                 show_input(session, fill.scale.inputs)
             } else {
                 hide_input(session, fill.scale.inputs)
             }
         }, ignoreInit = FALSE)
 
-        generate_DotPlot <- reactive({
-            isolate_fn <- setup_auto_update_logic(input, params)
+        # The size scale limits only apply to a Size By column; without one the
+        # dots size by count.
+        observeEvent(input$size.by, {
+            size.scale.inputs <- c("size.scale.min", "size.scale.max")
+            if (nz_value(input$size.by)) {
+                show_input(session, setdiff(size.scale.inputs, hide.inputs))
+            } else {
+                hide_input(session, size.scale.inputs)
+            }
+        }, ignoreInit = FALSE)
+
+        # The plot itself: everything that changes what is drawn. It is cached
+        # (see cached_structure()), so it reads every input through isolate_fn and
+        # has no side effects; the styling inputs are applied in generate_DotPlot().
+        draw_DotPlot <- function(isolate_fn) {
 
             # Null Values:
             facet.by <- NULL
-            if (.nz_value(isolate_fn(input$facet.by))) {
+            if (nz_value(isolate_fn(input$facet.by))) {
                 facet.by <- isolate_fn(input$facet.by)
             }
 
             size.by <- NULL
-            if (.nz_value(isolate_fn(input$size.by))) {
+            if (nz_value(isolate_fn(input$size.by))) {
                 size.by <- isolate_fn(input$size.by)
             }
 
             fill.by <- NULL
-            if (.nz_value(isolate_fn(input$fill.by))) {
+            if (nz_value(isolate_fn(input$fill.by))) {
                 fill.by <- isolate_fn(input$fill.by)
             }
 
@@ -193,13 +213,20 @@ plotthis_DotPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs = NUL
             }
 
             # Convert NA to NULL for facet.ncol and facet.nrow
-            facet.ncol <- .na_to_null(isolate_fn(input$facet.ncol))
-            facet.nrow <- .na_to_null(isolate_fn(input$facet.nrow))
+            facet.ncol <- na_to_null(isolate_fn(input$facet.ncol))
+            facet.nrow <- na_to_null(isolate_fn(input$facet.nrow))
 
             palette_arg <- isolate_fn(input$palette.name)
             if (is.null(palette_arg) || !nzchar(palette_arg)) palette_arg <- "Spectral"
 
             theme_args <- create_ggplot_axis_style(input, isolate_fn = isolate_fn)
+
+            # The value range the dot sizes span, resolved once so the plot and its
+            # size legend agree. Without a Size By column the dots size by count.
+            size.range <- .size_range(isolate_fn(input$size.min), isolate_fn(input$size.max))
+            size.limits <- if (!is.null(size.by)) {
+                .size_limits(data()[[size.by]], isolate_fn(input$size.scale.min), isolate_fn(input$size.scale.max))
+            }
 
             p <- DotPlot(
                 data(),
@@ -209,8 +236,8 @@ plotthis_DotPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs = NUL
                 size_by = size.by,
                 fill_by = fill.by,
                 fill_cutoff = fill.cutoff,
-                size_min = isolate_fn(input$size.min),
-                size_max = isolate_fn(input$size.max),
+                size_min = size.range[1],
+                size_max = size.range[2],
                 facet_by = facet.by,
                 facet_scales = isolate_fn(input$facet.scale),
                 facet_ncol = facet.ncol,
@@ -225,9 +252,14 @@ plotthis_DotPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs = NUL
                 border_size = isolate_fn(input$border.size),
                 lower_quantile = isolate_fn(input$lower.quantile),
                 upper_quantile = isolate_fn(input$upper.quantile),
-                lower_cutoff = .na_to_null(isolate_fn(input$lower.cutoff)),
-                upper_cutoff = .na_to_null(isolate_fn(input$upper.cutoff))
+                lower_cutoff = na_to_null(isolate_fn(input$lower.cutoff)),
+                upper_cutoff = na_to_null(isolate_fn(input$upper.cutoff))
             )
+            # plotthis spans its size scale over the data's range; this one spans
+            # the chosen limits, and draws values beyond them at the end sizes.
+            if (!is.null(size.limits)) {
+                p <- suppressMessages(p + .size_scale(size.range, size.limits))
+            }
             fig <- ggplotly(p)
 
             if (!is.null(facet.by) && nzchar(facet.by)) {
@@ -238,66 +270,40 @@ plotthis_DotPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs = NUL
                     nrow = facet.nrow
                 )
             }
-            fig <- apply_title_layout(fig, input, isolate_fn, title_y = 0.95, title_x = isolate_fn(input$axis.title.horizontal.position))
-
-            # Apply axis styling to all subplot axes (handles faceting)
-            xaxis_style <- create_axis_styles(input, axis_side = "x", isolate_fn = isolate_fn)
-            yaxis_style <- create_axis_styles(input, axis_side = "y", isolate_fn = isolate_fn)
-
-            fig <- apply_subplot_axis_styling(fig, xaxis_style, yaxis_style)
-
-            # Apply axis title font to shared facet annotation titles
-            if (!is.null(facet.by) && nzchar(facet.by)) {
-                fig <- apply_axis_title_to_annotations(fig, input, isolate_fn)
-            }
-
-            # Add reference lines
-            fig <- add_reference_lines(fig,
-                hline.intercepts = isolate_fn(input$hline.intercepts),
-                hline.colors = isolate_fn(input$hline.colors),
-                hline.widths = isolate_fn(input$hline.widths),
-                hline.linetypes = isolate_fn(input$hline.linetypes),
-                hline.opacities = isolate_fn(input$hline.opacities),
-                vline.intercepts = isolate_fn(input$vline.intercepts),
-                vline.colors = isolate_fn(input$vline.colors),
-                vline.widths = isolate_fn(input$vline.widths),
-                vline.linetypes = isolate_fn(input$vline.linetypes),
-                vline.opacities = isolate_fn(input$vline.opacities),
-                abline.slopes = isolate_fn(input$abline.slopes),
-                abline.intercepts = isolate_fn(input$abline.intercepts),
-                abline.colors = isolate_fn(input$abline.colors),
-                abline.widths = isolate_fn(input$abline.widths),
-                abline.linetypes = isolate_fn(input$abline.linetypes),
-                abline.opacities = isolate_fn(input$abline.opacities)
-            )
-
-            config_list <- add_plot_config(download.format = isolate_fn(input$download.format), include.modebar.buttons = TRUE, facet.by = facet.by)
-            fig <- do.call(config, c(list(p = fig), config_list))
-            fig <- apply_plotly_newshape(fig, input, isolate_fn)
-
             # Custom Legend:
-            # Generates a custom dot plot circle legend based on the number of values in size_values.
+            # Generates a custom dot plot circle legend spanning the size scale's limits.
             # Hiding the legend hides this one too.
-            fig <- .custom_legend(
+            fig <- add_size_legend(
                 fig,
                 data = data(),
-                size_by = if (isFALSE(isolate_fn(input$legend.show))) NULL else size.by,
+                size.by = if (isFALSE(isolate_fn(input$legend.show))) NULL else size.by,
+                limits = size.limits,
+                size.range = size.range,
                 gap = 0.04,
                 title.size = isolate_fn(input$legend.title.size),
                 text.size = isolate_fn(input$legend.text.size),
-                start_y = isolate_fn(input$size.legend.y),
-                start_x = isolate_fn(input$size.legend.x),
+                start.y = isolate_fn(input$size.legend.y),
+                start.x = isolate_fn(input$size.legend.x),
                 font.family = isolate_fn(input$legend.font.family),
                 font.color = isolate_fn(input$legend.font.color)
             )
 
-            # Apply the uniform legend visibility and font inputs
-            fig <- apply_legend_inputs(fig, input, isolate_fn)
+            # Many points draw far faster with WebGL (see auto_webgl()).
+            if (!isFALSE(isolate_fn(input$webgl))) {
+                fig <- auto_webgl(fig)
+            }
 
-            # Make single-panel x/y axis titles draggable (matches faceted behaviour)
-            fig <- axis_titles_as_annotations(fig)
+            list(fig = .ensure_built(fig), facet.by = facet.by)
+        }
+        base_DotPlot <- cached_structure(
+            draw_DotPlot, input, session, data, params = params
+        )
 
-            return(fig)
+        # The plot, styled: titles, fonts, axes, reference lines and legend.
+        generate_DotPlot <- reactive({
+            isolate_fn <- setup_auto_update_logic(input, params)
+            base <- base_DotPlot()
+            apply_uniform_styling(base$fig, input, isolate_fn, facet.by = base$facet.by, title_y = 0.95)
         })
 
         # Render the plot output

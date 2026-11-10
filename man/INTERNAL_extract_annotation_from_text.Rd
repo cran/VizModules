@@ -21,7 +21,8 @@ annotation field.
 \details{
 The hover text is expected to be in the format:
 "field1: value1\\nfield2: value2\\n..."
-or "field1 value1\\nfield2 value2\\n..."
+or "field1 value1\\nfield2 value2\\n...", with \verb{<br />} as the line break in
+the text of a \code{\link[plotly:ggplotly]{plotly::ggplotly()}} figure drawn with \code{tooltip = "text"}.
 }
 \author{
 Jared Andrews

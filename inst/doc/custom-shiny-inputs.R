@@ -104,6 +104,14 @@ knitr::include_graphics("../man/figures/multiDynamicInput.png")
 # )
 
 ## -----------------------------------------------------------------------------
+# row_spec = list(
+#     groups = list(type = "select", args = list(
+#         label = "Groups, in order", choices = c("setosa", "versicolor", "virginica"), multiple = TRUE
+#     ))
+# )
+# # elements = list(trajectories1 = list(groups = c("virginica", "setosa")))
+
+## -----------------------------------------------------------------------------
 # multiDynamicInput(
 #     "models",
 #     label = "Models",
@@ -142,4 +150,26 @@ knitr::include_graphics("../man/figures/multiDynamicInput.png")
 #     drc_fct    = list(type = "select", backend = "drm",
 #                       args = list(choices = c("LL.4", "LL.3")))
 # )
+
+## -----------------------------------------------------------------------------
+# ui <- fluidPage(
+#     selectInput("x", "X", c("department", "job_level")),
+#     level_order_input("x.order", "X Order",
+#         items = level_order_choices(example_demographics, "department")
+#     ),
+#     plotOutput("plot")
+# )
+# 
+# server <- function(input, output, session) {
+#     data <- reactive(example_demographics)
+#     # Refills the control when the column or data changes, and holds the order to draw.
+#     x.order <- setup_level_order(input, session, data, reactive(input$x))
+# 
+#     output$plot <- renderPlot({
+#         df <- apply_level_order(data(), input$x, x.order())
+#         boxplot(df$salary ~ df[[input$x]], xlab = input$x)
+#     })
+# }
+# 
+# shinyApp(ui, server)
 

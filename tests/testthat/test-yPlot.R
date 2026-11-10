@@ -22,6 +22,32 @@ test_that("yPlot UI exposes the hover and point annotation inputs", {
     expect_true(grepl("Hover Round Digits", html, fixed = TRUE))
 })
 
+test_that("yPlot Group, Color and Shape By leave out categoricals with too many levels", {
+    df <- data.frame(
+        val = seq_len(60),
+        id = paste0("gene", seq_len(60)),
+        grp = rep(c("a", "b", "c"), 20),
+        flag = rep(c(TRUE, FALSE), 30),
+        stringsAsFactors = FALSE
+    )
+    choices_of <- function(html, input) {
+        pat <- paste0("data-for=\"yplot-", input, "\">.*?</script>")
+        config <- regmatches(html, regexpr(pat, html))
+        jsonlite::fromJSON(sub("</script>$", "", sub("^data-for=\"[^\"]+\">", "", config)))$options$choices$value
+    }
+
+    html <- as.character(dittoViz_yPlotInputsUI("yplot", df))
+    for (input in c("group.by", "color.by", "shape.by")) {
+        ch <- choices_of(html, input)
+        expect_true(all(c("grp", "flag") %in% ch), info = input)
+        expect_false("id" %in% ch, info = input)
+    }
+
+    html <- as.character(dittoViz_yPlotInputsUI("yplot", df, defaults = list(group.by = "id")))
+    expect_true("id" %in% choices_of(html, "group.by"))
+    expect_false("id" %in% choices_of(html, "color.by"))
+})
+
 test_that("yPlot UI takes several Y variables, with limits spanning all of them", {
     df <- data.frame(
         num1 = c(1, 2, 3),
@@ -251,7 +277,7 @@ test_that("highlighting restyles only the jitter points that match", {
     fig <- fixture$fig
     before <- fig$x$data
 
-    out <- .apply_highlight_styling(
+    out <- apply_highlight_styling(
         fig,
         annotate.by = "lab",
         highlight_vals = c("cell1", "cell7"),
@@ -282,7 +308,7 @@ test_that("highlighting restyles only the jitter points that match", {
 test_that("auto-annotations label each highlighted jitter point where it is drawn", {
     fixture <- .yplot_jitter_fixture()
 
-    annos <- .create_highlight_annotations(
+    annos <- create_highlight_annotations(
         plot_data = fixture$df,
         fig = fixture$fig,
         annotate.by = "lab",
@@ -324,10 +350,10 @@ test_that("hand-selected and highlighted labels for the same point merge into on
     a <- list(x = 1, y = 2, text = "cell1")
     b <- list(x = 3, y = 4, text = "cell2")
 
-    expect_equal(.merge_annotation_sets(list(a), list(a)), list(a))
-    expect_equal(.merge_annotation_sets(list(a), list(b)), list(a, b))
-    expect_equal(.merge_annotation_sets(NULL, list(b)), list(b))
-    expect_equal(.merge_annotation_sets(list(a), NULL), list(a))
+    expect_equal(merge_annotation_sets(list(a), list(a)), list(a))
+    expect_equal(merge_annotation_sets(list(a), list(b)), list(a, b))
+    expect_equal(merge_annotation_sets(NULL, list(b)), list(b))
+    expect_equal(merge_annotation_sets(list(a), NULL), list(a))
 })
 
 test_that("selected points are labelled even after the jitter has been re-drawn", {
@@ -349,7 +375,7 @@ test_that("selected points are labelled even after the jitter has been re-drawn"
         y = trace$y[c(1, 3)]
     )
 
-    annos <- .create_selected_annotations(
+    annos <- create_selected_annotations(
         selected_data = selected,
         fig = fig,
         annotate.by = "lab",
@@ -373,7 +399,7 @@ test_that("selected points are labelled even after the jitter has been re-drawn"
 
 test_that("a fixed seed keeps jitter positions stable across rebuilds", {
     build <- function() {
-        .with_stable_seed(dittoViz::yPlot(
+        with_stable_seed(dittoViz::yPlot(
             data.frame(
                 grp = rep(c("A", "B"), each = 5),
                 val = as.numeric(1:10),
@@ -422,55 +448,6 @@ test_that("the y.min and y.max defaults seed the Y axis limits and survive start
 
 # --- Driving the module's own build ------------------------------------------
 
-# The plot output cannot be driven from testServer, but the reactive that builds
-# the figure can, given a complete set of inputs.
-.yplot_inputs <- function(...) {
-    base <- list(
-        var = "salary", group.by = "job_level", color.by = "", shape.by = "", split.by = "",
-        plots = c("boxplot", "jitter"), var.adjustment = "", var.adj.fxn = "",
-        y.min = NA, y.max = NA, auto.update = TRUE, update = 0,
-        multivar.aes = "split", multivar.split.dir = "col",
-        split.adjust = "fixed", split.ncol = NA, split.nrow = NA,
-        subplot.margin.x = 0.03, subplot.margin.y = 0.1,
-        do.raster = FALSE, raster.dpi = 600,
-        jitter.size = 1, jitter.width = 0.2, jitter.color = "#000000",
-        jitter.shape.legend.size = 5, jitter.shape.legend.show = TRUE,
-        boxplot.show.outliers = FALSE, boxplot.color = "#000000", boxplot.fill = TRUE,
-        boxplot.lineweight = 0.5, boxgap = 0.3, boxgroupgap = 0.2,
-        vlnplot.lineweight = 0.5, vlnplot.scaling = "area",
-        ridgeplot.lineweight = 0.5, ridgeplot.scale = 1.25, ridgeplot.ymax.expansion = NA,
-        ridgeplot.shape = "smooth", ridgeplot.bins = 30, ridgeplot.binwidth = NA,
-        hover.data = "", hover.round.digits = 5,
-        stats.enabled = FALSE, stat.test = "t.test", stat.p.adjust = "none",
-        stat.display = "p.adj", stat.sig.threshold = 0.05, stat.hide.ns = FALSE,
-        stat.paired = FALSE, stat.pairs = "", stat.per.facet = TRUE,
-        stat.bracket.style = "capped", stat.bracket.inset = 0.025,
-        stat.step.increase = 0.06, stat.text.bump = 0.04,
-        stat.line.color = "#000000", stat.line.width = 1,
-        annotate.by = "", highlight.points = "", highlight.auto.annotate = TRUE,
-        highlight.color = "#00FFF7", highlight.size = 7,
-        highlight.border.color = "#000000", highlight.border.width = 1,
-        annotation.color = "black", annotation.ax = 20, annotation.ay = -20,
-        annotation.size = 10, annotation.showarrow = TRUE,
-        annotation.arrowcolor = "black", annotation.arrowhead = 2, annotation.arrowwidth = 1.5,
-        download.format = "png", legend.title.size = 14, legend.text.size = 12,
-        title.font.size = 26, title.font.family = "Arial", title.font.color = "#000000",
-        axis.title.font.size = 18, axis.title.font.color = "#000000",
-        axis.title.font.family = "Arial", axis.title.horizontal.position = 0.5,
-        axis.showline = TRUE, axis.mirror = TRUE, show.grid.x = TRUE, show.grid.y = TRUE,
-        grid.color = "#CCCCCC", axis.linecolor = "black", axis.linewidth = 0.5,
-        axis.tickfont.size = 12, axis.tickfont.color = "black",
-        axis.tickfont.family = "Arial", axis.tickangle.x = 0, axis.tickangle.y = 0,
-        axis.ticks = "outside", axis.tickcolor = "black", axis.ticklen = 5,
-        axis.tickwidth = 1, facet.title.font.size = 14,
-        facet.title.font.color = "black", facet.title.font.family = "Arial",
-        hline.intercepts = "", vline.intercepts = "", abline.slopes = "", abline.intercepts = "",
-        shape.fill = "rgba(0, 0, 0, 0)", shape.line.color = "black", shape.line.width = 4,
-        shape.linetype = "solid", shape.opacity = 1,
-        margin.l = 80, margin.r = 80, margin.t = 80, margin.b = 80
-    )
-    utils::modifyList(base, list(...))
-}
 
 # Start the module on `inputs` and settle it. Selecting comparisons freezes
 # stat.pairs and repopulates it; the mock session never echoes that back, so the
@@ -505,7 +482,7 @@ test_that("significance brackets are tested on and drawn over the plotted values
 
                 # The tests ran on the values drawn, not the raw column: t-test
                 # p-values change under a rescaling or a log.
-                plotted <- VizModules:::.adjusted_values(df$salary, adj[1], adj[2])
+                plotted <- VizModules:::adjusted_values(df$salary, adj[1], adj[2])
                 stats_df <- last_stats_df()
                 for (i in seq_len(nrow(stats_df))) {
                     a <- plotted[as.character(df$job_level) == stats_df$group1[i]]
@@ -658,4 +635,26 @@ test_that("the Legend tab hides the legend and sets its font (#360, #362)", {
             }
         )
     }
+})
+
+test_that("the Group Order input sets the x order of the yPlot and its brackets", {
+    levels_rev <- rev(levels(example_demographics$job_level))
+    shiny::testServer(
+        dittoViz_yPlotServer,
+        args = list(id = "yplot", data = shiny::reactive(example_demographics)),
+        {
+            .yplot_settle(session, .yplot_inputs(stats.enabled = TRUE))
+            session$setInputs(x.order = levels_rev)
+            fig <- suppressWarnings(generate_yPlot())
+            expect_equal(.panel_x_orders(fig)[[1]], levels_rev)
+            expect_brackets_within_axes(fig, min.count = 3)
+            # The tests are drawn between the groups they compare.
+            stats_df <- last_stats_df()
+            pos <- function(g) match(g, levels_rev)
+            expected <- lapply(seq_len(nrow(stats_df)), function(i) {
+                as.numeric(sort(c(pos(stats_df$group1[i]), pos(stats_df$group2[i]))))
+            })
+            expect_setequal(.bracket_spans(fig), expected)
+        }
+    )
 })

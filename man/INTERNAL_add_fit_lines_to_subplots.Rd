@@ -15,7 +15,8 @@
   line_color = "#000000",
   fit_type = c("linear", "loess"),
   span = 0.75,
-  line_width = 3
+  line_width = 3,
+  show.legend = TRUE
 )
 }
 \arguments{
@@ -40,6 +41,10 @@
 \item{span}{Numeric. Span parameter for LOESS smoothing (ignored for linear).}
 
 \item{line_width}{Numeric. Width of the fit lines.}
+
+\item{show.legend}{Logical. Whether the lines get legend entries (one per
+line, not per panel). Without one, a group's line joins that group's
+\code{legendgroup}, so it hides and shows with the group's entry.}
 }
 \value{
 The modified plotly figure with fit lines added to all subplot panels.

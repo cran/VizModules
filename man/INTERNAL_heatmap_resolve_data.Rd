@@ -22,7 +22,7 @@ column matching the matrix's selected column names, for column
 annotations). This normalizes either shape to the list form.
 }
 \details{
-Deliberately does not use the shared \code{\link[=.require_data_frame]{.require_data_frame()}} — that helper
+Deliberately does not use the shared \code{\link[=require_data_frame]{require_data_frame()}} — that helper
 coerces its input straight to one data frame via \code{\link[=as.data.frame]{as.data.frame()}}, which
 would mangle the two-table list shape.
 

@@ -22,7 +22,7 @@ level of each supplied grouping column.
 }
 \details{
 Unlike the facet and grouping selectors this deliberately does not go through
-\code{\link[=.facet_check]{.facet_check()}}: samples are the unit of observation rather than a facet, so a
+\code{\link[=facet_check]{facet_check()}}: samples are the unit of observation rather than a facet, so a
 study with more than fifty of them is perfectly reasonable. Columns with a level
 for (nearly) every row are excluded instead, since a row identifier would give
 one observation per "sample" and so a frequency of 0 or 1 everywhere.

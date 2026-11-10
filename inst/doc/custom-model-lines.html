@@ -397,6 +397,12 @@ take the log twice. No model lines are drawn while
 toggles.</p>
 <p>You can add multiple rows — each draws its own line with independent
 settings.</p>
+<p>Model lines are left out of the legend unless <strong>Model Lines in
+Legend</strong> is on (<code>model.legend.show = TRUE</code> in
+<code>defaults</code>), which lists each custom model, and the linear
+model and best fit lines, by name. While it is off, a linear model or
+best fit line drawn for a <strong>Color By</strong> group hides and
+shows with that group’s legend entry.</p>
 </div>
 <div id="setting-defaults" class="section level2">
 <h2>Setting Defaults</h2>
@@ -532,9 +538,15 @@ function as the <code>drc_fct</code> argument.</p>
 <span id="cb4-10"><a href="#cb4-10" tabindex="-1"></a>))</span></code></pre></div>
 <p>No <code>fields</code> needed here because GAM complexity is
 expressed in the formula itself (<code>s()</code>, <code>te()</code>,
-etc.). Note: you’d need to add <code>&quot;s&quot;</code>, <code>&quot;te&quot;</code>, etc.
-to the formula whitelist, <code>.formula_allowed_calls()</code> in
-<code>R/parse_utils.R</code>, for this to work.</p>
+etc.). Note, though, that typed formulas are checked against a fixed
+allowlist of operators and transforms (<code>~</code>, <code>+</code>,
+<code>-</code>, <code>*</code>, <code>/</code>, <code>^</code>,
+<code>:</code>, <code>I()</code>, <code>log()</code>,
+<code>log2()</code>, <code>log10()</code>, <code>sqrt()</code>,
+<code>exp()</code>, <code>poly()</code>), and smooth terms such as
+<code>s()</code> and <code>te()</code> are not on it. Formulas using
+them are rejected, so this backend can currently only fit the parametric
+formulas the allowlist accepts (e.g. <code>y ~ poly(x, 2)</code>).</p>
 </div>
 </div>
 <div id="where-to-register-backends" class="section level2">

@@ -99,6 +99,9 @@
 #' @section Parameters controlling additional functionality:
 #' The following parameters implementing new functionality or controlling plotly-specific features are also available:
 #'
+#' - `x.order` - Order of the X values (UI: "X Order", drag and drop, default: the column's factor level order,
+#'   else sorted). As a default, a character vector of levels of `x.data`; levels it leaves out follow in their
+#'   default order. Not shown for an X with more than 20 values
 #' - `title.font.size` - Plot title font size (UI: "Title Size", default: 26)
 #' - `title.font.family` - Font family for title text (UI: "Title Font", default: "Arial")
 #' - `title.font.color` - Color for plot title (UI: "Title Color", default: "#000000")
@@ -120,6 +123,10 @@
 #' - `axis.tickcolor` - Color of tick marks (UI: "Tick mark color", default: "black")
 #' - `axis.ticklen` - Length of tick marks (UI: "Tick mark length", default: 5)
 #' - `axis.tickwidth` - Width of tick marks (UI: "Tick mark width", default: 1)
+#' - `axis.scientific` - Write numeric tick labels in scientific notation (UI: "Scientific Notation Ticks",
+#'   default: FALSE; when off they never switch to it). See [apply_tick_notation()]
+#' - `axis.padding.x` - Space between the data and the plot area's edges along X, as a fraction of the
+#'   data's extent at each end (UI: "X Axis Padding", default: NA = the plot's own). See [apply_axis_padding()]
 #' - `legend.show` - Show the legend and any colorbar (UI: "Show Legend", default: TRUE)
 #' - `legend.font.family` - Font family of the legend title and labels (UI: "Legend Font", default: "Arial")
 #' - `legend.font.color` - Font color of the legend title and labels (UI: "Legend Font Color", default: "#000000")
@@ -177,6 +184,12 @@ plotthis_BarPlotInputsUI <- function(id, data, defaults = NULL, title = NULL, co
     num.choices <- c("", names(data)[vapply(data, is.numeric, logical(1))])
     char.choices <- c("", names(data)[vapply(data, function(x) !is.numeric(x), logical(1))])
     numeric.data <- data[, vapply(data, is.numeric, logical(1)), drop = FALSE]
+    # Group By and Fill By leave out categoricals with too many levels to draw
+    # (an ID column asks for one bar segment per row), unless the caller asked
+    # for one. Fill By keeps numeric columns, which plotthis draws as a gradient.
+    group.choices <- c("", discrete_choices(data, keep = get_default(defaults, "group.by", NULL)))
+    fill.disc <- discrete_choices(data, keep = get_default(defaults, "fill.by", NULL))
+    fill.choices <- c("", names(data)[names(data) %in% c(num.choices, fill.disc)])
 
     # Axis range values
     if (length(num.choices) >= 2) {
@@ -211,20 +224,28 @@ plotthis_BarPlotInputsUI <- function(id, data, defaults = NULL, title = NULL, co
         choices = num.choices[nzchar(num.choices)]
         ), documentParameters$y, placement = "top", options = list(container = "body")),
         tipify(viz_select_input(ns("group.by"), "Group By",
-        selected = get_default(defaults, "group.by", char.choices[2],
-            function(x) x %in% c("", names(data))),
-        choices = c("", names(data))
+        selected = get_default(defaults, "group.by", group.choices[2],
+            function(x) x %in% group.choices),
+        choices = group.choices
         ), documentParameters$group_by, placement = "top", options = list(container = "body")),
         tipify(viz_select_input(ns("fill.by"), "Fill By",
-        selected = get_default(defaults, "fill.by", "", function(x) x == "" || x %in% names(data)),
-            choices = c("", names(data))),
-            documentParameters$fill_by, placement = "top", options = list(container = "body"))
+        selected = get_default(defaults, "fill.by", "", function(x) x %in% fill.choices),
+            choices = fill.choices),
+            documentParameters$fill_by, placement = "top", options = list(container = "body")),
+        level_order_input(ns("x.order"), "X Order",
+            items = level_order_choices(
+                data,
+                get_default(defaults, "x.data", char.choices[2], function(x) x %in% char.choices),
+                get_default(defaults, "x.order", NULL, is.character)
+            ),
+            tooltip = "Drag the X values into the order to plot them in. Not shown for an X with more than 20 values."
+        )
     ),
 
     "Facet" = tagList(
         tipify(viz_select_input(ns("facet.by"), "Facet By",
         selected = get_default(defaults, "facet.by", "", function(x) x == "" || x %in% char.choices),
-        choices = c("", .facet_check(data))
+        choices = c("", facet_check(data))
         ), documentParameters$facet_by, placement = "top", options = list(container = "body")),
         tipify(viz_select_input(ns("facet.scale"), "Facet Scale",
         selected = get_default(
@@ -242,7 +263,7 @@ plotthis_BarPlotInputsUI <- function(id, data, defaults = NULL, title = NULL, co
         tipify(materialSwitch(ns("facet.by.row"), "Facet by Row",
         value = get_default(defaults, "facet.by.row", TRUE, is.logical), status = "success"),
             documentParameters$facet_byrow, placement = "top", options = list(container = "body")),
-        .uniform_subplot_spacing_inputs_ui(ns, defaults)
+        uniform_subplot_spacing_inputs_ui(ns, defaults)
     ),
 
     "Aesthetics" = tagList(
@@ -288,7 +309,7 @@ plotthis_BarPlotInputsUI <- function(id, data, defaults = NULL, title = NULL, co
     "Legend" = uniform_legend_inputs_ui(ns, defaults),
 
     "Plotly" = uniform_plotly_inputs_ui(ns, defaults),
-    "Axes" = uniform_axes_inputs_ui(ns, defaults, include.rotate = TRUE),
+    "Axes" = uniform_axes_inputs_ui(ns, defaults, include.rotate = TRUE, include.padding = "x"),
     "Lines" = uniform_lines_inputs_ui(ns, defaults)
     )
 

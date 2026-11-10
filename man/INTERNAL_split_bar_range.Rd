@@ -4,7 +4,13 @@
 \alias{.split_bar_range}
 \title{Value-axis limits for a split bar plot}
 \usage{
-.split_bar_range(df, value_col, category_col, scale_factor = 1)
+.split_bar_range(
+  df,
+  value_col,
+  category_col,
+  scale_factor = 1,
+  facet_col = NULL
+)
 }
 \arguments{
 \item{df}{Data frame.}
@@ -14,6 +20,9 @@
 \item{category_col}{Name of the category column (the module's \code{y.data}).}
 
 \item{scale_factor}{Multiplier applied to the half-width for headroom.}
+
+\item{facet_col}{Name of the facet column, or \code{NULL}/\code{""} for none. Each
+panel stacks only its own rows.}
 }
 \value{
 \code{list(min = , max = )} with \code{min == -max}, or \code{NULL} when the columns
@@ -23,7 +32,8 @@ are missing or the value column is not numeric.
 A split bar plot draws each category's bars outward from zero, positives on
 one side and negatives on the other, stacking a category's bars on each side.
 The axis is symmetric, so its half-width has to clear the longest stack on
-either side: the largest absolute per-category sum of that side's values.
+either side: the largest absolute per-category sum of that side's values,
+within each facet panel when the plot is faceted.
 Summing signed values instead lets a long negative bar be cancelled by a short
 positive one, clipping it, and inverts the range when every value is negative.
 }

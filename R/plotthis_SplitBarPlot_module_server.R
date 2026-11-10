@@ -34,7 +34,7 @@
 #' @author Jacob Martin, Jared Andrews
 plotthis_SplitBarPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs = NULL, defaults = NULL) {
     stopifnot(is.reactive(data))
-    data <- .require_data_frame(data)
+    data <- require_data_frame(data)
 
     moduleServer(id, function(input, output, session) {
         params <- setup_reactive_defaults(defaults, input, session)
@@ -46,7 +46,7 @@ plotthis_SplitBarPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs 
         })
         # Symmetric value-axis limits wide enough for the longest bar on either side.
         axis_range <- reactive({
-            .split_bar_range(data(), input$x.data, input$y.data, axis_scale())
+            .split_bar_range(data(), input$x.data, input$y.data, axis_scale(), facet_col = input$facet.by)
         })
 
         # The limits the x.min/x.max controls are set to: axis_range(), unless
@@ -94,7 +94,7 @@ plotthis_SplitBarPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs 
 
         default_palette_name <- "dittoColors"
         default_gradient_palette <- "Spectral"
-        palette_lookup <- .flatten_palette_options(default_palettes()[["choices"]])
+        palette_lookup <- flatten_palette_options(default_palettes()[["choices"]])
         default_palette_values <- palette_lookup[[default_palette_name]]
         if (is.null(default_palette_values) || length(default_palette_values) == 0) {
             default_palette_values <- if (length(palette_lookup) > 0) palette_lookup[[1]] else character(0)
@@ -131,6 +131,17 @@ plotthis_SplitBarPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs 
         # Track initialization
         initialized <- reactiveVal(FALSE)
 
+        # What the plot actually draws with. The limits are pushed into the x.min and
+        # x.max controls below, which is a client round-trip; reading the store rather
+        # than the raw inputs means the plot draws once with new limits, and the echo
+        # of a limit just set costs no rebuild.
+        x_range_store <- setup_axis_range(input, session, min_key = "x.min", max_key = "x.max", params = params)
+        set_x_limits <- function(limits) {
+            x_range_store(list(min = limits$min, max = limits$max))
+            updateNumericInput(session, "x.max", value = limits$max)
+            updateNumericInput(session, "x.min", value = limits$min)
+        }
+
         # What the plot actually colours by. The picker is rebuilt whenever the group
         # set changes and is re-seeded from this same resolution, so the value it
         # then reports resolves to the palette already in use. A reactiveVal only
@@ -164,7 +175,7 @@ plotthis_SplitBarPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs 
 
                 initial_colors <- isolate(resolve_palette(
                     groups, input$palette.colours, default_palette_values,
-                    .default_group_colors(defaults, "palette.colours")
+                    default_group_colors(defaults, "palette.colours")
                 ))
 
                 # The picker is seeded with this, so it is also what the plot should be
@@ -196,13 +207,13 @@ plotthis_SplitBarPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs 
                 if (!is.null(input$x.data) && input$x.data != "") {
                     limits <- x_limits(axis_range())
                     if (!is.null(limits)) {
-                        updateNumericInput(session, "x.max", value = limits$max)
-                        updateNumericInput(session, "x.min", value = limits$min)
+                        set_x_limits(limits)
                         initialized(TRUE)
                     }
                 }
             }
-        })
+            # Just after setup_axis_range()'s observer and before the render.
+        }, priority = 999)
 
         # Auto-update x-axis range when relevant inputs change
         observe({
@@ -220,14 +231,13 @@ plotthis_SplitBarPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs 
             if (!is.null(input$auto.update) && input$auto.update) {
                 limits <- x_limits(x_range)
                 if (!is.null(limits)) {
-                    updateNumericInput(session, "x.max", value = limits$max)
-                    updateNumericInput(session, "x.min", value = limits$min)
+                    set_x_limits(limits)
                 }
             }
             if (!is.null(x_range)) {
-                updateSliderInput(session, "text.position", min = -x_range$max, max = x_range$max)
+                .update_text_position_slider(session, x_range$max)
             }
-        })
+        }, priority = 999)
 
         # Reset functionality
         observeEvent(input$reset, {
@@ -256,8 +266,12 @@ plotthis_SplitBarPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs 
             update_viz_select(session, "y.data",
                 selected = get_default(defaults, "y.data", char.choices[2], function(x) x %in% char.choices)
             )
+            # The capped Fill By pool the UI offers (see plotthis_SplitBarPlotInputsUI()),
+            # falling back to its first categorical column.
+            fill.disc <- discrete_choices(data(), keep = get_default(defaults, "fill.by", NULL))
+            fill.choices <- c("", names(data())[names(data()) %in% c(num.choices, fill.disc)])
             update_viz_select(session, "fill.by",
-                selected = get_default(defaults, "fill.by", char.choices[2], function(x) x %in% char.choices)
+                selected = get_default(defaults, "fill.by", c("", fill.disc)[2], function(x) x %in% fill.choices)
             )
 
             # Facet Section
@@ -303,8 +317,10 @@ plotthis_SplitBarPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs 
 
             # Axes
             updateMaterialSwitch(session, "rotate", value = get_default(defaults, "rotate", FALSE, is.logical))
-            updateNumericInput(session, "x.max", value = get_default(defaults, "x.max", max.x, is.numeric))
-            updateNumericInput(session, "x.min", value = get_default(defaults, "x.min", min.x, is.numeric))
+            set_x_limits(list(
+                min = get_default(defaults, "x.min", min.x, is.numeric),
+                max = get_default(defaults, "x.max", max.x, is.numeric)
+            ))
             updateNumericInput(session, "axis.title.font.size",
                 value = get_default(defaults, "axis.title.font.size", 18, is.numeric)
             )
@@ -317,16 +333,16 @@ plotthis_SplitBarPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs 
             update_viz_select(session, "gradient.palette",
                 selected = get_default(defaults, "gradient.palette", default_gradient_palette, is.character)
             )
-            .reset_group_colors(session, "palette.colours", defaults, palette_groups(), default_palette_values)
+            reset_group_colors(session, "palette.colours", defaults, palette_groups(), default_palette_values)
 
             reset_plotly_inputs(session, defaults)
-            .reset_manual_edits(edit_store)
+            reset_manual_edits(edit_store)
             reset_legend_inputs(session, defaults)
             reset_lines_inputs(session, defaults = defaults)
         })
 
-        # Update x-axis range when data columns or fill.by change (when auto-update is off)
-        observeEvent(list(input$x.data, input$y.data, input$fill.by), {
+        # Update x-axis range when data columns, fill.by, or facet.by change (when auto-update is off)
+        observeEvent(list(input$x.data, input$y.data, input$fill.by, input$facet.by), {
             req(input$x.data, input$y.data)
             req(input$x.data %in% names(data()))
             req(input$y.data %in% names(data()))
@@ -334,15 +350,14 @@ plotthis_SplitBarPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs 
             x_range <- axis_range()
             limits <- x_limits(x_range)
             if (!is.null(limits)) {
-                updateNumericInput(session, "x.max", value = limits$max)
-                updateNumericInput(session, "x.min", value = limits$min)
-                updateSliderInput(session, "text.position", min = -x_range$max, max = x_range$max)
+                set_x_limits(limits)
+                .update_text_position_slider(session, x_range$max)
             }
-        })
+        }, priority = 999)
 
 
         observeEvent(input$facet.by, {
-            .toggle_facet_title_inputs(session, .nz_value(input$facet.by), hidden = hide.inputs)
+            toggle_facet_title_inputs(session, nz_value(input$facet.by), hidden = hide.inputs)
         })
 
         # The color-scale trimming controls only affect a continuous fill gradient,
@@ -356,23 +371,27 @@ plotthis_SplitBarPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs 
             }
         }, ignoreInit = FALSE)
 
-        generate_SplitBarPlot <- reactive({
-            isolate_fn <- setup_auto_update_logic(input, params)
+        # The plot itself: everything that changes what is drawn. It is cached
+        # (see cached_structure()), so it reads every input through isolate_fn and
+        # has no side effects; the styling inputs are applied in generate_SplitBarPlot().
+        draw_SplitBarPlot <- function(isolate_fn) {
+            # Resolved server-side, so the echo of a limit just set costs no rebuild.
+            x.limits <- isolate_fn(x_range_store())
 
             # Null Values:
             facet.by <- NULL
-            if (.nz_value(isolate_fn(input$facet.by))) {
+            if (nz_value(isolate_fn(input$facet.by))) {
                 facet.by <- isolate_fn(input$facet.by)
             }
 
             fill.by <- NULL
-            if (.nz_value(isolate_fn(input$fill.by))) {
+            if (nz_value(isolate_fn(input$fill.by))) {
                 fill.by <- isolate_fn(input$fill.by)
             }
 
             # Convert NA to NULL for facet.ncol and facet.nrow
-            facet.ncol <- .na_to_null(isolate_fn(input$facet.ncol))
-            facet.nrow <- .na_to_null(isolate_fn(input$facet.nrow))
+            facet.ncol <- na_to_null(isolate_fn(input$facet.ncol))
+            facet.nrow <- na_to_null(isolate_fn(input$facet.nrow))
 
             # Determine palette/palcolor based on fill_by type
             palcolor_arg <- NULL
@@ -392,7 +411,7 @@ plotthis_SplitBarPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs 
                     isolate_fn(palette_groups()),
                     isolate_fn(palette_store()),
                     default_palette_values,
-                    .default_group_colors(defaults, "palette.colours")
+                    default_group_colors(defaults, "palette.colours")
                 )
                 if (!is.null(palette_values) && length(palette_values) > 0) {
                     palcolor_arg <- as.list(palette_values)
@@ -400,7 +419,7 @@ plotthis_SplitBarPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs 
             }
 
             alpha.by <- NULL
-            if (.nz_value(isolate_fn(input$alpha.by))) {
+            if (nz_value(isolate_fn(input$alpha.by))) {
                 alpha.by <- isolate_fn(input$alpha.by)
             }
 
@@ -424,8 +443,8 @@ plotthis_SplitBarPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs 
                 palcolor = palcolor_arg,
                 palette = palette_arg,
                 palreverse = isolate_fn(input$palreverse),
-                x_min = isolate_fn(input$x.min),
-                x_max = isolate_fn(input$x.max),
+                x_min = x.limits$min,
+                x_max = x.limits$max,
                 theme = "theme_this",
                 theme_args = theme_args,
                 alpha_by = alpha.by,
@@ -434,8 +453,8 @@ plotthis_SplitBarPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs 
                 bar_height = isolate_fn(input$bar.height),
                 lower_quantile = isolate_fn(input$lower.quantile),
                 upper_quantile = isolate_fn(input$upper.quantile),
-                lower_cutoff = .na_to_null(isolate_fn(input$lower.cutoff)),
-                upper_cutoff = .na_to_null(isolate_fn(input$upper.cutoff))
+                lower_cutoff = na_to_null(isolate_fn(input$lower.cutoff)),
+                upper_cutoff = na_to_null(isolate_fn(input$upper.cutoff))
             )
 
             y <- isolate_fn(input$y.data)
@@ -534,49 +553,20 @@ plotthis_SplitBarPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs 
                     nrow = facet.nrow
                 )
             }
-            fig <- apply_title_layout(fig, input, isolate_fn, title_y = 0.98, title_x = isolate_fn(input$axis.title.horizontal.position))
+            list(fig = .ensure_built(fig), facet.by = facet.by)
+        }
+        base_SplitBarPlot <- cached_structure(
+            draw_SplitBarPlot, input, session, data, params = params,
+            extra = function() list(palette_groups(), palette_store(), fill_by_is_numeric(), x_range_store())
+        )
 
-            # Apply axis styling to all subplot axes (handles faceting)
-            xaxis_style <- create_axis_styles(input, axis_side = "x", isolate_fn = isolate_fn)
-            yaxis_style <- create_axis_styles(input, axis_side = "y", isolate_fn = isolate_fn)
-
-            fig <- apply_subplot_axis_styling(fig, xaxis_style, yaxis_style)
-
-            # Apply axis title font to shared facet annotation titles
-            if (!is.null(facet.by) && nzchar(facet.by)) {
-                fig <- apply_axis_title_to_annotations(fig, input, isolate_fn)
-            }
-
-            # Add reference lines
-            fig <- add_reference_lines(fig,
-                hline.intercepts = isolate_fn(input$hline.intercepts),
-                hline.colors = isolate_fn(input$hline.colors),
-                hline.widths = isolate_fn(input$hline.widths),
-                hline.linetypes = isolate_fn(input$hline.linetypes),
-                hline.opacities = isolate_fn(input$hline.opacities),
-                vline.intercepts = isolate_fn(input$vline.intercepts),
-                vline.colors = isolate_fn(input$vline.colors),
-                vline.widths = isolate_fn(input$vline.widths),
-                vline.linetypes = isolate_fn(input$vline.linetypes),
-                vline.opacities = isolate_fn(input$vline.opacities),
-                abline.slopes = isolate_fn(input$abline.slopes),
-                abline.intercepts = isolate_fn(input$abline.intercepts),
-                abline.colors = isolate_fn(input$abline.colors),
-                abline.widths = isolate_fn(input$abline.widths),
-                abline.linetypes = isolate_fn(input$abline.linetypes),
-                abline.opacities = isolate_fn(input$abline.opacities)
+        # The plot, styled: titles, fonts, axes, reference lines and legend.
+        generate_SplitBarPlot <- reactive({
+            isolate_fn <- setup_auto_update_logic(input, params)
+            base <- base_SplitBarPlot()
+            apply_uniform_styling(base$fig, input, isolate_fn,
+                facet.by = base$facet.by, title_y = 0.98, padding.axes = "y"
             )
-
-            config_list <- add_plot_config(download.format = isolate_fn(input$download.format), include.modebar.buttons = TRUE, facet.by = facet.by)
-            fig <- do.call(config, c(list(p = fig), config_list))
-            fig <- apply_plotly_newshape(fig, input, isolate_fn)
-
-            # Apply the uniform legend visibility and font inputs
-            fig <- apply_legend_inputs(fig, input, isolate_fn)
-
-            # Make single-panel x/y axis titles draggable (matches faceted behaviour)
-            fig <- axis_titles_as_annotations(fig)
-            return(fig)
         })
 
         # Render the plot output
@@ -614,12 +604,47 @@ plotthis_SplitBarPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs 
 }
 
 
+#' Fit the Category Label Position slider to the value axis
+#'
+#' Sets the `text.position` slider to run from `-extent` to `extent` with a round step
+#' (a power of ten near a hundredth of the extent, no finer than 0.001), and rounds the
+#' ends to that step, so the slider shows tidy numbers instead of floating-point noise
+#' such as -0.8000000000000007.
+#'
+#' @param session The module's Shiny session.
+#' @param extent The largest absolute value on the value axis.
+#' @return Called for its side effect, the slider update.
+#' @author Jared Andrews
+#' @keywords internal
+#' @rdname INTERNAL_update_text_position_slider
+.update_text_position_slider <- function(session, extent) {
+    step <- .text_position_step(extent)
+    if (is.null(step)) {
+        return(invisible())
+    }
+    limit <- round(ceiling(round(extent / step, 6)) * step, 3)
+    updateSliderInput(session, "text.position", min = -limit, max = limit, step = step)
+}
+
+
+# The text.position slider's step for an axis reaching `extent`: a power of ten about
+# a hundredth of it, between 0.001 and 1e6. NULL when `extent` is not a positive number.
+.text_position_step <- function(extent) {
+    extent <- suppressWarnings(as.numeric(extent)[1])
+    if (length(extent) == 0 || !is.finite(extent) || extent <= 0) {
+        return(NULL)
+    }
+    10^min(max(floor(log10(extent / 100)), -3), 6)
+}
+
+
 #' Value-axis limits for a split bar plot
 #'
 #' A split bar plot draws each category's bars outward from zero, positives on
 #' one side and negatives on the other, stacking a category's bars on each side.
 #' The axis is symmetric, so its half-width has to clear the longest stack on
-#' either side: the largest absolute per-category sum of that side's values.
+#' either side: the largest absolute per-category sum of that side's values,
+#' within each facet panel when the plot is faceted.
 #' Summing signed values instead lets a long negative bar be cancelled by a short
 #' positive one, clipping it, and inverts the range when every value is negative.
 #'
@@ -627,6 +652,8 @@ plotthis_SplitBarPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs 
 #' @param value_col Name of the numeric value column (the module's `x.data`).
 #' @param category_col Name of the category column (the module's `y.data`).
 #' @param scale_factor Multiplier applied to the half-width for headroom.
+#' @param facet_col Name of the facet column, or `NULL`/`""` for none. Each
+#'   panel stacks only its own rows.
 #'
 #' @return `list(min = , max = )` with `min == -max`, or `NULL` when the columns
 #'   are missing or the value column is not numeric.
@@ -634,8 +661,8 @@ plotthis_SplitBarPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs 
 #' @author Jared Andrews
 #' @rdname INTERNAL_split_bar_range
 #' @keywords internal
-.split_bar_range <- function(df, value_col, category_col, scale_factor = 1) {
-    if (is.null(df) || !.nz_value(value_col) || !.nz_value(category_col) ||
+.split_bar_range <- function(df, value_col, category_col, scale_factor = 1, facet_col = NULL) {
+    if (is.null(df) || !nz_value(value_col) || !nz_value(category_col) ||
         !all(c(value_col, category_col) %in% names(df)) || !is.numeric(df[[value_col]])) {
         return(NULL)
     }
@@ -649,7 +676,11 @@ plotthis_SplitBarPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs 
         return(NULL)
     }
     side <- ifelse(v[keep] >= 0, "positive", "negative")
-    sums <- tapply(v[keep], list(as.character(df[[category_col]][keep]), side), sum)
+    keys <- list(as.character(df[[category_col]][keep]), side)
+    if (nz_value(facet_col) && facet_col %in% names(df)) {
+        keys <- c(keys, list(as.character(df[[facet_col]][keep])))
+    }
+    sums <- tapply(v[keep], keys, sum)
     extent <- suppressWarnings(max(abs(sums), na.rm = TRUE))
     if (!is.finite(extent) || extent == 0) {
         extent <- 1

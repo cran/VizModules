@@ -31,17 +31,20 @@
 #' controls functional for both categorical and continuous legends.
 #'
 #' @param fig A plotly figure object.
-#' @param title.size Numeric font size for the legend (or colorbar) title, or
-#'   `NULL` to leave unchanged.
+#' @param title.size Numeric font size for the legend (or colorbar) title, and
+#'   for the titles of a legend's sections (`legendgrouptitle`, such as the
+#'   colour and shape sections of a scatter plot mapping both), or `NULL` to
+#'   leave unchanged.
 #' @param text.size Numeric font size for the legend entry labels (or colorbar
 #'   tick labels), or `NULL` to leave unchanged.
 #' @param position Optional length-2 vector `c(x, xanchor)` placing the legend
 #'   horizontally, e.g. `c(1.02, "left")`. `NULL` (the default) leaves the
 #'   position unchanged.
-#' @param font.family Character font family for the legend title and entry
-#'   labels (and colorbar title and ticks), or `NULL` to leave unchanged.
-#' @param font.color Character color for the legend title and entry labels (and
-#'   colorbar title and ticks), or `NULL` to leave unchanged.
+#' @param font.family Character font family for the legend title, section
+#'   titles and entry labels (and colorbar title and ticks), or `NULL` to leave
+#'   unchanged.
+#' @param font.color Character color for the legend title, section titles and
+#'   entry labels (and colorbar title and ticks), or `NULL` to leave unchanged.
 #' @param show Logical. `FALSE` hides the legend and every colorbar; `TRUE` or
 #'   `NULL` (the default) leave their visibility unchanged.
 #' @return The plotly figure with the requested legend styling applied.
@@ -100,6 +103,8 @@ apply_legend_styling <- function(fig, title.size = NULL, text.size = NULL, posit
     }
     if (length(title_font) > 0L) {
         legend_args$title <- list(font = title_font)
+        # The titles of a legend's sections (see split_color_shape_legend()).
+        legend_args$grouptitlefont <- title_font
     }
 
     if (!is.null(position)) {
@@ -139,7 +144,7 @@ apply_legend_styling <- function(fig, title.size = NULL, text.size = NULL, posit
     # does not hide one, and ggplotly draws each on a dummy trace of its own.
     draws_colorbar <- function(x) is.list(x) && (!is.null(x$colorbar) || isTRUE(x$showscale))
 
-    fig <- plotly::plotly_build(fig)
+    fig <- .ensure_built(fig)
 
     traces <- fig$x$data
     if (!is.null(traces) && length(traces) > 0L) {
@@ -189,6 +194,8 @@ apply_legend_styling <- function(fig, title.size = NULL, text.size = NULL, posit
 #' @param input Shiny input object (or a list) containing the legend fields.
 #' @param isolate_fn Function to isolate reactive values. Defaults to
 #'   `shiny::isolate`.
+#' @param position Passed to [apply_legend_styling()]; `NULL` keeps the legend
+#'   where it is.
 #'
 #' @return The plotly figure with the legend inputs applied.
 #'
@@ -205,11 +212,12 @@ apply_legend_styling <- function(fig, title.size = NULL, text.size = NULL, posit
 #'     legend.title.size = 16, legend.text.size = 12
 #' )
 #' apply_legend_inputs(fig, legend_input, isolate_fn = identity)
-apply_legend_inputs <- function(fig, input, isolate_fn = isolate) {
+apply_legend_inputs <- function(fig, input, isolate_fn = isolate, position = NULL) {
     apply_legend_styling(
         fig,
         title.size = isolate_fn(input$legend.title.size),
         text.size = isolate_fn(input$legend.text.size),
+        position = position,
         font.family = isolate_fn(input$legend.font.family),
         font.color = isolate_fn(input$legend.font.color),
         show = isolate_fn(input$legend.show)
@@ -240,7 +248,8 @@ apply_legend_inputs <- function(fig, input, isolate_fn = isolate) {
     stopifnot("plotly" %in% class(fig))
     for (i in seq_along(fig$x$data)) {
         fig_data <- fig$x$data[[i]]
-        if (!is.null(fig_data$type) && fig_data$type == "scatter" && !is.null(fig_data$mode) && fig_data$mode == "markers") {
+        # Points drawn with WebGL (see auto_webgl()) are scattergl traces.
+        if (isTRUE(fig_data$type %in% c("scatter", "scattergl")) && identical(fig_data$mode, "markers")) {
             fig_data$showlegend <- FALSE
         }
         fig$x$data[[i]] <- fig_data
@@ -249,39 +258,254 @@ apply_legend_inputs <- function(fig, input, isolate_fn = isolate) {
 }
 
 
-#' Add a custom bubble-size legend to a plotly figure
+#' Give a plot's colour and shape their own legend sections
 #'
-#' Renders a manual size legend as a vertical column of HTML circle
-#' annotations alongside matching numeric labels. The legend is placed
-#' outside the right edge of the plot area using paper-referenced
-#' coordinates so it does not overlap data.
+#' A ggplot mapping both colour and shape to discrete columns has two legends,
+#' but [plotly::ggplotly()] merges them into one with an entry per combination,
+#' named `"(colour,shape)"` under a `"colour<br />shape"` title. This draws them
+#' as ggplot2 does instead: one legend in two titled sections, an entry per
+#' colour level and one per shape level (in black, as ggplot2 draws shape keys).
+#' Clicking an entry hides or shows every trace of its level, and
+#' double-clicking one shows only its level (`inst/src/legendSections.js`).
+#'
+#' The point traces drawn for each combination are kept, out of the legend and
+#' tagged with their levels (in `meta`). A trace drawn for a colour alone, such
+#' as a yPlot's boxes (`"(colour,1)"`, ggplot's placeholder shape for them),
+#' becomes its level's colour entry; a level without one gets a data-less
+#' legend-only trace, as does every shape level. Those are appended after the
+#' existing traces, so no trace's index (a selection's curve number) moves.
+#' Traces grouped under a colour level by name (the scatter plot's marginals)
+#' are hidden and shown with it.
+#'
+#' @param fig A built plotly figure.
+#' @param color.levels,shape.levels The colour and shape levels as plotted.
+#' @param color.title,shape.title The sections' titles. `NULL` takes each from
+#'   the legend title ggplotly wrote.
+#' @param marker.size The size, in px, of the entries' markers.
+#'
+#' @return The figure, unchanged when no trace is drawn for a combination of a
+#'   colour and a shape level.
+#'
+#' @seealso [apply_legend_styling()], whose title fonts style the section titles.
+#' @author Jared Andrews
+#' @export
+#' @examples
+#' d <- transform(mtcars, am = factor(am), vs = factor(vs))
+#' p <- ggplot2::ggplot(d, ggplot2::aes(wt, mpg, colour = am, shape = vs)) +
+#'     ggplot2::geom_point()
+#' fig <- plotly::plotly_build(plotly::ggplotly(p))
+#' fig <- split_color_shape_legend(fig, levels(d$am), levels(d$vs))
+split_color_shape_legend <- function(fig, color.levels, shape.levels,
+                                     color.title = NULL, shape.title = NULL, marker.size = 8) {
+    traces <- fig$x$data
+    color.levels <- unique(as.character(color.levels))
+    shape.levels <- unique(as.character(shape.levels))
+    if (!length(traces) || !length(color.levels) || !length(shape.levels)) {
+        return(fig)
+    }
+
+    # The colour level a "(colour,...)" name starts with, and the rest. Longest
+    # first, so a level that is a prefix of another (or holds a comma) is not
+    # taken for it.
+    by_length <- color.levels[order(-nchar(color.levels))]
+    parse_name <- function(name) {
+        if (!is.character(name) || length(name) != 1L || !startsWith(name, "(") || !endsWith(name, ")")) {
+            return(NULL)
+        }
+        inner <- substr(name, 2L, nchar(name) - 1L)
+        for (level in by_length) {
+            prefix <- paste0(level, ",")
+            if (startsWith(inner, prefix)) {
+                return(list(color = level, rest = substring(inner, nchar(prefix) + 1L)))
+            }
+        }
+        NULL
+    }
+    is_points <- function(tr) {
+        mode <- tr$mode %||% ""
+        isTRUE(tr$type %in% c("scatter", "scattergl")) && grepl("markers", mode, fixed = TRUE) &&
+            !grepl("lines", mode, fixed = TRUE)
+    }
+
+    tags <- vector("list", length(traces))
+    for (i in seq_along(traces)) {
+        parsed <- parse_name(traces[[i]]$name)
+        if (is.null(parsed)) {
+            next
+        }
+        tags[[i]] <- if (is_points(traces[[i]]) && parsed$rest %in% shape.levels) {
+            list(color = parsed$color, shape = parsed$rest)
+        } else {
+            list(color = parsed$color)
+        }
+    }
+    combos <- which(vapply(tags, function(t) !is.null(t$shape), logical(1)))
+    if (!length(combos)) {
+        return(fig)
+    }
+    for (i in which(vapply(tags, is.null, logical(1)))) {
+        group <- traces[[i]]$legendgroup
+        if (is.character(group) && length(group) == 1L && group %in% color.levels) {
+            tags[[i]] <- list(color = group, grouped = TRUE)
+        }
+    }
+
+    # Titles: ggplotly's "colour<br />shape".
+    parts <- strsplit(as.character(fig$x$layout$legend$title$text %||% ""), "<br\\s*/?>")[[1]]
+    color.title <- color.title %||% (if (length(parts) >= 1L) parts[1]) %||% ""
+    shape.title <- shape.title %||% (if (length(parts) >= 2L) parts[2]) %||% ""
+    if (!is.null(fig$x$layout$legend$title)) {
+        fig$x$layout$legend$title$text <- ""
+    }
+
+    color_group <- "vizmodules-color"
+    shape_group <- "vizmodules-shape"
+    # Ranks put the colour section first, each in level order.
+    color_rank <- function(level) match(level, color.levels)
+    shape_rank <- function(level) length(color.levels) + match(level, shape.levels)
+    entry_of <- setNames(rep(NA_integer_, length(color.levels)), color.levels)
+
+    for (i in which(!vapply(tags, is.null, logical(1)))) {
+        tag <- tags[[i]]
+        tr <- fig$x$data[[i]]
+        if (!is.null(tag$shape)) {
+            tr$showlegend <- FALSE
+        } else if (!isTRUE(tag$grouped)) {
+            # Drawn for a colour alone: named for it, and its first legend entry is
+            # the level's.
+            tr$name <- tag$color
+            tr$legendgroup <- color_group
+            if (is.na(entry_of[[tag$color]]) && !isFALSE(tr$showlegend)) {
+                entry_of[[tag$color]] <- i
+                tag$entry <- "color"
+                tr$legendgrouptitle <- list(text = color.title)
+                tr$legendrank <- color_rank(tag$color)
+            } else {
+                tr$showlegend <- FALSE
+            }
+        }
+        tag$grouped <- NULL
+        tr$meta <- c(if (is.list(tr$meta)) tr$meta, list(vizmodules_legend = tag))
+        fig$x$data[[i]] <- tr
+    }
+
+    # Entries for the levels no trace stands for, on the plot's first panel.
+    first <- traces[[combos[1]]]
+    entry <- function(name, group, title, rank, marker, tag) {
+        list(
+            type = "scatter", mode = "markers", x = list(NA), y = list(NA),
+            xaxis = first$xaxis %||% "x", yaxis = first$yaxis %||% "y",
+            name = name, legendgroup = group, legendgrouptitle = list(text = title),
+            legendrank = rank, showlegend = TRUE, hoverinfo = "skip",
+            marker = c(marker, list(size = marker.size)),
+            meta = list(vizmodules_legend = tag)
+        )
+    }
+    single <- function(x) if (is.character(x) && length(x) >= 1L) x[[1]] else NULL
+    combo_for <- function(field, level) {
+        combos[vapply(combos, function(i) identical(tags[[i]][[field]], level), logical(1))][1]
+    }
+    added <- list()
+    for (level in color.levels[is.na(entry_of)]) {
+        i <- combo_for("color", level)
+        if (is.na(i)) {
+            next
+        }
+        marker <- traces[[i]]$marker
+        color <- single(marker$color)
+        if (is.null(color) || identical(color, "transparent")) {
+            color <- single(marker$line$color) %||% "#000000"
+        }
+        added[[length(added) + 1L]] <- entry(
+            level, color_group, color.title, color_rank(level),
+            list(symbol = "circle", color = color, line = list(width = 0)),
+            list(entry = "color", color = level)
+        )
+    }
+    for (level in shape.levels) {
+        i <- combo_for("shape", level)
+        if (is.na(i)) {
+            next
+        }
+        marker <- traces[[i]]$marker
+        # A shape drawn without a fill (ggplot's 21-25 with no fill) keeps none.
+        fill <- if (identical(single(marker$color), "transparent")) "transparent" else "#000000"
+        added[[length(added) + 1L]] <- entry(
+            level, shape_group, shape.title, shape_rank(level),
+            list(
+                symbol = single(marker$symbol) %||% "circle", color = fill,
+                line = list(color = "#000000", width = marker$line$width %||% 1)
+            ),
+            list(entry = "shape", shape = level)
+        )
+    }
+    fig$x$data <- c(fig$x$data, added)
+
+    fig$dependencies <- c(fig$dependencies, list(htmlDependency(
+        name = "vizmodules-legend-sections",
+        version = as.character(utils::packageVersion("VizModules")),
+        src = "src",
+        package = "VizModules",
+        script = "legendSections.js"
+    )))
+    htmlwidgets::onRender(fig, htmlwidgets::JS(
+        "function(el) { if (window.VizModulesLegend) { window.VizModulesLegend.attach(el); } }"
+    ))
+}
+
+
+#' Add a point-size legend to a plotly figure
+#'
+#' plotly drops the size legend when marker size encodes a numeric column
+#' (plotly.R#705), whether the figure comes from [plotly::ggplotly()] or is
+#' built by hand. This draws one in its place: a vertical column of circles
+#' with numeric labels, outside the right edge of the plot area in
+#' paper-referenced coordinates so it does not overlap the data. The breaks run
+#' evenly across the size scale's `limits`, and each circle is drawn at the size
+#' the scale gives its value, so the legend follows the plot's size scaling. The
+#' DotPlot and scatter plot modules use it, and a module in another package can
+#' too.
+#'
+#' For a ggplot drawn with `scale_size(range = r, limits = l)`, pass
+#' `size.range = r` and `limits = l`. Without `size.range`, the circles are read
+#' from the figure's own markers instead, taking its smallest and largest to be
+#' the data's minimum and maximum.
+#'
+#' Call it after the figure's traces are complete. It builds the figure and
+#' appends its annotations to the built layout, so later
+#' [plotly::plotly_build()] calls (e.g. [apply_legend_inputs()] or
+#' [axis_titles_as_annotations()]) do not duplicate them. A module hiding its
+#' legend should pass `size.by = NULL`.
 #'
 #' @param fig A plotly figure object.
 #' @param data A data frame containing the variable mapped to point size.
-#' @param size_by Character string, or `NULL`. Name of the column in
+#' @param size.by Character string, or `NULL`. Name of the column in
 #'   `data` whose range determines the legend break labels. When `NULL`
 #'   or empty (no size mapping is in effect), the figure is returned unchanged.
 #' @param gap Numeric. Vertical spacing (in paper units, 0–1) between
-#'   consecutive legend entries. Defaults to `0.03`.
-#' @param size_values Numeric vector of font sizes (px) used to render the
+#'   consecutive legend entries. Defaults to `0.05`.
+#' @param size.values Numeric vector of font sizes (px) used to render the
 #'   circle glyphs, one per legend entry. When `NULL` (the default), the
-#'   glyph sizes are derived from the actual marker sizes in `fig` so the
-#'   legend reflects the plot's size scaling (i.e. the `size_min`/
-#'   `size_max` passed to the plot function); the marker pixel diameters
-#'   are converted to glyph font-sizes via `.CIRCLE_GLYPH_DIAMETER_RATIO`
-#'   so the rendered circles match the plotted dots. When supplied, the vector
-#'   is used verbatim as font sizes and its length determines the number of
-#'   legend entries.
+#'   glyph sizes follow the plot's size scaling: from `size.range` when it is
+#'   given, otherwise from the marker sizes in `fig`. The marker pixel
+#'   diameters are converted to glyph font-sizes via
+#'   `.CIRCLE_GLYPH_DIAMETER_RATIO` so the rendered circles match the plotted
+#'   dots. When supplied, the vector is used verbatim as font sizes and its
+#'   length determines the number of legend entries.
+#' @param title Character. Legend title. Defaults to `size.by`.
+#' @param digits Integer, or `NULL`. Decimal places the break labels are
+#'   rounded to. When `NULL` (the default), the break values are printed as
+#'   they are.
 #' @param title.size Numeric, or `NULL`. Font size (px) of the legend
 #'   title annotation. When `NULL`, plotly's default is used.
 #' @param text.size Numeric, or `NULL`. Font size (px) of the numeric
 #'   label annotations. Defaults to `12` when `NULL`.
-#' @param start_y Numeric. Paper-space y coordinate (0–1) at which the legend
+#' @param start.y Numeric. Paper-space y coordinate (0–1) at which the legend
 #'   column begins; the title sits just above it and subsequent entries stack
 #'   downward. Lower it to vertically offset the size legend from an overlapping
 #'   color/shape legend. Invalid values fall back to the default. Defaults to
 #'   `0.95`.
-#' @param start_x Numeric. Paper-space x coordinate at which the legend column
+#' @param start.x Numeric. Paper-space x coordinate at which the legend column
 #'   (circles, labels and title) is anchored. Values just above `1` place
 #'   the legend to the right of the plot area; nudge it lower to pull the whole
 #'   set inward when it would otherwise overflow a narrow plot, or higher to push
@@ -290,45 +514,81 @@ apply_legend_inputs <- function(fig, input, isolate_fn = isolate) {
 #'   annotations. When `NULL`, plotly's default is used.
 #' @param font.color Character, or `NULL`. Font color of the title and label
 #'   annotations. Defaults to `"#000000"` when `NULL`. The circles stay black.
+#' @param limits Numeric length-2 vector, or `NULL`. The `size.by` values drawn
+#'   at the smallest and largest sizes, as given to the plot's size scale. The
+#'   breaks run evenly between them. A `NA` end takes the data's minimum or
+#'   maximum, and limits that are not in increasing order fall back to the
+#'   data's range. Defaults to `NULL`, the data's range.
+#' @param size.range Numeric length-2 vector, or `NULL`. The size range the
+#'   plot's size scale maps `limits` onto, in ggplot2 size units (the `range`
+#'   of [ggplot2::scale_size()]). When given, each circle is drawn at the size
+#'   the scale gives its break. When `NULL` (the default), the circles are read
+#'   from the marker sizes in `fig`.
+#' @param breaks Numeric vector, or `NULL`. The `size.by` values to draw a circle
+#'   for, in place of five spaced evenly between the limits. Values outside the
+#'   limits are dropped. Useful for round labels, or to leave out the lower limit
+#'   of a scale whose `size.range` starts at 0, which would draw an empty circle.
+#'   When `size.values` is also given, it is recycled to one glyph size per break.
+#'   Defaults to `NULL`.
 #'
-#' @return The plotly figure with size-legend annotations appended, or the
-#'   unmodified figure when `size_by` is `NULL`/empty or not present
-#'   in `data`.
+#' @return The built plotly figure with size-legend annotations appended, or
+#'   the unmodified figure when `size.by` is `NULL`/empty, not present in
+#'   `data`, not numeric, or has no finite values.
 #'
-#' @author Jacob Martin
-#' @keywords internal
-#' @rdname INTERNAL_custom_legend
-.custom_legend <- function(fig, data, size_by, gap = 0.05, size_values = NULL,
-                           title.size = NULL, text.size = NULL, start_y = 0.95,
-                           start_x = 1.02, font.family = NULL, font.color = NULL) {
+#' @export
+#' @author Jacob Martin, Jared Andrews
+#' @examples
+#' library(plotly)
+#' df <- data.frame(x = 1:5, y = c(2, 4, 3, 5, 1), n = c(10, 40, 25, 80, 55))
+#' fig <- plot_ly(df, x = ~x, y = ~y, type = "scatter", mode = "markers",
+#'     marker = list(size = sqrt(df$n) * 3))
+#' add_size_legend(fig, df, size.by = "n", title = "Count", digits = 0)
+#'
+#' # A ggplot with a fixed size scale: the legend runs 0, 25, ..., 100.
+#' library(ggplot2)
+#' p <- ggplot(df, aes(x, y, size = n)) +
+#'     geom_point() +
+#'     scale_size(range = c(2, 8), limits = c(0, 100))
+#' add_size_legend(ggplotly(p), df, size.by = "n", limits = c(0, 100), size.range = c(2, 8))
+add_size_legend <- function(fig, data, size.by, gap = 0.05, size.values = NULL, title = size.by,
+                            digits = NULL, title.size = NULL, text.size = NULL, start.y = 0.95,
+                            start.x = 1.02, font.family = NULL, font.color = NULL,
+                            limits = NULL, size.range = NULL, breaks = NULL) {
     # No size mapping -> nothing to draw, return the figure untouched.
-    if (is.null(size_by) || !is.character(size_by) || length(size_by) != 1 ||
-        !nzchar(size_by) || !size_by %in% names(data)) {
+    if (is.null(size.by) || !is.character(size.by) || length(size.by) != 1 ||
+        !nzchar(size.by) || !size.by %in% names(data)) {
         return(fig)
     }
 
-    vals <- data[[size_by]]
-    if (!is.numeric(vals) || all(is.na(vals))) {
+    vals <- data[[size.by]]
+    if (!is.numeric(vals) || !any(is.finite(vals))) {
         return(fig)
     }
 
     valid_size <- function(s) is.numeric(s) && length(s) == 1L && !is.na(s)
 
-    if (!valid_size(start_x)) {
-        start_x <- 1.02
+    if (!valid_size(start.x)) {
+        start.x <- 1.02
     }
 
-    if (!valid_size(start_y)) {
-        start_y <- 0.95
+    if (!valid_size(start.y)) {
+        start.y <- 0.95
     }
 
-    n_breaks <- if (!is.null(size_values)) length(size_values) else 5L
-    breaks <- seq(
-        from = min(vals, na.rm = TRUE),
-        to = max(vals, na.rm = TRUE),
-        length.out = n_breaks
-    )
-    labels <- format(breaks, trim = TRUE, scientific = FALSE)
+    lims <- .size_limits(vals, limits[1], limits[2])
+    # Caller-chosen breaks, kept within the limits; without any, five run evenly
+    # between them (or one per size.values glyph).
+    breaks <- if (is.numeric(breaks)) breaks[is.finite(breaks) & breaks >= lims[1] & breaks <= lims[2]] else numeric(0)
+    breaks <- sort(unique(breaks))
+    if (length(breaks) == 0) {
+        n_breaks <- if (!is.null(size.values)) length(size.values) else 5L
+        breaks <- seq(from = lims[1], to = lims[2], length.out = n_breaks)
+    }
+    n_breaks <- length(breaks)
+    if (!is.null(size.values) && length(size.values) != n_breaks) {
+        size.values <- rep_len(size.values, n_breaks)
+    }
+    labels <- format(if (valid_size(digits)) round(breaks, digits) else breaks, trim = TRUE, scientific = FALSE)
 
     # Build the figure once up front. This consolidates marker attributes (so
     # marker sizes can be read back) and, crucially, lets us append the legend
@@ -336,32 +596,43 @@ apply_legend_inputs <- function(fig, input, isolate_fn = isolate) {
     # instead would defer the annotations into layoutAttrs, which any later
     # plotly_build() call (e.g. apply_legend_styling(),
     # axis_titles_as_annotations()) re-merges, duplicating every annotation.
-    fig <- plotly::plotly_build(fig)
+    fig <- .ensure_built(fig)
 
-    # Derive the circle glyph sizes from the plot's actual marker sizes so the
-    # legend matches the size scaling produced by size_min/size_max. The marker
-    # sizes already encode the area-based scale, so the smallest/largest markers
-    # anchor the smallest/largest legend entries and the intermediate breaks
-    # follow ggplot2's sqrt (area) interpolation (plotthis uses
-    # scale_size(range = c(size_min, size_max)), i.e. area scaling).
-    if (is.null(size_values)) {
-        marker_sizes <- .extract_marker_sizes(fig)
-        if (length(marker_sizes) > 0) {
+    # Size each circle as the plot sizes its break, on ggplot2's area scale
+    # (scale_size(), which plotthis and dittoViz both use): from the scale's own
+    # range when the caller gives it, otherwise from the figure's markers.
+    if (is.null(size.values)) {
+        range_known <- is.numeric(size.range) && length(size.range) == 2L && all(is.finite(size.range))
+        marker_sizes <- if (range_known) numeric(0) else .extract_marker_sizes(fig)
+        break_diameters <- if (range_known) {
+            .size_scale_px(breaks, size.range, lims)
+        } else if (length(marker_sizes) > 0) {
+            # The smallest and largest markers are the data's extremes, which sit
+            # inside the limits when those are wider than the data. Diameter is
+            # linear in the square root of a value's position within the limits,
+            # so the breaks are placed on that line.
             d_min <- min(marker_sizes)
             d_max <- max(marker_sizes)
-            frac <- if (n_breaks > 1L) seq(0, 1, length.out = n_breaks) else 0
-            # Break diameters (px) along ggplot2's area (sqrt) size scale.
-            break_diameters <- d_min + (d_max - d_min) * sqrt(frac)
-            # A plotly marker's `size` is its diameter in px, but the HTML circle
-            # glyph (U+25CF) only inks ~0.44x its font-size. Scale the font-size
-            # up so the legend glyphs render at the plotted marker diameters.
-            size_values <- break_diameters / .CIRCLE_GLYPH_DIAMETER_RATIO
+            ends <- .size_scale_position(range(vals[is.finite(vals)]), lims)
+            pos <- .size_scale_position(breaks, lims)
+            if (ends[2] > ends[1]) {
+                pmax(0, d_min + (d_max - d_min) * (pos - ends[1]) / (ends[2] - ends[1]))
+            } else {
+                frac <- if (n_breaks > 1L) seq(0, 1, length.out = n_breaks) else 0
+                d_min + (d_max - d_min) * sqrt(frac)
+            }
+        }
+        # A plotly marker's `size` is its diameter in px, but the HTML circle
+        # glyph (U+25CF) only inks ~0.44x its font-size. Scale the font-size
+        # up so the legend glyphs render at the plotted marker diameters.
+        size.values <- if (is.null(break_diameters)) {
+            c(10, 20, 30, 40, 50)
         } else {
-            size_values <- c(10, 20, 30, 40, 50)
+            break_diameters / .CIRCLE_GLYPH_DIAMETER_RATIO
         }
     }
 
-    x_pos <- start_x
+    x_pos <- start.x
     # Constant pixel gap inserted between a circle's right edge and its numeric
     # label. The labels are anchored at the circle's x (paper space) but offset
     # via the annotation `xshift`, which plotly measures in pixels. Pairing a
@@ -379,11 +650,11 @@ apply_legend_inputs <- function(fig, input, isolate_fn = isolate) {
     # affects absolute spacing; if the real figure height differs the entries
     # simply sit a little closer/further apart while staying proportional.
     nominal_height_px <- 500
-    rendered_radii <- (size_values * .CIRCLE_GLYPH_DIAMETER_RATIO) / 2 / nominal_height_px
-    centers <- numeric(length(size_values))
-    for (i in seq_along(size_values)) {
+    rendered_radii <- (size.values * .CIRCLE_GLYPH_DIAMETER_RATIO) / 2 / nominal_height_px
+    centers <- numeric(length(size.values))
+    for (i in seq_along(size.values)) {
         centers[i] <- if (i == 1L) {
-            start_y - rendered_radii[i]
+            start.y - rendered_radii[i]
         } else {
             centers[i - 1L] - rendered_radii[i - 1L] - gap - rendered_radii[i]
         }
@@ -411,7 +682,7 @@ apply_legend_inputs <- function(fig, input, isolate_fn = isolate) {
         length(legend_title) == 1L) {
         parts <- unlist(strsplit(legend_title, "<br\\s*/?>|\n"))
         if (length(parts) > 1L) {
-            kept <- parts[parts != size_by]
+            kept <- parts[parts != size.by]
             if (length(kept) == 0L) {
                 kept <- parts[1]
             }
@@ -422,37 +693,43 @@ apply_legend_inputs <- function(fig, input, isolate_fn = isolate) {
     # Assemble the legend annotations and append them directly to the built
     # layout (see plotly_build() note above) so they are not duplicated by
     # subsequent builds.
+    # The title's foot sits just above the first entry, so a title of several
+    # lines grows upwards instead of running into a small first circle.
     new_anns <- list(
         list(
-            x = x_pos + 0.02, y = min(start_y + gap, 1),
+            x = x_pos + 0.02, y = min(start.y + gap / 2, 1),
             xref = "paper", yref = "paper",
-            text = size_by, showarrow = FALSE,
-            xanchor = "center", yanchor = "middle", font = title_font
+            text = title, showarrow = FALSE,
+            xanchor = "center", yanchor = "bottom", font = title_font,
+            # Tagged so facet-title styling (apply_axis_title_to_annotations())
+            # does not take these centred paper annotations for strip labels.
+            annotationType = "legend"
         )
     )
-    for (i in seq_along(size_values)) {
+    for (i in seq_along(size.values)) {
         yc <- centers[i]
 
         # Circle annotation
         new_anns[[length(new_anns) + 1L]] <- list(
             x = x_pos, y = yc, xref = "paper", yref = "paper",
             text = paste0(
-                "<span style='font-size:", size_values[i],
+                "<span style='font-size:", size.values[i],
                 "px; color:#000000;'>&#9679;</span>"
             ),
-            showarrow = FALSE, xanchor = "center", yanchor = "middle"
+            showarrow = FALSE, xanchor = "center", yanchor = "middle",
+            annotationType = "legend"
         )
 
         # Label annotation. Offset from the circle by a fixed pixel distance
         # (the glyph's rendered radius plus a constant gap) so the spacing does
         # not scale with plot width.
-        rendered_diameter_px <- size_values[i] * .CIRCLE_GLYPH_DIAMETER_RATIO
+        rendered_diameter_px <- size.values[i] * .CIRCLE_GLYPH_DIAMETER_RATIO
         label_xshift <- rendered_diameter_px / 2 + label_gap_px
         new_anns[[length(new_anns) + 1L]] <- list(
             x = x_pos, y = yc, xref = "paper", yref = "paper",
             text = labels[i], showarrow = FALSE,
             xanchor = "left", yanchor = "middle", xshift = label_xshift,
-            font = label_font
+            font = label_font, annotationType = "legend"
         )
     }
 
@@ -482,7 +759,7 @@ apply_legend_inputs <- function(fig, input, isolate_fn = isolate) {
 #' @keywords internal
 #' @rdname INTERNAL_extract_marker_sizes
 .extract_marker_sizes <- function(fig) {
-    built <- tryCatch(plotly::plotly_build(fig), error = function(e) NULL)
+    built <- tryCatch(.ensure_built(fig), error = function(e) NULL)
     if (is.null(built) || is.null(built$x$data)) {
         return(numeric(0))
     }
@@ -494,4 +771,110 @@ apply_legend_inputs <- function(fig, input, isolate_fn = isolate) {
         }
     }
     sizes[is.finite(sizes)]
+}
+
+
+#' Size range for a numeric size mapping
+#'
+#' The smallest and largest point sizes, in ggplot2 size units, from a module's
+#' min/max inputs. An end that is missing, `NA` or not numeric falls back to
+#' ggplot2's default range, `c(1, 6)`.
+#'
+#' @param min,max The smallest and largest sizes.
+#' @return A numeric length-2 vector.
+#'
+#' @author Jared Andrews
+#' @keywords internal
+#' @noRd
+.size_range <- function(min, max) {
+    valid <- function(s) is.numeric(s) && length(s) == 1L && is.finite(s)
+    c(if (valid(min)) min else 1, if (valid(max)) max else 6)
+}
+
+
+#' Limits for a numeric size mapping
+#'
+#' The values drawn at the smallest and largest sizes. A blank or `NA` end takes
+#' the data's minimum or maximum. Limits that do not increase (say a lower limit
+#' above the data's maximum) fall back to the data's range, since ggplot2 would
+#' otherwise reverse the scale. A module resolves the limits once and gives the
+#' same pair to `.size_scale()` and `add_size_legend()`, so the two agree.
+#'
+#' @param values The numeric values mapped to size.
+#' @param lower,upper The requested limits, or `NULL`/`NA` for the data's own.
+#' @return A numeric length-2 vector, or `NULL` when `values` has no finite value.
+#'
+#' @author Jared Andrews
+#' @keywords internal
+#' @noRd
+.size_limits <- function(values, lower = NULL, upper = NULL) {
+    values <- values[is.finite(values)]
+    if (length(values) == 0L) {
+        return(NULL)
+    }
+    valid <- function(s) is.numeric(s) && length(s) == 1L && is.finite(s)
+    data_range <- range(values)
+    lims <- c(if (valid(lower)) lower else data_range[1], if (valid(upper)) upper else data_range[2])
+    if (lims[1] < lims[2]) lims else data_range
+}
+
+
+#' Size scale for a numeric size mapping
+#'
+#' ggplot2's area size scale (what [ggplot2::scale_size()] builds) over the
+#' given limits, except that a value beyond a limit is drawn at that end's size
+#' rather than dropped. Adding it to a plot replaces any size scale already
+#' there.
+#'
+#' @param range The smallest and largest sizes, in ggplot2 size units.
+#' @param limits The values drawn at those sizes, or `NULL` for the data's range.
+#' @return A ggplot2 continuous scale for the `size` aesthetic.
+#'
+#' @author Jared Andrews
+#' @keywords internal
+#' @noRd
+.size_scale <- function(range, limits = NULL) {
+    ggplot2::continuous_scale(
+        "size",
+        palette = scales::area_pal(range),
+        limits = limits,
+        oob = scales::squish
+    )
+}
+
+
+#' Position of values on an area size scale
+#'
+#' The square root of each value's position between the limits, values beyond
+#' them taken as the nearest one. A point's diameter on ggplot2's area scale is
+#' linear in this.
+#'
+#' @param values Numeric values.
+#' @param limits The scale's limits.
+#' @return A numeric vector in `[0, 1]`.
+#'
+#' @author Jared Andrews
+#' @keywords internal
+#' @noRd
+.size_scale_position <- function(values, limits) {
+    sqrt(scales::rescale(pmin(pmax(values, limits[1]), limits[2]), from = limits))
+}
+
+
+#' Diameter of the marker drawn for a value on an area size scale
+#'
+#' The size `.size_scale()` (or `ggplot2::scale_size()`) gives each value, in
+#' the pixels `plotly::ggplotly()` draws it at: a size is in mm, at 96 px to the
+#' inch.
+#'
+#' @param values Numeric values.
+#' @param range The scale's smallest and largest sizes, in ggplot2 size units.
+#' @param limits The scale's limits.
+#' @return Marker diameters in px.
+#'
+#' @author Jared Andrews
+#' @keywords internal
+#' @noRd
+.size_scale_px <- function(values, range, limits) {
+    (range[1] + (range[2] - range[1]) * .size_scale_position(values, limits)) * 96 / 25.4
 }

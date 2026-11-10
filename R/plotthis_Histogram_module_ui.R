@@ -97,6 +97,12 @@
 #' - `axis.tickcolor` - Color of tick marks (UI: "Tick mark color", default: "black")
 #' - `axis.ticklen` - Length of tick marks (UI: "Tick mark length", default: 5)
 #' - `axis.tickwidth` - Width of tick marks (UI: "Tick mark width", default: 1)
+#' - `axis.scientific` - Write numeric tick labels in scientific notation (UI: "Scientific Notation Ticks",
+#'   default: FALSE; when off they never switch to it). See [apply_tick_notation()]
+#' - `axis.padding.x` - Space between the data and the plot area's edges along X, as a fraction of the
+#'   data's extent at each end (UI: "X Axis Padding", default: NA = the plot's own). See [apply_axis_padding()]
+#' - `axis.padding.y` - Space between the data and the plot area's edges along Y, as a fraction of the
+#'   data's extent at each end (UI: "Y Axis Padding", default: NA = the plot's own). See [apply_axis_padding()]
 #' - `legend.show` - Show the legend and any colorbar (UI: "Show Legend", default: TRUE)
 #' - `legend.font.family` - Font family of the legend title and labels (UI: "Legend Font", default: "Arial")
 #' - `legend.font.color` - Font color of the legend title and labels (UI: "Legend Font Color", default: "#000000")
@@ -152,6 +158,9 @@ plotthis_HistogramInputsUI <- function(id, data, defaults = NULL, title = NULL, 
     choices <- c("", names(data))
     num.choices <- c("", names(data)[vapply(data, is.numeric, logical(1))])
     cat.choices <- c("", names(data)[vapply(data, function(x) !is.numeric(x), logical(1))])
+    # Group By leaves out categoricals with too many levels to draw (an ID
+    # column asks for one group per row), unless the caller asked for one.
+    group.choices <- c("", discrete_choices(data, keep = get_default(defaults, "group.by", NULL)))
 
     selected <- list(
         "x", "group_by", "bins", "binwidth",
@@ -179,9 +188,9 @@ plotthis_HistogramInputsUI <- function(id, data, defaults = NULL, title = NULL, 
                 viz_select_input(ns("group.by"), "Group By",
                     selected = get_default(
                         defaults, "group.by", "",
-                        function(x) x %in% c("", cat.choices)
+                        function(x) x %in% group.choices
                     ),
-                    choices = c("", cat.choices)
+                    choices = group.choices
                 ),
                 documentParameters$group_by,
                 placement = "top", options = list(container = "body")
@@ -190,7 +199,7 @@ plotthis_HistogramInputsUI <- function(id, data, defaults = NULL, title = NULL, 
         "Facet" = tagList(
             tipify(viz_select_input(ns("facet.by"), "Facet By",
                 selected = get_default(defaults, "facet.by", "", function(x) x == "" || x %in% cat.choices),
-                choices = c("", .facet_check(data))),
+                choices = c("", facet_check(data))),
                 documentParameters$facet_by,
                 placement = "top", options = list(container = "body")
             ),
@@ -218,7 +227,7 @@ plotthis_HistogramInputsUI <- function(id, data, defaults = NULL, title = NULL, 
                 documentParameters$facet_byrow,
                 placement = "top", options = list(container = "body")
             ),
-            .uniform_subplot_spacing_inputs_ui(ns, defaults)
+            uniform_subplot_spacing_inputs_ui(ns, defaults)
         ),
         "Aesthetics" = tagList(
             tipify(numericInput(ns("bins"), "Number of Bins",

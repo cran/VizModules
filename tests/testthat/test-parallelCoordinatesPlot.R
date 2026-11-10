@@ -81,20 +81,33 @@ test_that("parallelCoordinatesPlot shows or hides the colorbar", {
     }
 })
 
-test_that("parallelCoordinatesPlot styles its lines, label and tick fonts", {
+test_that("parallelCoordinatesPlot styles its label and tick fonts", {
     trace <- plotly::plotly_build(parallelCoordinatesPlot(
         data = mtcars,
         dimensions = c("mpg", "cyl", "disp"),
-        line.width = 2,
         label.font.size = 16, label.font.color = "#FF0000", label.font.family = "Courier",
         tick.font.size = 14, tick.font.color = "#0000FF", tick.font.family = "Times"
     ))$x$data[[1]]
 
-    expect_equal(trace$line$width, 2)
+    # parcoords lines take no width or opacity, so none is sent.
+    expect_null(trace$line$width)
+    expect_null(trace$line$opacity)
     expect_equal(trace$labelfont$size, 16)
     expect_equal(trace$labelfont$color, "#FF0000")
     expect_equal(trace$labelfont$family, "Courier")
     expect_equal(trace$tickfont$size, 14)
     expect_equal(trace$tickfont$color, "#0000FF")
     expect_equal(trace$tickfont$family, "Times")
+})
+
+test_that("parallelCoordinatesPlot Color By keeps numerics but leaves out wide categoricals", {
+    df <- .wide_id_df()
+    color <- .select_choices(as.character(parallelCoordinatesPlotInputsUI("pc", df)), "pc-color.by")
+    # Numeric columns stay for the continuous colour scale; the 60-level ID column is gone.
+    expect_true(all(c("val", "val2", "grp", "grp2", "flag") %in% color))
+    expect_false("id" %in% color)
+
+    # An explicit default naming the wide column is honoured.
+    html <- as.character(parallelCoordinatesPlotInputsUI("pc", df, defaults = list(color.by = "id")))
+    expect_true("id" %in% .select_choices(html, "pc-color.by"))
 })

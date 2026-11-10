@@ -33,7 +33,7 @@
 #' @author Jared Andrews, Jacob Martin
 dittoViz_yPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs = NULL, defaults = NULL) {
     stopifnot(is.reactive(data))
-    data <- .require_data_frame(data)
+    data <- require_data_frame(data)
 
     moduleServer(id, function(input, output, session) {
         params <- setup_reactive_defaults(defaults, input, session)
@@ -113,9 +113,9 @@ dittoViz_yPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs = NULL,
             freezeReactiveValue(input, "stat.pairs")
             update_viz_select(session, "stat.pairs",
                 choices = c("", pair_strings),
-                selected = .default_stat_pairs(defaults, pair_strings)
+                selected = default_stat_pairs(defaults, pair_strings)
             )
-        })
+        }, priority = 998)
 
         ns <- session$ns
 
@@ -132,8 +132,6 @@ dittoViz_yPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs = NULL,
         # variable (its dragged position still persists).
         last_axis_vars <- reactiveVal(NULL)
 
-        # Store last computed stats table for download
-        last_stats_df <- reactiveVal(NULL)
 
         # Points gathered from box/lasso selections, accumulated across selections
         selected.data <- reactiveVal()
@@ -171,7 +169,7 @@ dittoViz_yPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs = NULL,
         )
 
         default_palette_name <- "dittoColors"
-        palette_lookup <- .flatten_palette_options(default_palettes()[["choices"]])
+        palette_lookup <- flatten_palette_options(default_palettes()[["choices"]])
         default_palette_values <- palette_lookup[[default_palette_name]]
         if (is.null(default_palette_values) || length(default_palette_values) == 0) {
             default_palette_values <- if (length(palette_lookup) > 0) palette_lookup[[1]] else character(0)
@@ -231,6 +229,9 @@ dittoViz_yPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs = NULL,
             default_palette_values, defaults, params
         )
 
+        # The dragged Group Order the plot draws, NULL for the default one.
+        x_order <- setup_level_order(input, session, data, reactive(input$group.by), defaults)
+
         output$palette.selection <- renderUI({
             groups <- palette_groups()
             if (length(groups) == 0) {
@@ -239,7 +240,7 @@ dittoViz_yPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs = NULL,
 
             initial_colors <- isolate(resolve_palette(
                 groups, input$palette.colours, default_palette_values,
-                .default_group_colors(defaults, "palette.colours")
+                default_group_colors(defaults, "palette.colours")
             ))
 
             # The picker is seeded with this, so it is also what the plot should be
@@ -261,6 +262,7 @@ dittoViz_yPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs = NULL,
 
         # Reset functionality
         observeEvent(input$reset, {
+            updateCheckboxInput(session, "webgl", value = get_default(defaults, "webgl", TRUE, is.logical))
             char.choices <- c("", names(data())[vapply(data(), function(x) !is.numeric(x), logical(1))])
             num.choices <- c("", names(data())[vapply(data(), is.numeric, logical(1))])
             choices <- c("", names(data()))
@@ -273,7 +275,7 @@ dittoViz_yPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs = NULL,
             # Calculate y.max and y.min from the default selections, in the units
             # the default adjustment plots them in
             y.range <- .calculate_range(
-                df = .as_plotted(data(), default.var, default.adjustment, default.adj.fxn),
+                df = as_plotted(data(), default.var, default.adjustment, default.adj.fxn),
                 data_col_y = default.var,
                 axis_scale_factor = .y_axis_scale_factor, grouping = FALSE
             )
@@ -367,10 +369,10 @@ dittoViz_yPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs = NULL,
 
             # Plotly
             # Group colors
-            .reset_group_colors(session, "palette.colours", defaults, palette_groups(), default_palette_values)
+            reset_group_colors(session, "palette.colours", defaults, palette_groups(), default_palette_values)
 
             reset_plotly_inputs(session, defaults)
-            .reset_manual_edits(edit_store)
+            reset_manual_edits(edit_store)
             reset_legend_inputs(session, defaults)
 
             # Hover
@@ -387,7 +389,7 @@ dittoViz_yPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs = NULL,
             reset_lines_inputs(session, defaults = defaults)
 
             # Stats
-            .reset_stats_inputs(session, defaults, pair_choices())
+            reset_stats_inputs(session, defaults, pair_choices())
         })
 
         # How high the significance brackets will reach, so the y-axis can reserve
@@ -405,22 +407,22 @@ dittoViz_yPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs = NULL,
                 return(NULL)
             }
 
-            xvar <- .blank_to_null(input$group.by)
+            xvar <- blank_to_null(input$group.by)
             if (is.null(xvar)) {
                 return(NULL)
             }
             ctx <- .yplot_stat_context(
-                data(), input$var, input$var.adjustment, input$var.adj.fxn,
+                apply_level_order(data(), xvar, x_order()), input$var, input$var.adjustment, input$var.adj.fxn,
                 split.by = input$split.by, per.facet = input$stat.per.facet
             )
             if (is.null(ctx)) {
                 return(NULL)
             }
 
-            color.by <- .blank_to_null(input$color.by)
+            color.by <- blank_to_null(input$color.by)
             grp_var <- if (!is.null(color.by) && !identical(color.by, xvar)) color.by else NULL
 
-            .stat_bracket_headroom(
+            stat_bracket_headroom(
                 df = ctx$df, x = xvar, y = ctx$y,
                 group.by = grp_var, facet.by = ctx$facet.by,
                 per.facet = ctx$per.facet, input = input,
@@ -442,40 +444,48 @@ dittoViz_yPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs = NULL,
         seeded_limits <- .seed_axis_limits(defaults, "y.min", "y.max")
         observeEvent(c(input$var, input$var.adjustment, input$var.adj.fxn), {
             y_range <- .calculate_range(
-                df = .as_plotted(data(), input$var, input$var.adjustment, input$var.adj.fxn),
+                df = as_plotted(data(), input$var, input$var.adjustment, input$var.adj.fxn),
                 data_col_y = input$var, axis_scale_factor = .y_axis_scale_factor, grouping = FALSE
             )
             y_range <- seeded_limits(y_range, list(
-                input$var, .blank_to_null(input$var.adjustment), .blank_to_null(input$var.adj.fxn)
+                input$var, blank_to_null(input$var.adjustment), blank_to_null(input$var.adj.fxn)
             ))
             if (!is.null(y_range)) {
                 y_range_store(list(min = y_range$min, max = y_range$max))
                 updateNumericInput(session, "y.max", value = y_range$max)
                 updateNumericInput(session, "y.min", value = y_range$min)
             }
-        })
+            # Just after setup_axis_range()'s observer and before the render, so the
+            # plot draws once with the new column's limits rather than the old ones.
+        }, priority = 999)
 
         # Mirrors the facet.cols resolution in generate_yPlot(): several Y variables
         # split into panels of their own even with no split.by set.
         observeEvent(c(input$split.by, input$var, input$multivar.aes), {
             split.set <- !is.null(input$split.by) && any(nzchar(input$split.by))
             multivar.split <- length(input$var) > 1 &&
-                (!.nz_value(input$multivar.aes) || identical(input$multivar.aes, "split"))
-            .toggle_facet_title_inputs(session, split.set || multivar.split, hidden = hide.inputs)
+                (!nz_value(input$multivar.aes) || identical(input$multivar.aes, "split"))
+            toggle_facet_title_inputs(session, split.set || multivar.split, hidden = hide.inputs)
         })
 
         # Generate yPlot reactive
-        generate_yPlot <- reactive({
-            req(input$var)
-            isolate_fn <- setup_auto_update_logic(input, params)
+        # The plot itself: everything that changes what is drawn, with the stats
+        # table, any notes raised along the way and what the axis titles say. It is
+        # cached (see cached_structure()), so it reads every input through
+        # isolate_fn and has no side effects; the styling inputs are applied in
+        # generate_yPlot().
+        draw_yPlot <- function(isolate_fn) {
+            req(isolate_fn(input$var))
+            notes <- list()
+            stats_df <- NULL
 
             # Resolved server-side, so they already clear any significance brackets.
             y.limits <- isolate_fn(y_range_store())
 
             # Parse inputs that might need conversion
-            split.by <- .na_to_null(isolate_fn(input$split.by))
-            color.by <- .na_to_null(isolate_fn(input$color.by))
-            shape.by <- .na_to_null(isolate_fn(input$shape.by))
+            split.by <- na_to_null(isolate_fn(input$split.by))
+            color.by <- na_to_null(isolate_fn(input$color.by))
+            shape.by <- na_to_null(isolate_fn(input$shape.by))
 
             # Several Y variables can be plotted at once; dittoViz then reshapes the
             # data internally (into "var.multi"/"var.which") and maps the variables
@@ -488,8 +498,8 @@ dittoViz_yPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs = NULL,
             }
 
             # Parse split dimensions
-            split.ncol <- .na_to_null(isolate_fn(input$split.ncol))
-            split.nrow <- .na_to_null(isolate_fn(input$split.nrow))
+            split.ncol <- na_to_null(isolate_fn(input$split.ncol))
+            split.nrow <- na_to_null(isolate_fn(input$split.nrow))
 
             # Handle ridgeplot.ymax.expansion
             ridgeplot.ymax.expansion <- isolate_fn(input$ridgeplot.ymax.expansion)
@@ -498,7 +508,7 @@ dittoViz_yPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs = NULL,
             }
 
             # Handle ridgeplot.binwidth
-            ridgeplot.binwidth <- .na_to_null(isolate_fn(input$ridgeplot.binwidth))
+            ridgeplot.binwidth <- na_to_null(isolate_fn(input$ridgeplot.binwidth))
 
             # Resolve color palette
             palette_values <- isolate_fn(palette_store())
@@ -536,7 +546,7 @@ dittoViz_yPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs = NULL,
 
             # Reflect any applied Y-axis data adjustment in the continuous-axis title so it
             # accurately describes the values displayed (e.g. "z-score(log2(units))").
-            var.adjustment <- .na_to_null(isolate_fn(input$var.adjustment))
+            var.adjustment <- na_to_null(isolate_fn(input$var.adjustment))
             var.adj.fxn.name <- isolate_fn(input$var.adj.fxn)
 
             adjustment.active <- !is.null(var.adjustment) ||
@@ -548,7 +558,7 @@ dittoViz_yPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs = NULL,
                 # only the adjustment description, if any.
                 if (!adjustment.active) {
                     NULL
-                } else if (.nz_value(var.adj.fxn.name)) {
+                } else if (nz_value(var.adj.fxn.name)) {
                     # e.g. "z-score(log2)": the function is applied first
                     adjusted_axis_label(var.adj.fxn.name, var.adjustment)
                 } else {
@@ -561,26 +571,20 @@ dittoViz_yPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs = NULL,
             # When an adjustment is active the axis title is regenerated to reflect it, so
             # flag its side for finalize_manual_edits() to skip persisting the text. The
             # continuous var lands on the x-axis for ridgeplots, otherwise the y-axis.
-            regen_keys_rv(if (adjustment.active) {
+            regen_keys <- if (adjustment.active) {
                 if ("ridgeplot" %in% isolate_fn(input$plots)) "axis:x" else "axis:y"
             } else {
                 character(0)
-            })
+            }
 
-            # If a variable feeding an axis title (or the ridge orientation that swaps
-            # which axis it lands on) changed, drop any persisted manual title text so the
-            # title regenerates for the new variable. Runs before finalize_manual_edits()
-            # in the same render pass, so the cleared store is what gets re-applied.
+            # The variables feeding the axis titles (and the ridge orientation that
+            # swaps which axis it lands on); see generate_yPlot().
             axis_vars <- list(
                 var = y.vars,
                 group.by = isolate_fn(input$group.by),
                 multivar.aes = if (multivar) multivar.aes else NULL,
                 ridge = "ridgeplot" %in% isolate_fn(input$plots)
             )
-            if (!identical(axis_vars, last_axis_vars())) {
-                reset_axis_title_text(edit_store)
-                last_axis_vars(axis_vars)
-            }
 
             # Draw axis borders at the ggplot level
             additional_theme <- create_ggplot_axis_style(input, isolate_fn = isolate_fn)
@@ -593,8 +597,8 @@ dittoViz_yPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs = NULL,
 
             # Collect hover data, falling back to dittoViz's own default set
             # when the user makes no explicit selection.
-            annotate.by <- .na_to_null(isolate_fn(input$annotate.by))
-            hover.data <- .na_to_null(isolate_fn(input$hover.data))
+            annotate.by <- na_to_null(isolate_fn(input$annotate.by))
+            hover.data <- na_to_null(isolate_fn(input$hover.data))
             if (is.null(hover.data)) {
                 hover.data <- .yplot_default_hover(y.vars, isolate_fn(input$group.by), color.by, shape.by, split.by)
             }
@@ -607,17 +611,21 @@ dittoViz_yPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs = NULL,
             boxgap <- .box_num(isolate_fn(input$boxgap), 0.3)
             boxgroupgap <- .box_num(isolate_fn(input$boxgroupgap), 0.2)
 
-            p <- .with_stable_seed(yPlot(
-                data_frame = data(),
+            # The dragged Group Order is set on the frame as factor levels, which
+            # dittoViz keeps and the stats and brackets below read.
+            plot.df <- apply_level_order(data(), isolate_fn(input$group.by), isolate_fn(x_order()))
+
+            p <- with_stable_seed(yPlot(
+                data_frame = plot.df,
                 var = y.vars,
                 multivar.aes = multivar.aes,
                 multivar.split.dir = isolate_fn(input$multivar.split.dir),
                 # dittoViz would rescale before applying the function; handing it the
                 # whole transform as one function applies the function first (log,
-                # then z-score), which is what .adjusted_values() and so the stats,
+                # then z-score), which is what adjusted_values() and so the stats,
                 # brackets and axis limits assume.
                 var.adjustment = NULL,
-                var.adj.fxn = .adjustment_fn(var.adjustment, var.adj.fxn.name),
+                var.adj.fxn = adjustment_fn(var.adjustment, var.adj.fxn.name),
                 # Blank main title by default; dittoViz's "make" would otherwise
                 # auto-generate one (the var name) and re-render it every rebuild.
                 main = NULL,
@@ -682,11 +690,6 @@ dittoViz_yPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs = NULL,
                 )
 
             }
-            fig <- apply_title_layout(fig, input, isolate_fn, title_y = 0.98, title_x = isolate_fn(input$axis.title.horizontal.position))
-            
-            
-
-
             # Put the boxes back on the coordinates ggplot dodged them to, which is
             # where the jitter and violin traces already are. The dodge width has to
             # be the one yPlot() built the ggplot with: boxplot.position.dodge and
@@ -696,38 +699,6 @@ dittoViz_yPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs = NULL,
                 fig,
                 dodge.width = 1 - boxgap,
                 box.width = 1 - boxgroupgap
-            )
-
-            # Apply axis styling (borders handled at the ggplot level via theme_style above)
-            xaxis_style <- create_axis_styles(input, axis_side = "x", isolate_fn = isolate_fn)
-            yaxis_style <- create_axis_styles(input, axis_side = "y", isolate_fn = isolate_fn)
-
-            fig <- apply_subplot_axis_styling(fig, xaxis_style, yaxis_style)
-
-
-            # Apply axis title font to shared facet annotation titles
-            if (faceted) {
-                fig <- apply_axis_title_to_annotations(fig, input, isolate_fn)
-            }
-
-            # Add reference lines
-            fig <- add_reference_lines(fig,
-                hline.intercepts = isolate_fn(input$hline.intercepts),
-                hline.colors = isolate_fn(input$hline.colors),
-                hline.widths = isolate_fn(input$hline.widths),
-                hline.linetypes = isolate_fn(input$hline.linetypes),
-                hline.opacities = isolate_fn(input$hline.opacities),
-                vline.intercepts = isolate_fn(input$vline.intercepts),
-                vline.colors = isolate_fn(input$vline.colors),
-                vline.widths = isolate_fn(input$vline.widths),
-                vline.linetypes = isolate_fn(input$vline.linetypes),
-                vline.opacities = isolate_fn(input$vline.opacities),
-                abline.slopes = isolate_fn(input$abline.slopes),
-                abline.intercepts = isolate_fn(input$abline.intercepts),
-                abline.colors = isolate_fn(input$abline.colors),
-                abline.widths = isolate_fn(input$abline.widths),
-                abline.linetypes = isolate_fn(input$abline.linetypes),
-                abline.opacities = isolate_fn(input$abline.opacities)
             )
 
             # Statistical annotations. With several Y variables the tests are run per
@@ -741,7 +712,7 @@ dittoViz_yPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs = NULL,
             # are measured against (NULL when the adjustment leaves them non-numeric).
             stats.ctx <- if (isTRUE(isolate_fn(input$stats.enabled)) && stats.supported) {
                 .yplot_stat_context(
-                    data(), y.vars, var.adjustment, var.adj.fxn.name,
+                    plot.df, y.vars, var.adjustment, var.adj.fxn.name,
                     split.by = split.by, per.facet = isolate_fn(input$stat.per.facet)
                 )
             }
@@ -762,19 +733,13 @@ dittoViz_yPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs = NULL,
                     per.facet = stats.ctx$per.facet,
                     sig.threshold = isolate_fn(input$stat.sig.threshold)
                 )
-
-                last_stats_df(stats_df)
-            } else {
-                # Nothing was tested for this figure, so the source download must
-                # not ship the table from an earlier one.
-                last_stats_df(NULL)
             }
 
             # dittoViz lays the whole figure out horizontally once a ridge plot is in
             # it, so the values run along the x-axis and there is no room above them
             # for brackets. The tests above still reach the source download.
             if (!is.null(stats.ctx) && "ridgeplot" %in% isolate_fn(input$plots)) {
-                .note_brackets_skipped(session)
+                notes <- c(notes, list(.brackets_skipped_note()))
             } else if (!is.null(stats.ctx)) {
                 stat_result <- create_stat_annotations(
                     stats_df = stats_df, fig = fig, df = stats.ctx$df,
@@ -810,11 +775,11 @@ dittoViz_yPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs = NULL,
                 highlight_points_raw <- isolate_fn(input$highlight.points)
                 highlight_vals <- character(0)
                 if (!is.null(highlight_points_raw) && highlight_points_raw != "") {
-                    highlight_vals <- .parse_highlight_values(highlight_points_raw, data()[[annotate.by]])
+                    highlight_vals <- parse_highlight_values(highlight_points_raw, data()[[annotate.by]])
                 }
 
                 if (length(highlight_vals) > 0) {
-                    fig <- .apply_highlight_styling(
+                    fig <- apply_highlight_styling(
                         fig,
                         annotate.by = annotate.by,
                         highlight_vals = highlight_vals,
@@ -840,9 +805,10 @@ dittoViz_yPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs = NULL,
                     color = isolate_fn(input$annotation.color)
                 )
 
-                if (!is.null(selected.data())) {
-                    annos <- .create_selected_annotations(
-                        selected_data = selected.data(),
+                selected <- isolate_fn(selected.data())
+                if (!is.null(selected)) {
+                    annos <- create_selected_annotations(
+                        selected_data = selected,
                         fig = fig,
                         annotate.by = annotate.by,
                         annotation_params = annotation_params,
@@ -851,7 +817,7 @@ dittoViz_yPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs = NULL,
                 }
 
                 if (isTRUE(isolate_fn(input$highlight.auto.annotate)) && length(highlight_vals) > 0) {
-                    highlight_annos <- .create_highlight_annotations(
+                    highlight_annos <- create_highlight_annotations(
                         plot_data = data(),
                         fig = fig,
                         annotate.by = annotate.by,
@@ -861,7 +827,7 @@ dittoViz_yPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs = NULL,
                         annotation_params = annotation_params,
                         require.markers = TRUE
                     )
-                    annos <- .merge_annotation_sets(annos, highlight_annos)
+                    annos <- merge_annotation_sets(annos, highlight_annos)
                 }
             }
 
@@ -870,17 +836,73 @@ dittoViz_yPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs = NULL,
                 fig$x$layout$annotations <- c(fig$x$layout$annotations, annos)
             }
 
-            config_list <- add_plot_config(download.format = isolate_fn(input$download.format), include.modebar.buttons = TRUE, facet.by = facet.cols)
-            fig <- do.call(config, c(list(p = fig), config_list))
-            fig <- apply_plotly_newshape(fig, input, isolate_fn)
+            # Many points draw far faster with WebGL (see auto_webgl()).
+            if (!isFALSE(isolate_fn(input$webgl))) {
+                fig <- auto_webgl(fig)
+            }
 
-            # Apply the uniform legend visibility and font inputs
-            fig <- apply_legend_inputs(fig, input, isolate_fn)
+            # Colour and shape each get a legend section, rather than ggplotly's one
+            # entry per combination. Several Y variables can be the colour.
+            fig <- .ensure_built(fig)
+            if (!is.null(shape.by) && !isFALSE(isolate_fn(input$jitter.shape.legend.show))) {
+                color.levels <- if (multivar && identical(multivar.aes, "color")) {
+                    y.vars
+                } else {
+                    levels(droplevels(as.factor(plot.df[[color.by]])))
+                }
+                # jitter.shape.legend.size is a ggplot size (mm), converted as ggplotly does.
+                legend.size <- isolate_fn(input$jitter.shape.legend.size)
+                fig <- split_color_shape_legend(
+                    fig,
+                    color.levels = color.levels,
+                    shape.levels = levels(droplevels(as.factor(plot.df[[shape.by]]))),
+                    marker.size = if (is.numeric(legend.size) && length(legend.size) == 1L && !is.na(legend.size)) {
+                        legend.size * 96 / 25.4
+                    } else {
+                        8
+                    }
+                )
+            }
 
-            # Make single-panel x/y axis titles draggable (matches faceted behaviour)
-            fig <- axis_titles_as_annotations(fig)
+            # Nothing was tested when stats are off, so the source download gets no
+            # table from an earlier figure.
+            list(
+                fig = .ensure_built(fig), facet.by = facet.cols, stats = stats_df, notes = notes,
+                axis_vars = axis_vars, regen_keys = regen_keys
+            )
+        }
+        base_yPlot <- cached_structure(
+            draw_yPlot, input, session, data, params = params,
+            extra = function() list(y_range_store(), palette_store(), x_order(), selected.data())
+        )
+        notify <- .structure_notifier(session)
 
-            return(fig)
+        # The stats table behind the brackets drawn, for the source download.
+        last_stats_df <- reactive(base_yPlot()$stats)
+
+        # The plot, styled: titles, fonts, axes, reference lines and legend.
+        generate_yPlot <- reactive({
+            isolate_fn <- setup_auto_update_logic(input, params)
+            base <- base_yPlot()
+            notify(base)
+
+            # Axis sides whose title text is regenerated rather than persisted, read
+            # at render. The reads are isolated: the writes must not invalidate this.
+            if (!identical(base$regen_keys, isolate(regen_keys_rv()))) {
+                regen_keys_rv(base$regen_keys)
+            }
+            # If a variable feeding an axis title changed, drop any persisted manual
+            # title text so the title regenerates for the new variable. Runs before
+            # finalize_manual_edits() in the same render pass, so the cleared store is
+            # what gets re-applied.
+            if (!identical(base$axis_vars, isolate(last_axis_vars()))) {
+                reset_axis_title_text(edit_store)
+                last_axis_vars(base$axis_vars)
+            }
+
+            apply_uniform_styling(base$fig, input, isolate_fn,
+                facet.by = base$facet.by, title_y = 0.98, padding.axes = "x"
+            )
         })
 
         # Render the plot output
@@ -971,7 +993,7 @@ dittoViz_yPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs = NULL,
     }
 
     # dittoViz adjusts each variable on its own, then stacks them.
-    plotted <- .as_plotted(df, y.vars, var.adjustment, var.adj.fxn)
+    plotted <- as_plotted(df, y.vars, var.adjustment, var.adj.fxn)
     if (length(y.vars) > 1) {
         plotted <- .multivar_long_df(plotted, y.vars)
         y <- "var.multi"
@@ -979,7 +1001,7 @@ dittoViz_yPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs = NULL,
         per.facet <- TRUE
     } else {
         y <- y.vars
-        facet.by <- .blank_to_null(split.by)
+        facet.by <- blank_to_null(split.by)
         per.facet <- isTRUE(per.facet)
     }
 
@@ -1011,6 +1033,6 @@ dittoViz_yPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs = NULL,
 .yplot_free_y <- function(split.by, vars, multivar.aes, scales) {
     split.set <- !is.null(split.by) && any(nzchar(split.by))
     multivar.split <- length(vars) > 1 &&
-        (!.nz_value(multivar.aes) || identical(multivar.aes, "split"))
+        (!nz_value(multivar.aes) || identical(multivar.aes, "split"))
     (split.set || multivar.split) && isTRUE(scales %in% c("free", "free_y"))
 }

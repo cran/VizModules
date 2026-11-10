@@ -88,6 +88,12 @@ The following \code{\link[plotthis:DotPlot]{plotthis::DotPlot()}} and custom par
 \item \code{size_by} - Numeric column mapped to dot size (UI: "Size By", default: "" = count)
 \item \code{size_min} - Minimum dot size (UI: "Min Dot Size", default: 1)
 \item \code{size_max} - Maximum dot size (UI: "Max Dot Size", default: 6)
+\item \code{size.scale.min} - \code{size_by} value drawn at the minimum dot size, where the size legend starts
+(UI: "Size Scale Min", default: NA = the column's minimum); smaller values are drawn at the minimum size.
+Shown while \code{size_by} is set
+\item \code{size.scale.max} - \code{size_by} value drawn at the maximum dot size, where the size legend ends
+(UI: "Size Scale Max", default: NA = the column's maximum); larger values are drawn at the maximum size.
+Shown while \code{size_by} is set
 \item \code{fill_by} - Numeric column mapped to dot fill (UI: "Fill By", default: "")
 \item \code{fill_cutoff} - Cutoff applied to the fill column (UI: "Fill Cutoff", default: NA)
 \item \code{fill_cutoff_direction} - Direction of the fill cutoff (UI: "Fill Cutoff Direction",
@@ -121,6 +127,15 @@ default: 0.35); nudges the manual size legend (drawn when \code{size.by} is set)
 \item \code{legend.font.color} - Font color of the legend title and labels (UI: "Legend Font Color", default: "#000000")
 \item \code{legend.title.size} - Legend title font size (UI: "Legend Title Size", default: 14)
 \item \code{legend.text.size} - Legend entry label font size (UI: "Legend Text Size", default: 12)
+}
+}
+
+\section{Parameters controlling additional functionality}{
+
+The following parameters implementing new functionality or controlling plotly-specific features are also available:
+\itemize{
+\item \code{webgl} - Draw the points with WebGL once there are 5,000 or more, as set by the
+\code{VizModules.webgl.threshold} option (UI: "Plot with WebGL", default: TRUE)
 }
 }
 

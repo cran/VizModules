@@ -83,6 +83,12 @@
 #' - `axis.tickcolor` - Color of tick marks (UI: "Tick mark color", default: "black")
 #' - `axis.ticklen` - Length of tick marks (UI: "Tick mark length", default: 5)
 #' - `axis.tickwidth` - Width of tick marks (UI: "Tick mark width", default: 1)
+#' - `axis.scientific` - Write numeric tick labels in scientific notation (UI: "Scientific Notation Ticks",
+#'   default: FALSE; when off they never switch to it). See [apply_tick_notation()]
+#' - `axis.padding.x` - Space between the data and the plot area's edges along X, as a fraction of the
+#'   data's extent at each end (UI: "X Axis Padding", default: NA = the plot's own). See [apply_axis_padding()]
+#' - `axis.padding.y` - Space between the data and the plot area's edges along Y, as a fraction of the
+#'   data's extent at each end (UI: "Y Axis Padding", default: NA = the plot's own). See [apply_axis_padding()]
 #' - `legend.show` - Show the legend and any colorbar (UI: "Show Legend", default: TRUE)
 #' - `legend.font.family` - Font family of the legend title and labels (UI: "Legend Font", default: "Arial")
 #' - `legend.font.color` - Font color of the legend title and labels (UI: "Legend Font Color", default: "#000000")
@@ -145,7 +151,10 @@ plotthis_AreaPlotInputsUI <- function(id, data, defaults = NULL, title = NULL, c
     # matching what the server offers once X changes and on Reset.
     x.default <- get_default(defaults, "x.data", cat.choices[2], function(x) x %in% cat.choices)
     group_facet_choices <- setdiff(cat.choices, x.default)
-    group.fallback <- c(group_facet_choices[nzchar(group_facet_choices)], "")[1]
+    # Group By also leaves out categoricals with too many levels to draw (an ID
+    # column asks for one area per row), unless the caller asked for one.
+    group.choices <- setdiff(discrete_choices(data, keep = get_default(defaults, "group.by", NULL)), x.default)
+    group.fallback <- c(group.choices, "")[1]
 
     selected <- list(
         "x", "y", "group_by", "scale_y",
@@ -173,9 +182,9 @@ plotthis_AreaPlotInputsUI <- function(id, data, defaults = NULL, title = NULL, c
             tipify(viz_select_input(ns("group.by"), "Group By",
                 selected = get_default(
                     defaults, "group.by", group.fallback,
-                    function(x) x %in% c("", group_facet_choices)
+                    function(x) x %in% c("", group.choices)
                 ),
-                choices = c("", group_facet_choices)
+                choices = c("", group.choices)
             ), documentParameters$group_by, placement = "top", options = list(container = "body")),
             tipify(materialSwitch(ns("scale.y"), "Scale Y-Axis by Total",
                 value = get_default(defaults, "scale.y", FALSE, is.logical),
@@ -188,7 +197,7 @@ plotthis_AreaPlotInputsUI <- function(id, data, defaults = NULL, title = NULL, c
                     defaults, "facet.by", "",
                     function(x) x %in% c(group_facet_choices, "")
                 ),
-                choices = c(intersect(group_facet_choices, .facet_check(data)), "")
+                choices = c(intersect(group_facet_choices, facet_check(data)), "")
             ), documentParameters$facet_by, placement = "top", options = list(container = "body")),
             tipify(viz_select_input(ns("facet.scale"), "Facet Scale",
                 selected = get_default(
@@ -209,7 +218,7 @@ plotthis_AreaPlotInputsUI <- function(id, data, defaults = NULL, title = NULL, c
                 value = get_default(defaults, "facet.by.row", TRUE, is.logical),
                 status = "success"
             ), documentParameters$facet_byrow, placement = "top", options = list(container = "body")),
-            .uniform_subplot_spacing_inputs_ui(ns, defaults)
+            uniform_subplot_spacing_inputs_ui(ns, defaults)
         ),
         "Aesthetics" = tagList(
             uiOutput(ns("palette.selection")),

@@ -25,7 +25,7 @@ variable facet) can then work against the same rows the plot was built from.
 \details{
 No data adjustment is applied here; the column values are carried
 over as given. dittoViz adjusts each variable before stacking, so pass a
-frame already run through \code{\link[=.as_plotted]{.as_plotted()}} to get the values it plots.
+frame already run through \code{\link[=as_plotted]{as_plotted()}} to get the values it plots.
 }
 \author{
 Jared Andrews

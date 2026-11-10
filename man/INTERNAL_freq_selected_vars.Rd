@@ -13,7 +13,7 @@
 A character vector of selected levels, or \code{NULL}.
 }
 \description{
-\code{\link[=.blank_to_null]{.blank_to_null()}} returns \code{NULL} for anything that is not length one, so a
+\code{\link[=blank_to_null]{blank_to_null()}} returns \code{NULL} for anything that is not length one, so a
 multi-value selection would read as "no selection" and silently draw every
 facet. Empty entries are dropped and an empty result becomes \code{NULL}, which is
 \code{\link[dittoViz:freqPlot]{dittoViz::freqPlot()}}'s "use them all".

@@ -12,7 +12,8 @@
   split.by = NULL,
   line_color = "#000000",
   line_width = 2,
-  backend = NULL
+  backend = NULL,
+  show.legend = TRUE
 )
 }
 \arguments{
@@ -31,6 +32,10 @@
 color specified. Default \code{"#000000"}.}
 
 \item{line_width}{Numeric. Default line width. Default \code{2}.}
+
+\item{backend}{A model backend from \code{\link[=get_model_backend]{get_model_backend()}}, or \code{NULL}.}
+
+\item{show.legend}{Logical. Whether each model gets a legend entry.}
 }
 \value{
 The modified plotly figure with custom model lines added.

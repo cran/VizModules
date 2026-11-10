@@ -29,6 +29,15 @@ uniform across modules** — check the row before writing a key.
 | `ComplexHeatmap_Heatmap` | `ComplexHeatmap::Heatmap` | `matrix.cols` `rowname.col` `row_filter` `column_filter` `row_annotations` `column_annotations` `column_key` `row_split_by` `row_split_cols` `column_split_by` `column_split_cols` | `low_color`/`mid_color`/`high_color` | — |
 | `dittoViz_freqPlot` | `dittoViz::freqPlot` | `var` `sample.by` `group.by` `color.by` `vars.use` `plots` `scale` `max.normalize` `y.min` `y.max` | `palette.colours` | **yes** |
 
+**Category order.** `plotthis_BarPlot`, `plotthis_BoxPlot`, `dittoViz_yPlot` and
+`dittoViz_freqPlot` also take `x.order`: a character vector of the x-axis categories (the
+levels of `x.data`, or of `group.by` on the dittoViz two) in the order to draw them. Levels it
+leaves out follow in their default order, and levels the column lacks are ignored. The user
+reorders them by dragging in the Data tab's **X Order** / **Group Order** control, which is
+not shown for a column with more than 20 levels. On `plotthis_BoxPlot` a **Sort X By**
+(`sort_x`) key such as `"median(salary)"` takes precedence over `x.order`; it orders a
+faceted plot too, with one order shared by every panel.
+
 `ComplexHeatmap_Heatmap` is the odd one out: its output is **not** plotly. It renders
 through `InteractiveComplexHeatmap`, so plotly-specific advice does not apply to it — or
 through `ComplexHeatmap_HeatmapStaticOutputUI()`, a plain `plotOutput()` of the same heatmap
@@ -70,17 +79,57 @@ plots those per-sample frequencies, one facet per level. So `y.min`/`y.max`, the
 the point annotations (points are *samples*), and the source download all describe that
 summarised frequency table, not the input rows. `scale` picks percent vs count.
 
-`linePlot` draws error bars only for a single categorical X and a single Y, and its
-`defaults` keys are **not** the `linePlot()` argument names: `error.bar` (TRUE),
-`error.bar.type` (`"sd"` by default, or `"sem"`, `"ci95"`; `error.type` in the function),
-`error.bar.ci.method` (`"normal"` by default, or `"t"`; `error.ci.method` in the function),
-`error.bar.colour` and `error.bar.width`. Each bar is the group mean plus or minus the
-chosen amount, worked out from that group's y-values as plotted (after any Y adjustment),
-where a group is an x category within each `group.by`/`facet.by` level; a group with fewer
-than two values gets no bar. `"ci95"` uses 1.96 unless the method is `"t"`, which is wider
-for small groups. The method input only shows while the type is `"ci95"`. To fix the
-statistic for users: `defaults = list(error.bar.type = "sem")` with
+`linePlot` draws an interval around a single Y as error bars (`error.bar`, TRUE), as a
+shaded ribbon in each line's colour (`error.ribbon`, FALSE; `error.ribbon.opacity`, 0.25),
+or both. Several of its `defaults` keys are **not** the `linePlot()` argument names:
+`error.bar.type` (`"sd"` by default, or `"sem"`, `"ci95"`, `"columns"`; `error.type` in the
+function), `error.bar.ci.method` (`"normal"` by default, or `"t"`; `error.ci.method`),
+`error.bar.colour` and `error.bar.width`. `"sd"`/`"sem"`/`"ci95"` need a categorical X: the
+interval is the group mean plus or minus the chosen amount, worked out from that group's
+y-values as plotted (after any Y adjustment), where a group is an x category within each
+`group.by`/`facet.by` level; a group with fewer than two values gets none. `"ci95"` uses
+1.96 unless the method is `"t"`, which is wider for small groups. `"columns"` works with any
+X: the interval runs between the numeric columns named by `error.lower` and `error.upper`
+(same keys in the function; either order; Y's adjustment applies to them, and a categorical
+X averages them per group). Use it for precomputed CIs or ranges. The method input only
+shows while the type is `"ci95"`, and the bound selects only while it is `"columns"`. To fix
+the statistic for users: `defaults = list(error.bar.type = "sem")` with
 `hide.inputs = c("error.bar.type", "error.bar.ci.method")`.
+
+`dittoViz_scatterPlot` can draw the distribution of X above the plot (`marginal.x`) and of Y
+to its right (`marginal.y`). Each takes a character vector of any of `"density"`,
+`"histogram"` and `"rug"`, and the default (empty) draws none. There is one distribution per
+`color.by` group, in its colour, or one in `single.point.color` when the plot has no groups.
+They are drawn from the plotted values, after any X/Y adjustment. A density and a histogram
+share a strip, with the histogram scaled to a density. The rug gets its own strip next to the
+plot, with one lane per group. The other keys:
+- `marginal.x.size` and `marginal.y.size` (0.15): share of the plot each side takes.
+- `marginal.opacity` (0.5).
+- `marginal.bins` (30), or `marginal.binwidth` (NA), which overrides it.
+- `marginal.density.adjust` (1): bandwidth multiplier.
+- `marginal.rug.height` (0.3): the rug's share of a side it shares with a density or histogram.
+- `marginal.rug.width` (1): line width of the rug ticks, in pixels.
+- `marginal.axes` (FALSE): show the density or count axis of each density and histogram strip.
+
+Each control shows only while a side draws what it adjusts. No marginals are drawn on a
+`split.by` plot or along an axis an `as.factor` adjustment makes categorical. Example:
+`defaults = list(marginal.x = c("density", "rug"), marginal.y = "density")`.
+
+Point size in `dittoViz_scatterPlot`: `size` (1) applies while `size.by` is unset. Once a
+numeric `size.by` column is set, `size.min` (1) and `size.max` (6) are the point sizes it maps
+onto, and `size.scale.min` / `size.scale.max` (NA = the column's own range) are the column
+values drawn at those two sizes, so the size legend can run over round numbers such as 0 to 100;
+values beyond a limit are drawn at that end's size. `plotthis_DotPlot` has the same
+`size.scale.min` / `size.scale.max` keys alongside `size.by`, `size.min` and `size.max`. Both
+draw their own circle size legend (`size.legend.x`, `size.legend.y`), since plotly drops it.
+
+Trajectories in `dittoViz_scatterPlot` (Trajectory tab): `trajectory.group.by` names the
+column whose groups a path visits, and `add.trajectory.by.groups` lists the paths as a **list
+of character vectors**, each the groups it visits in order, e.g.
+`defaults = list(trajectory.group.by = "cluster", add.trajectory.by.groups = list(c("A", "B", "C")))`.
+The paths apply while `trajectory.group.by` is its default column. The old bracketed text
+`"[A,B,C]"` is still accepted. `trajectory.arrow.size` (0.1) is the arrowhead length in inches.
+Each path runs through its groups' medians as plotted, after any adjustment.
 
 The colour key takes a **named character vector** mapping group level to colour, e.g.
 `defaults = list(palette.colours = c(Healthy = "#0072B2", Disease = "red"))`. Unnamed
@@ -90,7 +139,7 @@ groups fall back to the stock palette; the user can still edit every colour.
 
 | Module | Tabs |
 |---|---|
-| `dittoViz_scatterPlot` | Data, Adjustments, Points, Colors, Facet, Annotations, Legend, Trajectory, Lines, Axes, Plotly, Extras |
+| `dittoViz_scatterPlot` | Data, Adjustments, Points, Colors, Facet, Annotations, Legend, Trajectory, Marginals, Lines, Axes, Plotly, Extras |
 | `dittoViz_yPlot` | Data, Adjustments, Jitter, Box, Violin, Ridge, Stats, Facet, Annotations, Legend, Axes, Lines, Plotly |
 | `plotthis_BoxPlot` | Data, Adjustments, Highlight, Facet, Stats, Legend, Axes, Lines, Plotly |
 | `plotthis_AreaPlot`, `plotthis_DotPlot`, `linePlot`, `dumbbellPlot` | Data, Facet, Aesthetics, Legend, Axes, Lines, Plotly |
@@ -110,6 +159,7 @@ the same keys in every module. Full lists are on their help pages —
 `?uniform_plotly_inputs_ui`. The ones you will reach for most:
 
 - Axes: `axis.title.font.size` (18), `title.font.size` (26), `axis.showline` (TRUE), `show.grid.x` / `show.grid.y` (TRUE), `axis.tickfont.size` (12), `axis.tickangle.x` (0)
+- Axes, padding and notation: `axis.padding.x` / `axis.padding.y` (NA = the plot's own padding; `0` makes the data fill the plot area), offered only for an axis without its own limit inputs (so x only on BarPlot, BoxPlot, freqPlot, and yPlot, y only on SplitBarPlot); `axis.scientific` (FALSE): tick labels in scientific notation
 - Legend: `legend.show` (TRUE), `legend.font.family` ("Arial"), `legend.font.color` ("#000000"), `legend.title.size` (14), `legend.text.size` (12)
 - Lines: `hline.intercepts`, `vline.intercepts`, `abline.slopes` — comma-separated strings, with matching `*.colors` / `*.widths` / `*.linetypes` / `*.opacities`
 - Plotly: `download.format`, `subplot.margin.x`, `subplot.margin.y`

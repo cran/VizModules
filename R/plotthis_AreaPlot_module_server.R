@@ -29,7 +29,7 @@
 #' @author Jacob Martin, Jared Andrews
 plotthis_AreaPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs = NULL, defaults = NULL) {
     stopifnot(is.reactive(data))
-    data <- .require_data_frame(data)
+    data <- require_data_frame(data)
 
     moduleServer(id, function(input, output, session) {
         params <- setup_reactive_defaults(defaults, input, session)
@@ -54,7 +54,7 @@ plotthis_AreaPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs = NU
         edit_store <- setup_manual_edits(input, session, plot_source)
 
         default_palette_name <- "dittoColors"
-        palette_lookup <- .flatten_palette_options(default_palettes()[["choices"]])
+        palette_lookup <- flatten_palette_options(default_palettes()[["choices"]])
         default_palette_values <- palette_lookup[[default_palette_name]]
         if (is.null(default_palette_values) || length(default_palette_values) == 0) {
             default_palette_values <- if (length(palette_lookup) > 0) palette_lookup[[1]] else character(0)
@@ -96,7 +96,7 @@ plotthis_AreaPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs = NU
 
             initial_colors <- isolate(resolve_palette(
                 groups, input$palette.colours, default_palette_values,
-                .default_group_colors(defaults, "palette.colours")
+                default_group_colors(defaults, "palette.colours")
             ))
 
             # The picker is seeded with this, so it is also what the plot should be
@@ -119,8 +119,15 @@ plotthis_AreaPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs = NU
         observeEvent(input$x.data, ignoreInit = TRUE, {
             char.choices <- c("", names(data())[vapply(data(), function(x) !is.numeric(x), logical(1))])
             group_facet_choices <- setdiff(char.choices, input$x.data)
-            update_viz_select(session, "group.by", choices = c(group_facet_choices), selected = if (input$group.by %in% group_facet_choices) input$group.by else "")
-            update_viz_select(session, "facet.by", choices = c("", group_facet_choices), selected = if (input$facet.by %in% group_facet_choices) input$facet.by else "")
+            # The same capped pools the UI offers (see plotthis_AreaPlotInputsUI()).
+            group_choices <- c("", setdiff(
+                discrete_choices(data(), keep = get_default(defaults, "group.by", NULL)), input$x.data
+            ))
+            facet_choices <- c("", intersect(group_facet_choices, facet_check(data())))
+            update_viz_select(session, "group.by", choices = group_choices,
+                selected = if (input$group.by %in% group_choices) input$group.by else "")
+            update_viz_select(session, "facet.by", choices = facet_choices,
+                selected = if (input$facet.by %in% facet_choices) input$facet.by else "")
         })
 
         # Reset functionality
@@ -130,7 +137,10 @@ plotthis_AreaPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs = NU
 
             x_default <- get_default(defaults, "x.data", char.choices[2], function(x) x %in% char.choices)
             group_facet_choices <- setdiff(char.choices, x_default)
-            group_fallback <- c(group_facet_choices[nzchar(group_facet_choices)], "")[1]
+            group_choices <- setdiff(
+                discrete_choices(data(), keep = get_default(defaults, "group.by", NULL)), x_default
+            )
+            group_fallback <- c(group_choices, "")[1]
 
             # Data
             update_viz_select(session, "x.data", selected = x_default)
@@ -138,7 +148,7 @@ plotthis_AreaPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs = NU
                 selected = get_default(defaults, "y.data", num.choices[2], function(x) x %in% num.choices))
             update_viz_select(session, "group.by",
                 selected = get_default(
-                    defaults, "group.by", group_fallback, function(x) x %in% c("", group_facet_choices)
+                    defaults, "group.by", group_fallback, function(x) x %in% c("", group_choices)
                 ))
 
             # Facet
@@ -164,10 +174,10 @@ plotthis_AreaPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs = NU
 
             # Plotly
             # Group colors
-            .reset_group_colors(session, "palette.colours", defaults, palette_groups(), default_palette_values)
+            reset_group_colors(session, "palette.colours", defaults, palette_groups(), default_palette_values)
 
             reset_plotly_inputs(session, defaults)
-            .reset_manual_edits(edit_store)
+            reset_manual_edits(edit_store)
             reset_legend_inputs(session, defaults)
 
             # Lines
@@ -175,32 +185,34 @@ plotthis_AreaPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs = NU
         })
 
         observeEvent(input$facet.by, {
-            .toggle_facet_title_inputs(session, .nz_value(input$facet.by), hidden = hide.inputs)
+            toggle_facet_title_inputs(session, nz_value(input$facet.by), hidden = hide.inputs)
         })
 
-        generate_AreaPlot <- reactive({
-            isolate_fn <- setup_auto_update_logic(input, params)
+        # The plot itself: everything that changes what is drawn. It is cached
+        # (see cached_structure()), so it reads every input through isolate_fn and
+        # has no side effects; the styling inputs are applied in generate_AreaPlot().
+        draw_AreaPlot <- function(isolate_fn) {
 
             group.by <- NULL
-            if (.nz_value(isolate_fn(input$group.by))) {
+            if (nz_value(isolate_fn(input$group.by))) {
                 group.by <- isolate_fn(input$group.by)
             }
 
             # Null Values:
             facet.by <- NULL
-            if (.nz_value(isolate_fn(input$facet.by))) {
+            if (nz_value(isolate_fn(input$facet.by))) {
                 facet.by <- isolate_fn(input$facet.by)
             }
 
             # Convert NA to NULL for facet.ncol and facet.nrow
-            facet.ncol <- .na_to_null(isolate_fn(input$facet.ncol))
-            facet.nrow <- .na_to_null(isolate_fn(input$facet.nrow))
+            facet.ncol <- na_to_null(isolate_fn(input$facet.ncol))
+            facet.nrow <- na_to_null(isolate_fn(input$facet.nrow))
 
             palette_values <- resolve_palette(
                 isolate_fn(palette_groups()),
                 isolate_fn(palette_store()),
                 default_palette_values,
-                .default_group_colors(defaults, "palette.colours")
+                default_group_colors(defaults, "palette.colours")
             )
 
             palcolor_arg <- NULL
@@ -242,50 +254,18 @@ plotthis_AreaPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs = NU
                     nrow = facet.nrow
                 )
             }
-            fig <- apply_title_layout(fig, input, isolate_fn, title_y = 0.98, title_x = isolate_fn(input$axis.title.horizontal.position))
+            list(fig = .ensure_built(fig), facet.by = facet.by)
+        }
+        base_AreaPlot <- cached_structure(
+            draw_AreaPlot, input, session, data, params = params,
+            extra = function() list(palette_groups(), palette_store())
+        )
 
-            # Apply axis styling to all subplot axes (handles faceting)
-            xaxis_style <- create_axis_styles(input, axis_side = "x", isolate_fn = isolate_fn)
-            yaxis_style <- create_axis_styles(input, axis_side = "y", isolate_fn = isolate_fn)
-
-            fig <- apply_subplot_axis_styling(fig, xaxis_style, yaxis_style)
-
-            # Apply axis title font to shared facet annotation titles
-            if (!is.null(facet.by) && nzchar(facet.by)) {
-                fig <- apply_axis_title_to_annotations(fig, input, isolate_fn)
-            }
-
-            # Add reference lines
-            fig <- add_reference_lines(fig,
-                hline.intercepts = isolate_fn(input$hline.intercepts),
-                hline.colors = isolate_fn(input$hline.colors),
-                hline.widths = isolate_fn(input$hline.widths),
-                hline.linetypes = isolate_fn(input$hline.linetypes),
-                hline.opacities = isolate_fn(input$hline.opacities),
-                vline.intercepts = isolate_fn(input$vline.intercepts),
-                vline.colors = isolate_fn(input$vline.colors),
-                vline.widths = isolate_fn(input$vline.widths),
-                vline.linetypes = isolate_fn(input$vline.linetypes),
-                vline.opacities = isolate_fn(input$vline.opacities),
-                abline.slopes = isolate_fn(input$abline.slopes),
-                abline.intercepts = isolate_fn(input$abline.intercepts),
-                abline.colors = isolate_fn(input$abline.colors),
-                abline.widths = isolate_fn(input$abline.widths),
-                abline.linetypes = isolate_fn(input$abline.linetypes),
-                abline.opacities = isolate_fn(input$abline.opacities)
-            )
-
-            config_list <- add_plot_config(download.format = isolate_fn(input$download.format), include.modebar.buttons = TRUE, facet.by = facet.by)
-            fig <- do.call(config, c(list(p = fig), config_list))
-            fig <- apply_plotly_newshape(fig, input, isolate_fn)
-
-            # Apply the uniform legend visibility and font inputs
-            fig <- apply_legend_inputs(fig, input, isolate_fn)
-
-            # Make single-panel x/y axis titles draggable (matches faceted behaviour)
-            fig <- axis_titles_as_annotations(fig)
-
-            return(fig)
+        # The plot, styled: titles, fonts, axes, reference lines and legend.
+        generate_AreaPlot <- reactive({
+            isolate_fn <- setup_auto_update_logic(input, params)
+            base <- base_AreaPlot()
+            apply_uniform_styling(base$fig, input, isolate_fn, facet.by = base$facet.by, title_y = 0.98)
         })
 
         # Render the plot output

@@ -30,7 +30,7 @@
 #' @author Jacob Martin, Jared Andrews
 plotthis_BarPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs = NULL, defaults = NULL) {
     stopifnot(is.reactive(data))
-    data <- .require_data_frame(data)
+    data <- require_data_frame(data)
 
 
     moduleServer(id, function(input, output, session) {
@@ -60,7 +60,7 @@ plotthis_BarPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs = NUL
         edit_store <- setup_manual_edits(input, session, plot_source)
 
         default_palette_name <- "dittoColors"
-        palette_lookup <- .flatten_palette_options(default_palettes()[["choices"]])
+        palette_lookup <- flatten_palette_options(default_palettes()[["choices"]])
         default_palette_values <- palette_lookup[[default_palette_name]]
         if (is.null(default_palette_values) || length(default_palette_values) == 0) {
             default_palette_values <- if (length(palette_lookup) > 0) palette_lookup[[1]] else character(0)
@@ -119,9 +119,12 @@ plotthis_BarPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs = NUL
             default_palette_values, defaults, params
         )
 
+        # The dragged x order the plot draws, NULL for the default one.
+        x_order <- setup_level_order(input, session, data, reactive(input$x.data), defaults)
+
         output$palette.selection <- renderUI({
             if (fill_numeric()) {
-                palette_names <- names(.flatten_palette_options(default_palettes()[["choices"]]))
+                palette_names <- names(flatten_palette_options(default_palettes()[["choices"]]))
                 viz_select_input(
                     ns("palette.name"),
                     "Color Palette",
@@ -136,7 +139,7 @@ plotthis_BarPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs = NUL
 
                 initial_colors <- isolate(resolve_palette(
                     groups, input$palette.colours, default_palette_values,
-                    .default_group_colors(defaults, "palette.colours")
+                    default_group_colors(defaults, "palette.colours")
                 ))
 
                 # The picker is seeded with this, so it is also what the plot should be
@@ -165,31 +168,34 @@ plotthis_BarPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs = NUL
             default.x <- get_default(defaults, "x.data", char.choices[2], function(x) x %in% char.choices)
             default.y <- get_default(defaults, "y.data", num.choices[2], function(x) x %in% num.choices)
 
-            # Limits for the columns being reset to, summed per x like the y.data
-            # observer's. That observer only recomputes them when the selection
-            # changes, which a reset to the current columns does not.
-            y.range <- .calculate_range(
-                df = data(), data_col_x = default.x, data_col_y = default.y,
-                axis_scale_factor = y_axis_scale_factor, grouping = TRUE
+            # The capped Group By and Fill By pools the UI offers (see plotthis_BarPlotInputsUI()).
+            group.choices <- c("", discrete_choices(data(), keep = get_default(defaults, "group.by", NULL)))
+            fill.disc <- discrete_choices(data(), keep = get_default(defaults, "fill.by", NULL))
+            fill.choices <- c("", names(data())[names(data()) %in% c(num.choices, fill.disc)])
+            default.group <- get_default(defaults, "group.by", group.choices[2], function(x) x %in% group.choices)
+            default.fill <- get_default(defaults, "fill.by", "", function(x) x %in% fill.choices)
+            default.facet <- get_default(defaults, "facet.by", "", function(x) x == "" || x %in% char.choices)
+
+            # Limits for the selection being reset to, fitted to the bars as drawn
+            # like the limits observer's. That observer only recomputes them when the
+            # selection changes, which a reset to the current one does not.
+            y.range <- .bar_range(
+                data(), default.x, default.y,
+                group.by = default.group, fill.by = default.fill, facet.by = default.facet,
+                axis_scale_factor = y_axis_scale_factor
             )
             max.y <- if (!is.null(y.range)) y.range$max else 1
-            min.y <- 0
+            min.y <- if (!is.null(y.range)) y.range$min else 0
 
             # Data
             update_viz_select(session, "x.data", selected = default.x)
             update_viz_select(session, "y.data", selected = default.y)
-            update_viz_select(session, "group.by",
-                selected = get_default(defaults, "group.by", char.choices[2], function(x) x %in% char.choices)
-            )
-            update_viz_select(session, "fill.by",
-                selected = get_default(defaults, "fill.by", "", function(x) x == "" || x %in% char.choices)
-            )
+            update_viz_select(session, "group.by", selected = default.group)
+            update_viz_select(session, "fill.by", selected = default.fill)
 
 
             # Facet
-            update_viz_select(session, "facet.by",
-                selected = get_default(defaults, "facet.by", "", function(x) x == "" || x %in% char.choices)
-            )
+            update_viz_select(session, "facet.by", selected = default.facet)
             update_viz_select(session, "facet.scale",
                 selected = get_default(defaults, "facet.scale", "fixed")
             )
@@ -233,10 +239,10 @@ plotthis_BarPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs = NUL
             update_viz_select(session, "palette.name",
                 selected = get_default(defaults, "palette.name", "viridis", is.character)
             )
-            .reset_group_colors(session, "palette.colours", defaults, palette_groups(), default_palette_values)
+            reset_group_colors(session, "palette.colours", defaults, palette_groups(), default_palette_values)
 
             reset_plotly_inputs(session, defaults)
-            .reset_manual_edits(edit_store)
+            reset_manual_edits(edit_store)
             reset_legend_inputs(session, defaults)
 
             # Lines
@@ -252,18 +258,17 @@ plotthis_BarPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs = NUL
         # Limits given as y.min/y.max defaults stand until x.data or y.data first
         # changes, since those are all the range depends on.
         seeded_limits <- .seed_axis_limits(defaults, "y.min", "y.max")
-        observeEvent(list(input$y.data, input$group.by, input$fill.by), {
+        observeEvent(list(input$x.data, input$y.data, input$group.by, input$fill.by, input$facet.by), {
             req(input$y.data, input$x.data)
             req(input$y.data %in% names(data()))
             req(input$x.data %in% names(data()))
 
-            # Summed per x, since bars sharing an x stack.
-            y_range <- .calculate_range(
-                df                = data(),
-                data_col_x        = input$x.data,
-                data_col_y        = input$y.data,
-                axis_scale_factor = y_axis_scale_factor,
-                grouping          = TRUE
+            # Fitted to the bars as drawn: dodged groups are one bar per row, stacked
+            # ones sum per x within each facet panel.
+            y_range <- .bar_range(
+                data(), input$x.data, input$y.data,
+                group.by = input$group.by, fill.by = input$fill.by, facet.by = input$facet.by,
+                axis_scale_factor = y_axis_scale_factor
             )
             y_range <- seeded_limits(y_range, list(input$x.data, input$y.data))
 
@@ -272,11 +277,13 @@ plotthis_BarPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs = NUL
                 updateNumericInput(session, "y.max", value = y_range$max)
                 updateNumericInput(session, "y.min", value = y_range$min)
             }
-        })
+            # Just after setup_axis_range()'s observer and before the render, so the
+            # plot draws once with the new column's limits rather than the old ones.
+        }, priority = 999)
 
 
         observeEvent(input$facet.by, {
-            .toggle_facet_title_inputs(session, .nz_value(input$facet.by), hidden = hide.inputs)
+            toggle_facet_title_inputs(session, nz_value(input$facet.by), hidden = hide.inputs)
         })
 
         # The color-scale trimming controls only affect a continuous fill gradient,
@@ -297,19 +304,21 @@ plotthis_BarPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs = NUL
             }
         }, ignoreInit = FALSE)
 
-        generate_BarPlot <- reactive({
-            isolate_fn <- setup_auto_update_logic(input, params)
+        # The plot itself: everything that changes what is drawn. It is cached
+        # (see cached_structure()), so it reads every input through isolate_fn and
+        # has no side effects; the styling inputs are applied in generate_BarPlot().
+        draw_BarPlot <- function(isolate_fn) {
 
             # Resolved server-side, so the echo of a limit just set costs no rebuild.
             y.limits <- isolate_fn(y_range_store())
 
             # Null Values:
             facet.by <- NULL
-            if (.nz_value(isolate_fn(input$facet.by))) {
+            if (nz_value(isolate_fn(input$facet.by))) {
                 facet.by <- isolate_fn(input$facet.by)
             }
             expand <- waiver()
-            expand.input <- .na_to_null(isolate_fn(input$expand))
+            expand.input <- na_to_null(isolate_fn(input$expand))
             if (!is.null(expand.input)) {
                 expand <- as.numeric(strsplit(expand.input, ",\\s*")[[1]])
             }
@@ -319,13 +328,13 @@ plotthis_BarPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs = NUL
                 width <- waiver()
             }
             group.by <- NULL
-            if (.nz_value(isolate_fn(input$group.by))) {
+            if (nz_value(isolate_fn(input$group.by))) {
                 group.by <- isolate_fn(input$group.by)
             }
 
 
             fill_by_input <- isolate_fn(input$fill.by)
-            if (.nz_value(fill_by_input)) {
+            if (nz_value(fill_by_input)) {
                 fill.by <- fill_by_input
                 group.by <- NULL
             } else {
@@ -344,19 +353,19 @@ plotthis_BarPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs = NUL
                     isolate_fn(palette_groups()),
                     isolate_fn(palette_store()),
                     default_palette_values,
-                    .default_group_colors(defaults, "palette.colours")
+                    default_group_colors(defaults, "palette.colours")
                 )
                 palcolor_arg <- as.list(palette_values)
             }
 
             # Convert NA to NULL for facet.ncol and facet.nrow
-            facet.ncol <- .na_to_null(isolate_fn(input$facet.ncol))
-            facet.nrow <- .na_to_null(isolate_fn(input$facet.nrow))
+            facet.ncol <- na_to_null(isolate_fn(input$facet.ncol))
+            facet.nrow <- na_to_null(isolate_fn(input$facet.nrow))
 
             theme_args <- create_ggplot_axis_style(input, isolate_fn = isolate_fn)
 
             p <- BarPlot(
-                data(),
+                apply_level_order(data(), isolate_fn(input$x.data), isolate_fn(x_order())),
                 x = isolate_fn(input$x.data),
                 y = isolate_fn(input$y.data),
                 flip = isolate_fn(input$rotate),
@@ -379,8 +388,8 @@ plotthis_BarPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs = NUL
                 fill_by = fill.by,
                 lower_quantile = isolate_fn(input$lower.quantile),
                 upper_quantile = isolate_fn(input$upper.quantile),
-                lower_cutoff = .na_to_null(isolate_fn(input$lower.cutoff)),
-                upper_cutoff = .na_to_null(isolate_fn(input$upper.cutoff))
+                lower_cutoff = na_to_null(isolate_fn(input$lower.cutoff)),
+                upper_cutoff = na_to_null(isolate_fn(input$upper.cutoff))
             )
 
             fig <- ggplotly(p)
@@ -393,51 +402,20 @@ plotthis_BarPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs = NUL
                 )
             }
 
-            fig <- apply_title_layout(fig, input, isolate_fn, title_y = 0.95, title_x = isolate_fn(input$axis.title.horizontal.position))
+            list(fig = .ensure_built(fig), facet.by = facet.by)
+        }
+        base_BarPlot <- cached_structure(
+            draw_BarPlot, input, session, data, params = params,
+            extra = function() list(y_range_store(), palette_groups(), palette_store(), x_order(), fill_numeric())
+        )
 
-            # Apply axis styling to all subplot axes (handles faceting)
-            # Disable plotly borders since we're handling them through ggplot theme_args
-            xaxis_style <- create_axis_styles(input, axis_side = "x", isolate_fn = isolate_fn)
-            yaxis_style <- create_axis_styles(input, axis_side = "y", isolate_fn = isolate_fn)
-
-            fig <- apply_subplot_axis_styling(fig, xaxis_style, yaxis_style)
-
-            # Apply axis title font to shared facet annotation titles
-            if (!is.null(facet.by) && nzchar(facet.by)) {
-                fig <- apply_axis_title_to_annotations(fig, input, isolate_fn)
-            }
-
-            # Add reference lines
-            fig <- add_reference_lines(fig,
-                hline.intercepts = isolate_fn(input$hline.intercepts),
-                hline.colors = isolate_fn(input$hline.colors),
-                hline.widths = isolate_fn(input$hline.widths),
-                hline.linetypes = isolate_fn(input$hline.linetypes),
-                hline.opacities = isolate_fn(input$hline.opacities),
-                vline.intercepts = isolate_fn(input$vline.intercepts),
-                vline.colors = isolate_fn(input$vline.colors),
-                vline.widths = isolate_fn(input$vline.widths),
-                vline.linetypes = isolate_fn(input$vline.linetypes),
-                vline.opacities = isolate_fn(input$vline.opacities),
-                abline.slopes = isolate_fn(input$abline.slopes),
-                abline.intercepts = isolate_fn(input$abline.intercepts),
-                abline.colors = isolate_fn(input$abline.colors),
-                abline.widths = isolate_fn(input$abline.widths),
-                abline.linetypes = isolate_fn(input$abline.linetypes),
-                abline.opacities = isolate_fn(input$abline.opacities)
+        # The plot, styled: titles, fonts, axes, reference lines and legend.
+        generate_BarPlot <- reactive({
+            isolate_fn <- setup_auto_update_logic(input, params)
+            base <- base_BarPlot()
+            apply_uniform_styling(base$fig, input, isolate_fn,
+                facet.by = base$facet.by, title_y = 0.95, padding.axes = "x"
             )
-
-            config_list <- add_plot_config(download.format = isolate_fn(input$download.format), include.modebar.buttons = TRUE, facet.by = facet.by)
-            fig <- do.call(config, c(list(p = fig), config_list))
-            fig <- apply_plotly_newshape(fig, input, isolate_fn)
-
-            # Apply the uniform legend visibility and font inputs
-            fig <- apply_legend_inputs(fig, input, isolate_fn)
-
-            # Make single-panel x/y axis titles draggable (matches faceted behaviour)
-            fig <- axis_titles_as_annotations(fig)
-
-            return(fig)
         })
 
         # Render the plot output
@@ -449,7 +427,7 @@ plotthis_BarPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs = NUL
 
             # group.by is not req()'d above, so it can still be NULL here; a
             # bare == against it yields logical(0) and errors the render.
-            if (.nz_value(input$group.by) && input$y.data == input$group.by) {
+            if (nz_value(input$group.by) && input$y.data == input$group.by) {
                 return_empty <- TRUE
                 txt <- c(txt, "Cannot have the y input and group.by be equal. Please change either inputs.")
             }

@@ -1,6 +1,6 @@
 ---
 name: vizmodules-custom-module
-description: Build a custom Shiny wrapper module on top of a VizModules plot module, or extend one from outside the package - adding your own inputs, filtering or transforming the data before it reaches the plot, driving a base module's parameters from your wrapper's state, registering a custom model-line backend with register_model_backend(), or adding multiColorPicker()/multiDynamicInput() widgets. Use whenever wrapping, extending, subclassing, or composing a VizModules module, or when a hand-rolled plotly output needs the same manual-edit persistence the built-in modules have. The wrapper lives in your own app or package; adding a module to the VizModules package source is vizmodules-new-module, and plain use of an existing module in an app is vizmodules-app.
+description: Build a custom Shiny wrapper module on top of a VizModules plot module, or extend one from outside the package - adding your own inputs, filtering or transforming the data before it reaches the plot, driving a base module's parameters from your wrapper's state, registering a custom model-line backend with register_model_backend(), or adding multiColorPicker()/multiDynamicInput()/level_order_input() widgets. Use whenever wrapping, extending, subclassing, or composing a VizModules module, or when a hand-rolled plotly output needs the same manual-edit persistence the built-in modules have. The wrapper lives in your own app or package; adding a module to the VizModules package source is vizmodules-new-module, and plain use of an existing module in an app is vizmodules-app.
 license: MIT
 ---
 
@@ -71,7 +71,8 @@ when the parameter should never move.
 
 **The key must be an input the module actually reads.** A `defaults` entry for a key no
 module exposes is a silent no-op — nothing errors, the plot just ignores it. Check the
-key against `references/../module-inventory.md` or the module's own
+key against the `vizmodules-app` skill's `references/module-inventory.md` (installed alongside
+this one by `use_vizmodules_skills()`) or the module's own
 **Plot parameters and defaults** roxygen section before relying on it.
 
 > Known trap: `main` (plot title) is **not** exposed by any module — every server passes
@@ -101,8 +102,10 @@ observeEvent(input$stat.x, {
 ## Other extension points
 
 - **Manual layout edits** on a hand-rolled plotly output — two calls, `setup_manual_edits()` and `finalize_manual_edits()`. Inherited for free if you delegate to a base module. See `references/manual-edits.md`.
+- **Keeping a hand-rolled plot fast** — draw it in a function of `isolate_fn` handed to `cached_structure()`, and style the cached figure with `apply_uniform_styling()` in a separate reactive, so a styling change never redraws it and `finalize_manual_edits()` can send only the layout. Three rules, and breaking one draws a stale plot rather than failing: read every input as the literal `isolate_fn(input$key)`, name every other reactive it reads in `extra`, and give it no side effects. See the custom-modules vignette. For many points add `auto_webgl()` with `webgl_input()`, with `overlays = TRUE` if lines must stay on top of them; for colour and shape on a ggplotly figure, `split_color_shape_legend()`.
 - **Model-line backends** — `register_model_backend(name, backend)` adds a fitting engine to the scatter module's Model Type dropdown. See `references/model-backends.md`.
-- **Widgets** — `multiColorPicker()` and `multiDynamicInput()` are exported and usable in any Shiny app. See `references/custom-inputs.md`, which also covers styling a widget of your own: a stylesheet goes into the *host* document unscoped, so every selector must be anchored on a class you invented.
+- **Adding layers to a wrapped figure** — `dittoViz_scatterPlotServer(..., fig.fn = function(fig, input, isolate_fn) fig)` runs your function on the built figure before its axis titles become draggable annotations: add traces or annotations (loading arrows, threshold labels), or set `fig$x$layout$xaxis$title$text`. It runs in the figure's styling step, so the additions reach the render, manual-edit persistence and the source download; the plot under it is cached but that step is not, so it can read any of your reactives. It runs after the Marginals tab's panels are drawn, so anchor anything spanning the plot with `xref = "x domain"` / `yref = "y domain"` rather than `"paper"`, which reaches across them. Read your own inputs as `isolate_fn(input$key)`; they share the module's namespace when the wrapper uses the same `id`.
+- **Widgets** — `multiColorPicker()`, `multiDynamicInput()` and `level_order_input()` (drag-and-drop category order, with `setup_level_order()` / `apply_level_order()`) are exported and usable in any Shiny app. See `references/custom-inputs.md`, which also covers styling a widget of your own: a stylesheet goes into the *host* document unscoped, so every selector must be anchored on a class you invented.
 - **Runtime show/hide** — `hide_input(session, ids)` / `show_input(session, ids)`, not `shinyjs::hide()`; the VizModules helpers reflow the grid. If your server takes `hide.inputs`, show only `setdiff(ids, hide.inputs)`, or the toggle un-hides what the app hid (`linePlotServer()` does this for its error bar controls).
 - **User-typed expressions** — `safe_eval_filter()`, `validate_expression()`, `safe_resolve_adj_fxn()`. Never `eval(parse())` on user input.
 

@@ -96,7 +96,8 @@
 #' - `y` - Y-axis variable (UI: "Y data", default: 2nd numeric variable)
 #' - `group_by` - Grouping variable (UI: "Group by", default: "")
 #' - `flip` - Flip/swap the x and y axes (UI: "Rotate (swap X/Y)", default: FALSE)
-#' - `sort_x` - Sort X-axis by statistic (UI: "Sort X by", default: "")
+#' - `sort_x` - Sort X-axis by statistic (UI: "Sort X by", default: ""). An expression evaluated once per x
+#'   group over all the data, e.g. `mean(salary)`; a faceted plot shares the one order across its panels
 #' - `y_max` - Maximum Y-axis value (UI: "Max Value of Y Axis", default: calculated)
 #' - `y_min` - Minimum Y-axis value (UI: "Min Value of Y Axis", default: calculated)
 #' - `add_point` - Add jitter points (UI: "Add Jitter Points", default: FALSE)
@@ -145,7 +146,12 @@
 #' @section Parameters controlling additional functionality:
 #' The following parameters implementing new functionality or controlling plotly-specific features are also available:
 #'
+#' - `webgl` - Draw the points with WebGL once there are 5,000 or more, as set by the
+#'   `VizModules.webgl.threshold` option (UI: "Plot with WebGL", default: TRUE)
 #' - `boxplot.width` - Width of boxplot (UI: "Boxplot Width", default: 0.8)
+#' - `x.order` - Order of the X groups (UI: "X Order", drag and drop, default: the column's factor level order,
+#'   else sorted). As a default, a character vector of levels of `x.data`; levels it leaves out follow in their
+#'   default order. Ignored while `sort_x` is set, and not shown for an X with more than 20 groups
 #' - `show.outliers` - Show outlier points (UI: "Show Outliers", default: TRUE)
 #' - `axis.title.font.size` - Axis title font size (UI: "Axis title size", default: 18)
 #' - `title.font.size` - Plot title font size (UI: "Title Size", default: 26)
@@ -169,6 +175,10 @@
 #' - `axis.tickcolor` - Color of tick marks (UI: "Tick mark color", default: "black")
 #' - `axis.ticklen` - Length of tick marks (UI: "Tick mark length", default: 5)
 #' - `axis.tickwidth` - Width of tick marks (UI: "Tick mark width", default: 1)
+#' - `axis.scientific` - Write numeric tick labels in scientific notation (UI: "Scientific Notation Ticks",
+#'   default: FALSE; when off they never switch to it). See [apply_tick_notation()]
+#' - `axis.padding.x` - Space between the data and the plot area's edges along X, as a fraction of the
+#'   data's extent at each end (UI: "X Axis Padding", default: NA = the plot's own). See [apply_axis_padding()]
 #' - `legend.show` - Show the legend and any colorbar (UI: "Show Legend", default: TRUE)
 #' - `legend.font.family` - Font family of the legend title and labels (UI: "Legend Font", default: "Arial")
 #' - `legend.font.color` - Font color of the legend title and labels (UI: "Legend Font Color", default: "#000000")
@@ -224,6 +234,9 @@ plotthis_BoxPlotInputsUI <- function(id, data, defaults = NULL, title = NULL, co
     choices <- c("", names(data))
     num.choices <- c("", names(data)[vapply(data, is.numeric, logical(1))])
     cat.choices <- c("", names(data)[vapply(data, function(x) !is.numeric(x), logical(1))])
+    # Group By leaves out categoricals with too many levels to draw (an ID
+    # column asks for one box per row), unless the caller asked for one.
+    group.choices <- c("", discrete_choices(data, keep = get_default(defaults, "group.by", NULL)))
     numeric.data <- data[, vapply(data, is.numeric, logical(1)), drop = FALSE]
 
     if (length(num.choices) >= 2) {
@@ -275,9 +288,9 @@ plotthis_BoxPlotInputsUI <- function(id, data, defaults = NULL, title = NULL, co
                 viz_select_input(ns("group.by"), "Group By",
                     selected = get_default(
                         defaults, "group.by", "",
-                        function(x) x %in% c("", cat.choices)
+                        function(x) x %in% group.choices
                     ),
-                    choices = c("", cat.choices)
+                    choices = group.choices
                 ),
                 documentParameters$group_by,
                 placement = "top", options = list(container = "body")
@@ -287,7 +300,18 @@ plotthis_BoxPlotInputsUI <- function(id, data, defaults = NULL, title = NULL, co
                 "Toggle whether outlier points beyond the whiskers are displayed on the boxplot",
                 placement = "top", options = list(container = "body")
             ),
-            uiOutput(ns("palette.selection"))
+            uiOutput(ns("palette.selection")),
+            level_order_input(ns("x.order"), "X Order",
+                items = level_order_choices(
+                    data,
+                    get_default(defaults, "x.data", cat.choices[2], function(x) x %in% cat.choices),
+                    get_default(defaults, "x.order", NULL, is.character)
+                ),
+                tooltip = paste(
+                    "Drag the X groups into the order to plot them in. Ignored while 'Sort X By' is set.",
+                    "Not shown for an X with more than 20 groups."
+                )
+            )
         ),
         "Adjustments" = tagList(
             tipify(numericInput(ns("boxplot.width"), "Boxplot Width", min = 0, max = 1,
@@ -323,6 +347,7 @@ plotthis_BoxPlotInputsUI <- function(id, data, defaults = NULL, title = NULL, co
                 documentParameters$pt_alpha,
                 placement = "top", options = list(container = "body")
             ),
+            webgl_input(ns, defaults),
             tipify(numericInput(ns("jitter.width"), "Jitter Width", min = 0, max = 1,
                 value = get_default(defaults, "jitter.width", 0.3, is.numeric), step = 0.05),
                 documentParameters$jitter_width,
@@ -359,7 +384,7 @@ plotthis_BoxPlotInputsUI <- function(id, data, defaults = NULL, title = NULL, co
         "Facet" = tagList(
             tipify(viz_select_input(ns("facet.by"), "Facet By",
                 selected = get_default(defaults, "facet.by", "", function(x) x == "" || x %in% cat.choices),
-                choices = c("", .facet_check(data))),
+                choices = c("", facet_check(data))),
                 documentParameters$facet_by,
                 placement = "top", options = list(container = "body")
             ),
@@ -387,12 +412,12 @@ plotthis_BoxPlotInputsUI <- function(id, data, defaults = NULL, title = NULL, co
                 documentParameters$facet_byrow,
                 placement = "top", options = list(container = "body")
             ),
-            .uniform_subplot_spacing_inputs_ui(ns, defaults)
+            uniform_subplot_spacing_inputs_ui(ns, defaults)
         ),
-        "Stats" = .uniform_stats_inputs_ui(ns, defaults),
+        "Stats" = uniform_stats_inputs_ui(ns, defaults),
         "Legend" = uniform_legend_inputs_ui(ns, defaults),
         "Plotly" = uniform_plotly_inputs_ui(ns, defaults),
-        "Axes" = uniform_axes_inputs_ui(ns, defaults, include.rotate = TRUE, include.flip = FALSE),
+        "Axes" = uniform_axes_inputs_ui(ns, defaults, include.rotate = TRUE, include.flip = FALSE, include.padding = "x"),
         "Lines" = uniform_lines_inputs_ui(ns, defaults)
     )
 

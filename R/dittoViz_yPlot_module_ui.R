@@ -54,7 +54,7 @@
 #' - `y.breaks` - Custom continuous-axis breaks (not implemented)
 #' - `x.labels` - Override group labels (not implemented)
 #' - `x.labels.rotate` - Rotate group labels (handled by the Axes tab tick-angle controls)
-#' - `x.reorder` - Reorder x-axis groups (not implemented)
+#' - `x.reorder` - Reorder x-axis groups (use `x.order`, the "Group Order" input, instead)
 #' - `boxplot.width` - Boxplot width (controlled via `boxgap` and `boxgroupgap`)
 #' - `boxplot.outlier.size` - Outlier point size (not implemented)
 #' - `boxplot.position.dodge` - Boxplot dodge (controlled via `boxgap`)
@@ -120,6 +120,11 @@
 #' @section Parameters controlling additional functionality:
 #' The following parameters implementing new functionality or controlling plotly-specific features are also available:
 #'
+#' - `webgl` - Draw the points with WebGL once there are 5,000 or more, as set by the
+#'   `VizModules.webgl.threshold` option (UI: "Plot with WebGL", default: TRUE)
+#' - `x.order` - Order of the `group.by` groups along the x-axis (UI: "Group Order", drag and drop, default: the
+#'   column's factor level order, else sorted). As a default, a character vector of levels of `group.by`; levels
+#'   it leaves out follow in their default order. Not shown for a `group.by` with more than 20 groups
 #' - `boxmode` - Always "overlay": the boxes carry explicit x positions matching
 #'   ggplot's dodge, so plotly.js is not asked to dodge them
 #' - `boxgap` - Boxplot position dodge (UI: "Boxplot Position Dodge", default: 0.3)
@@ -145,6 +150,10 @@
 #' - `axis.tickcolor` - Color of tick marks (UI: "Tick Mark Color", default: "black")
 #' - `axis.ticklen` - Length of tick marks (UI: "Tick Mark Length", default: 5)
 #' - `axis.tickwidth` - Width of tick marks (UI: "Tick Mark Width", default: 1)
+#' - `axis.scientific` - Write numeric tick labels in scientific notation (UI: "Scientific Notation Ticks",
+#'   default: FALSE; when off they never switch to it). See [apply_tick_notation()]
+#' - `axis.padding.x` - Space between the data and the plot area's edges along X, as a fraction of the
+#'   data's extent at each end (UI: "X Axis Padding", default: NA = the plot's own). See [apply_axis_padding()]
 #' - `legend.font.family` - Font family of the legend title and labels (UI: "Legend Font", default: "Arial")
 #' - `legend.font.color` - Font color of the legend title and labels (UI: "Legend Font Color", default: "#000000")
 #' - `legend.title.size` - Legend title font size (UI: "Legend Title Size", default: 14)
@@ -219,6 +228,14 @@ dittoViz_yPlotInputsUI <- function(id, data, defaults = NULL, title = NULL, colu
     num.choices <- c("", names(data)[vapply(data, is.numeric, logical(1))])
     cat.choices <- c("", names(data)[vapply(data, function(x) !is.numeric(x), logical(1))])
 
+    # Grouping, colour and shape choices leave out categoricals with too many
+    # levels to draw (an ID column asks for one group per row), unless the
+    # caller asked for one.
+    disc_for <- function(key) c("", discrete_choices(data, keep = get_default(defaults, key, NULL)))
+    group.choices <- disc_for("group.by")
+    color.choices <- disc_for("color.by")
+    shape.choices <- disc_for("shape.by")
+
     # Recognized data adjustments for the (numeric) continuous variable.
     adj.choices <- c("", .adjustment_choices)
     adj.fxn.choices <- c("", .adj_fxn_choices)
@@ -227,7 +244,7 @@ dittoViz_yPlotInputsUI <- function(id, data, defaults = NULL, title = NULL, colu
     # The limits are in the units plotted, so any default adjustment applies.
     default.var <- get_default(defaults, "var", num.choices[2], function(x) all(x %in% num.choices))
     y.range <- .calculate_range(
-        df = .as_plotted(
+        df = as_plotted(
             data, default.var,
             get_default(defaults, "var.adjustment", "", function(x) x %in% adj.choices),
             get_default(defaults, "var.adj.fxn", "", function(x) x %in% adj.fxn.choices)
@@ -279,10 +296,10 @@ dittoViz_yPlotInputsUI <- function(id, data, defaults = NULL, title = NULL, colu
             ),
             tipify(
                 viz_select_input(ns("group.by"), "Group By",
-                    choices = cat.choices,
+                    choices = group.choices,
                     selected = get_default(
-                        defaults, "group.by", cat.choices[2],
-                        function(x) x %in% cat.choices
+                        defaults, "group.by", group.choices[2],
+                        function(x) x %in% group.choices
                     )
                 ),
                 documentParameters$group.by,
@@ -290,10 +307,10 @@ dittoViz_yPlotInputsUI <- function(id, data, defaults = NULL, title = NULL, colu
             ),
             tipify(
                 viz_select_input(ns("color.by"), "Color By",
-                    choices = cat.choices,
+                    choices = color.choices,
                     selected = get_default(
                         defaults, "color.by", "",
-                        function(x) x %in% cat.choices
+                        function(x) x %in% color.choices
                     )
                 ),
                 documentParameters$color.by,
@@ -301,10 +318,10 @@ dittoViz_yPlotInputsUI <- function(id, data, defaults = NULL, title = NULL, colu
             ),
             tipify(
                 viz_select_input(ns("shape.by"), "Shape By",
-                    choices = cat.choices,
+                    choices = shape.choices,
                     selected = get_default(
                         defaults, "shape.by", "",
-                        function(x) x %in% cat.choices
+                        function(x) x %in% shape.choices
                     )
                 ),
                 documentParameters$shape.by,
@@ -321,7 +338,18 @@ dittoViz_yPlotInputsUI <- function(id, data, defaults = NULL, title = NULL, colu
                 multiple = TRUE
             ), documentParameters$plots, placement = "top", options = list(container = "body")),
             helpText("Order not currently respected"),
-            uiOutput(ns("palette.selection"))
+            uiOutput(ns("palette.selection")),
+            level_order_input(ns("x.order"), "Group Order",
+                items = level_order_choices(
+                    data,
+                    get_default(defaults, "group.by", group.choices[2], function(x) x %in% group.choices),
+                    get_default(defaults, "x.order", NULL, is.character)
+                ),
+                tooltip = paste(
+                    "Drag the Group By groups into the order to plot them along the x-axis.",
+                    "Not shown for a Group By with more than 20 groups."
+                )
+            )
         ),
         "Adjustments" = tagList(
             tipify(
@@ -387,6 +415,7 @@ dittoViz_yPlotInputsUI <- function(id, data, defaults = NULL, title = NULL, colu
                 documentParameters$jitter.color,
                 placement = "top", options = list(container = "body")
             ),
+            webgl_input(ns, defaults),
             tipify(viz_select_input(ns("hover.data"), "Hover Data",
                 choices = choices,
                 multiple = TRUE,
@@ -565,11 +594,11 @@ dittoViz_yPlotInputsUI <- function(id, data, defaults = NULL, title = NULL, colu
                 placement = "top", options = list(container = "body")
             )
         ),
-        "Stats" = .uniform_stats_inputs_ui(ns, defaults),
+        "Stats" = uniform_stats_inputs_ui(ns, defaults),
         "Facet" = tagList(
             tipify(
                 viz_select_input(ns("split.by"), "Split by (facet)",
-                    choices = c("", .facet_check(data)),
+                    choices = c("", facet_check(data)),
                     selected = get_default(
                         defaults, "split.by", "",
                         function(x) x %in% cat.choices
@@ -619,7 +648,7 @@ dittoViz_yPlotInputsUI <- function(id, data, defaults = NULL, title = NULL, colu
                 documentParameters$multivar.split.dir,
                 placement = "top", options = list(container = "body")
             ),
-            .uniform_subplot_spacing_inputs_ui(ns, defaults)
+            uniform_subplot_spacing_inputs_ui(ns, defaults)
         ),
         "Annotations" = uniform_annotation_inputs_ui(ns, defaults, choices,
             annotate.note = paste(
@@ -629,7 +658,7 @@ dittoViz_yPlotInputsUI <- function(id, data, defaults = NULL, title = NULL, colu
         ),
         "Legend" = uniform_legend_inputs_ui(ns, defaults),
         "Plotly" = uniform_plotly_inputs_ui(ns, defaults),
-        "Axes" = uniform_axes_inputs_ui(ns, defaults),
+        "Axes" = uniform_axes_inputs_ui(ns, defaults, include.padding = "x"),
         "Lines" = uniform_lines_inputs_ui(ns, defaults)
     )
 

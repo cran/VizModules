@@ -350,10 +350,10 @@ controls while reusing the full functionality of the base modules.</p>
 <p>This vignette demonstrates how to create a custom module by building
 on top of the <code>scatterPlot</code> module.</p>
 <p>If you are working with an AI coding agent, the package ships an <a href="https://agentskills.io">Agent Skill</a> covering exactly this
-material - <strong><code>vizmodules-custom-module</code></strong> -
-along with the namespace contract, reactive <code>defaults</code>,
-avoiding double renders, manual-edit persistence, and model-line
-backends. Install it (and its two siblings) into your project with
+material (<strong><code>vizmodules-custom-module</code></strong>), along
+with the namespace contract, reactive <code>defaults</code>, avoiding
+double renders, manual-edit persistence, and model-line backends.
+Install it (and its two siblings) into your project with
 <code>VizModules::use_vizmodules_skills(&quot;.&quot;)</code>, or pass
 <code>client = &quot;copilot&quot;</code> / <code>client = &quot;claude&quot;</code> to
 write to <code>.github/skills/</code> or <code>.claude/skills/</code>
@@ -363,7 +363,7 @@ details.</p>
 <div id="the-pattern" class="section level2">
 <h2>The Pattern</h2>
 <p>When building a custom module, you need to handle Shiny’s namespacing
-correctly. The key insight is:</p>
+correctly. Some key tips include:</p>
 <ol style="list-style-type: decimal">
 <li><strong>Your module’s custom inputs</strong> need to be namespaced
 with <code>NS(id)</code>.</li>
@@ -519,6 +519,58 @@ twice, and the control stays user-editable. See
 <code>vignette(&quot;defaults-and-hiding&quot;, package = &quot;VizModules&quot;)</code> for
 the full semantics.</p>
 </div>
+<div id="adding-layers-to-the-scatter-figure-fig.fn" class="section level2">
+<h2>Adding Layers to the Scatter Figure (<code>fig.fn</code>)</h2>
+<p><code>defaults</code> sets what the base module draws; to draw
+something <em>more</em>, such as loading arrows on a PCA biplot, a
+threshold label, or axis titles your wrapper works out, pass
+<code>dittoViz_scatterPlotServer()</code> a <code>fig.fn</code>. It is a
+<code>function(fig, input, isolate_fn)</code> that receives the built
+plotly figure and returns it. It runs in the figure’s styling step (see
+<code>apply_uniform_styling()</code>), after the legend is styled and
+before the axis titles become draggable annotations, so what it adds
+reaches the rendered plot, manual-edit persistence and the source
+download alike. The plot underneath is cached, but this step is not, so
+<code>fig.fn</code> can read any of your wrapper’s reactives as well as
+its inputs.</p>
+<div class="sourceCode" id="cb6"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" tabindex="-1"></a>cutoffScatterInputsUI <span class="ot">&lt;-</span> <span class="cf">function</span>(id, data, <span class="at">defaults =</span> <span class="cn">NULL</span>) {</span>
+<span id="cb6-2"><a href="#cb6-2" tabindex="-1"></a>    ns <span class="ot">&lt;-</span> <span class="fu">NS</span>(id)</span>
+<span id="cb6-3"><a href="#cb6-3" tabindex="-1"></a>    <span class="fu">tagList</span>(</span>
+<span id="cb6-4"><a href="#cb6-4" tabindex="-1"></a>        <span class="fu">numericInput</span>(<span class="fu">ns</span>(<span class="st">&quot;cutoff&quot;</span>), <span class="st">&quot;Y Cutoff&quot;</span>, <span class="at">value =</span> <span class="cn">NA</span>),</span>
+<span id="cb6-5"><a href="#cb6-5" tabindex="-1"></a>        <span class="fu">dittoViz_scatterPlotInputsUI</span>(id, data, <span class="at">defaults =</span> defaults)</span>
+<span id="cb6-6"><a href="#cb6-6" tabindex="-1"></a>    )</span>
+<span id="cb6-7"><a href="#cb6-7" tabindex="-1"></a>}</span>
+<span id="cb6-8"><a href="#cb6-8" tabindex="-1"></a></span>
+<span id="cb6-9"><a href="#cb6-9" tabindex="-1"></a>cutoffScatterServer <span class="ot">&lt;-</span> <span class="cf">function</span>(id, data_reactive, <span class="at">defaults =</span> <span class="cn">NULL</span>) {</span>
+<span id="cb6-10"><a href="#cb6-10" tabindex="-1"></a>    <span class="fu">dittoViz_scatterPlotServer</span>(</span>
+<span id="cb6-11"><a href="#cb6-11" tabindex="-1"></a>        id, data_reactive,</span>
+<span id="cb6-12"><a href="#cb6-12" tabindex="-1"></a>        <span class="at">defaults =</span> defaults,</span>
+<span id="cb6-13"><a href="#cb6-13" tabindex="-1"></a>        <span class="at">fig.fn =</span> <span class="cf">function</span>(fig, input, isolate_fn) {</span>
+<span id="cb6-14"><a href="#cb6-14" tabindex="-1"></a>            <span class="co"># The wrapper&#39;s input shares the module&#39;s id, so it is on this `input` too.</span></span>
+<span id="cb6-15"><a href="#cb6-15" tabindex="-1"></a>            <span class="co"># isolate_fn() respects the module&#39;s Auto Update setting.</span></span>
+<span id="cb6-16"><a href="#cb6-16" tabindex="-1"></a>            cutoff <span class="ot">&lt;-</span> <span class="fu">isolate_fn</span>(input<span class="sc">$</span>cutoff)</span>
+<span id="cb6-17"><a href="#cb6-17" tabindex="-1"></a>            <span class="cf">if</span> (<span class="fu">is.null</span>(cutoff) <span class="sc">||</span> <span class="fu">is.na</span>(cutoff)) {</span>
+<span id="cb6-18"><a href="#cb6-18" tabindex="-1"></a>                <span class="fu">return</span>(fig)</span>
+<span id="cb6-19"><a href="#cb6-19" tabindex="-1"></a>            }</span>
+<span id="cb6-20"><a href="#cb6-20" tabindex="-1"></a>            <span class="co"># Append rather than replace: facet strips, brackets and line labels share this list.</span></span>
+<span id="cb6-21"><a href="#cb6-21" tabindex="-1"></a>            fig<span class="sc">$</span>x<span class="sc">$</span>layout<span class="sc">$</span>annotations <span class="ot">&lt;-</span> <span class="fu">c</span>(fig<span class="sc">$</span>x<span class="sc">$</span>layout<span class="sc">$</span>annotations, <span class="fu">list</span>(<span class="fu">list</span>(</span>
+<span id="cb6-22"><a href="#cb6-22" tabindex="-1"></a>                <span class="at">text =</span> <span class="fu">paste</span>(<span class="st">&quot;Cutoff:&quot;</span>, cutoff), <span class="at">showarrow =</span> <span class="cn">FALSE</span>,</span>
+<span id="cb6-23"><a href="#cb6-23" tabindex="-1"></a>                <span class="at">xref =</span> <span class="st">&quot;paper&quot;</span>, <span class="at">x =</span> <span class="dv">1</span>, <span class="at">xanchor =</span> <span class="st">&quot;right&quot;</span>,</span>
+<span id="cb6-24"><a href="#cb6-24" tabindex="-1"></a>                <span class="at">yref =</span> <span class="st">&quot;y&quot;</span>, <span class="at">y =</span> cutoff, <span class="at">yanchor =</span> <span class="st">&quot;bottom&quot;</span></span>
+<span id="cb6-25"><a href="#cb6-25" tabindex="-1"></a>            )))</span>
+<span id="cb6-26"><a href="#cb6-26" tabindex="-1"></a>            fig<span class="sc">$</span>x<span class="sc">$</span>layout<span class="sc">$</span>yaxis<span class="sc">$</span>title<span class="sc">$</span>text <span class="ot">&lt;-</span> <span class="fu">paste0</span>(<span class="fu">isolate_fn</span>(input<span class="sc">$</span>y.by), <span class="st">&quot; (cutoff &quot;</span>, cutoff, <span class="st">&quot;)&quot;</span>)</span>
+<span id="cb6-27"><a href="#cb6-27" tabindex="-1"></a>            fig</span>
+<span id="cb6-28"><a href="#cb6-28" tabindex="-1"></a>        }</span>
+<span id="cb6-29"><a href="#cb6-29" tabindex="-1"></a>    )</span>
+<span id="cb6-30"><a href="#cb6-30" tabindex="-1"></a>}</span></code></pre></div>
+<p>Coordinates are those of the plot as drawn, so a cutoff on an
+adjusted (e.g. log10) Y axis is in adjusted units, and anything you
+derive from the data should come from the plotted values
+(<code>as_plotted()</code>), not raw <code>data()</code>. Edit
+<code>fig$x$layout</code> directly rather than queuing whole elements
+through <code>plotly::layout()</code>, which would overwrite the
+module’s own annotations and shapes at build time.</p>
+</div>
 <div id="automatically-preserving-manual-titlelegendannotation-edits" class="section level2">
 <h2>Automatically Preserving Manual Title/Legend/Annotation Edits</h2>
 <p>The base modules let users interactively drag and edit the plot
@@ -529,22 +581,114 @@ persistence is inherited for free.</p>
 <p>If you build a brand-new <code>plotly</code> output from scratch
 inside a custom module (rather than delegating to a base module’s
 server), you can add the same behaviour simply with 3 basic steps:</p>
-<div class="sourceCode" id="cb6"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" tabindex="-1"></a>customPlotServer <span class="ot">&lt;-</span> <span class="cf">function</span>(id, data_reactive) {</span>
-<span id="cb6-2"><a href="#cb6-2" tabindex="-1"></a>    <span class="fu">moduleServer</span>(id, <span class="cf">function</span>(input, output, session) {</span>
-<span id="cb6-3"><a href="#cb6-3" tabindex="-1"></a>        <span class="co"># 1. A unique event source + the edit store, created once.</span></span>
-<span id="cb6-4"><a href="#cb6-4" tabindex="-1"></a>        plot_source <span class="ot">&lt;-</span> session<span class="sc">$</span><span class="fu">ns</span>(<span class="st">&quot;customplot&quot;</span>)</span>
-<span id="cb6-5"><a href="#cb6-5" tabindex="-1"></a>        edit_store <span class="ot">&lt;-</span> <span class="fu">setup_manual_edits</span>(input, session, plot_source)</span>
-<span id="cb6-6"><a href="#cb6-6" tabindex="-1"></a></span>
-<span id="cb6-7"><a href="#cb6-7" tabindex="-1"></a>        output<span class="sc">$</span>plot <span class="ot">&lt;-</span> <span class="fu">renderPlotly</span>({</span>
-<span id="cb6-8"><a href="#cb6-8" tabindex="-1"></a>            <span class="co"># 2. Create your plotly object with your plotting function</span></span>
-<span id="cb6-9"><a href="#cb6-9" tabindex="-1"></a>            fig <span class="ot">&lt;-</span> <span class="fu">build_my_plotly_figure</span>(<span class="fu">data_reactive</span>(), input)</span>
-<span id="cb6-10"><a href="#cb6-10" tabindex="-1"></a>            <span class="co"># 3. Restore + capture edits on every render, then return the figure.</span></span>
-<span id="cb6-11"><a href="#cb6-11" tabindex="-1"></a>            <span class="fu">finalize_manual_edits</span>(fig, plot_source, edit_store, session)</span>
-<span id="cb6-12"><a href="#cb6-12" tabindex="-1"></a>        })</span>
-<span id="cb6-13"><a href="#cb6-13" tabindex="-1"></a>    })</span>
-<span id="cb6-14"><a href="#cb6-14" tabindex="-1"></a>}</span></code></pre></div>
+<div class="sourceCode" id="cb7"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" tabindex="-1"></a>customPlotServer <span class="ot">&lt;-</span> <span class="cf">function</span>(id, data_reactive) {</span>
+<span id="cb7-2"><a href="#cb7-2" tabindex="-1"></a>    <span class="fu">moduleServer</span>(id, <span class="cf">function</span>(input, output, session) {</span>
+<span id="cb7-3"><a href="#cb7-3" tabindex="-1"></a>        <span class="co"># 1. A unique event source + the edit store, created once.</span></span>
+<span id="cb7-4"><a href="#cb7-4" tabindex="-1"></a>        plot_source <span class="ot">&lt;-</span> session<span class="sc">$</span><span class="fu">ns</span>(<span class="st">&quot;customplot&quot;</span>)</span>
+<span id="cb7-5"><a href="#cb7-5" tabindex="-1"></a>        edit_store <span class="ot">&lt;-</span> <span class="fu">setup_manual_edits</span>(input, session, plot_source)</span>
+<span id="cb7-6"><a href="#cb7-6" tabindex="-1"></a></span>
+<span id="cb7-7"><a href="#cb7-7" tabindex="-1"></a>        output<span class="sc">$</span>plot <span class="ot">&lt;-</span> <span class="fu">renderPlotly</span>({</span>
+<span id="cb7-8"><a href="#cb7-8" tabindex="-1"></a>            <span class="co"># 2. Create your plotly object with your plotting function</span></span>
+<span id="cb7-9"><a href="#cb7-9" tabindex="-1"></a>            fig <span class="ot">&lt;-</span> <span class="fu">build_my_plotly_figure</span>(<span class="fu">data_reactive</span>(), input)</span>
+<span id="cb7-10"><a href="#cb7-10" tabindex="-1"></a>            <span class="co"># 3. Restore + capture edits on every render. Last: when only the</span></span>
+<span id="cb7-11"><a href="#cb7-11" tabindex="-1"></a>            <span class="co">#    layout changed, it sends just that and ends the render.</span></span>
+<span id="cb7-12"><a href="#cb7-12" tabindex="-1"></a>            <span class="fu">finalize_manual_edits</span>(fig, plot_source, edit_store, session)</span>
+<span id="cb7-13"><a href="#cb7-13" tabindex="-1"></a>        })</span>
+<span id="cb7-14"><a href="#cb7-14" tabindex="-1"></a>    })</span>
+<span id="cb7-15"><a href="#cb7-15" tabindex="-1"></a>}</span></code></pre></div>
 <p>See the “Adding a New Module” vignette for the full description of
 these helpers, but this is pretty much all you need to do.</p>
+</div>
+<div id="drawing-a-custom-plot-once-styling-it-often" class="section level2">
+<h2>Drawing a Custom Plot Once, Styling It Often</h2>
+<p>Wrapping a base module gets you this for free. A plot you draw
+yourself is rebuilt whenever anything it reads changes, so if titles,
+fonts, and gridlines are read alongside the data, changing a font
+redraws the plot. Split it in two, as the base modules do:
+<code>cached_structure()</code> draws the plot and caches it, and
+<code>apply_uniform_styling()</code> styles the cached figure.</p>
+<div class="sourceCode" id="cb8"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" tabindex="-1"></a>customPlotServer <span class="ot">&lt;-</span> <span class="cf">function</span>(id, data_reactive, <span class="at">defaults =</span> <span class="cn">NULL</span>) {</span>
+<span id="cb8-2"><a href="#cb8-2" tabindex="-1"></a>    <span class="fu">moduleServer</span>(id, <span class="cf">function</span>(input, output, session) {</span>
+<span id="cb8-3"><a href="#cb8-3" tabindex="-1"></a>        params <span class="ot">&lt;-</span> <span class="fu">setup_reactive_defaults</span>(defaults, input, session)</span>
+<span id="cb8-4"><a href="#cb8-4" tabindex="-1"></a>        plot_source <span class="ot">&lt;-</span> session<span class="sc">$</span><span class="fu">ns</span>(<span class="st">&quot;customplot&quot;</span>)</span>
+<span id="cb8-5"><a href="#cb8-5" tabindex="-1"></a>        edit_store <span class="ot">&lt;-</span> <span class="fu">setup_manual_edits</span>(input, session, plot_source)</span>
+<span id="cb8-6"><a href="#cb8-6" tabindex="-1"></a></span>
+<span id="cb8-7"><a href="#cb8-7" tabindex="-1"></a>        <span class="co"># What is drawn: cached, keyed on the data and every input read here.</span></span>
+<span id="cb8-8"><a href="#cb8-8" tabindex="-1"></a>        draw_plot <span class="ot">&lt;-</span> <span class="cf">function</span>(isolate_fn) {</span>
+<span id="cb8-9"><a href="#cb8-9" tabindex="-1"></a>            p <span class="ot">&lt;-</span> <span class="fu">my_plot_function</span>(<span class="fu">data_reactive</span>(), <span class="at">x =</span> <span class="fu">isolate_fn</span>(input<span class="sc">$</span>x.by))</span>
+<span id="cb8-10"><a href="#cb8-10" tabindex="-1"></a>            <span class="fu">list</span>(<span class="at">fig =</span> plotly<span class="sc">::</span><span class="fu">ggplotly</span>(p))</span>
+<span id="cb8-11"><a href="#cb8-11" tabindex="-1"></a>        }</span>
+<span id="cb8-12"><a href="#cb8-12" tabindex="-1"></a>        base_plot <span class="ot">&lt;-</span> <span class="fu">cached_structure</span>(draw_plot, input, session, data_reactive, <span class="at">params =</span> params)</span>
+<span id="cb8-13"><a href="#cb8-13" tabindex="-1"></a></span>
+<span id="cb8-14"><a href="#cb8-14" tabindex="-1"></a>        <span class="co"># How it looks: re-run for a styling change, without redrawing.</span></span>
+<span id="cb8-15"><a href="#cb8-15" tabindex="-1"></a>        generate_plot <span class="ot">&lt;-</span> <span class="fu">reactive</span>({</span>
+<span id="cb8-16"><a href="#cb8-16" tabindex="-1"></a>            isolate_fn <span class="ot">&lt;-</span> <span class="fu">setup_auto_update_logic</span>(input, params)</span>
+<span id="cb8-17"><a href="#cb8-17" tabindex="-1"></a>            <span class="fu">apply_uniform_styling</span>(<span class="fu">base_plot</span>()<span class="sc">$</span>fig, input, isolate_fn)</span>
+<span id="cb8-18"><a href="#cb8-18" tabindex="-1"></a>        })</span>
+<span id="cb8-19"><a href="#cb8-19" tabindex="-1"></a></span>
+<span id="cb8-20"><a href="#cb8-20" tabindex="-1"></a>        output<span class="sc">$</span>plot <span class="ot">&lt;-</span> <span class="fu">renderPlotly</span>({</span>
+<span id="cb8-21"><a href="#cb8-21" tabindex="-1"></a>            <span class="fu">finalize_manual_edits</span>(<span class="fu">apply_render_margins</span>(<span class="fu">generate_plot</span>(), input), plot_source, edit_store, session)</span>
+<span id="cb8-22"><a href="#cb8-22" tabindex="-1"></a>        })</span>
+<span id="cb8-23"><a href="#cb8-23" tabindex="-1"></a>    })</span>
+<span id="cb8-24"><a href="#cb8-24" tabindex="-1"></a>}</span></code></pre></div>
+<p>The traces then stay the same across a styling change, so
+<code>finalize_manual_edits()</code> sends the browser only the new
+layout. The cache is only as good as what it can see, so the draw
+function has three rules. Breaking one does not fail; it draws a stale
+plot:</p>
+<ul>
+<li><strong>Read every input as
+<code>isolate_fn(input$key)</code>.</strong> A wrapped read such as
+<code>isolate_fn(as.numeric(input$size))</code>, or a bare
+<code>input$size</code>, never reaches the cache key. Convert outside
+the call.</li>
+<li><strong>Name every other reactive it reads in
+<code>extra</code></strong>: colour stores, a debounced text input, a
+reactive argument. A reactive that only derives from <code>data</code>
+is already covered.</li>
+<li><strong>No side effects.</strong> A cache hit skips the function, so
+it must not show notifications or write <code>reactiveVal()</code>s.
+Return anything else you need in the list.</li>
+</ul>
+</div>
+<div id="helpers-for-modules-in-extension-packages" class="section level2">
+<h2>Helpers for Modules in Extension Packages</h2>
+<p>A module built on VizModules’ exports (in your own package, say) can
+reuse the helpers the built-in modules share, rather than keeping
+copies:</p>
+<div class="sourceCode" id="cb9"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" tabindex="-1"></a>extendedServer <span class="ot">&lt;-</span> <span class="cf">function</span>(id, data, <span class="at">defaults =</span> <span class="cn">NULL</span>, <span class="at">hide.inputs =</span> <span class="cn">NULL</span>) {</span>
+<span id="cb9-2"><a href="#cb9-2" tabindex="-1"></a>    <span class="fu">moduleServer</span>(id, <span class="cf">function</span>(input, output, session) {</span>
+<span id="cb9-3"><a href="#cb9-3" tabindex="-1"></a>        data <span class="ot">&lt;-</span> <span class="fu">require_data_frame</span>(data)</span>
+<span id="cb9-4"><a href="#cb9-4" tabindex="-1"></a></span>
+<span id="cb9-5"><a href="#cb9-5" tabindex="-1"></a>        <span class="co"># A faceted plot has no editable main title: swap in the facet title inputs.</span></span>
+<span id="cb9-6"><a href="#cb9-6" tabindex="-1"></a>        <span class="fu">observe</span>({</span>
+<span id="cb9-7"><a href="#cb9-7" tabindex="-1"></a>            <span class="fu">toggle_facet_title_inputs</span>(session, <span class="fu">nz_value</span>(input<span class="sc">$</span>facet.by), <span class="at">hidden =</span> hide.inputs)</span>
+<span id="cb9-8"><a href="#cb9-8" tabindex="-1"></a>        })</span>
+<span id="cb9-9"><a href="#cb9-9" tabindex="-1"></a></span>
+<span id="cb9-10"><a href="#cb9-10" tabindex="-1"></a>        output<span class="sc">$</span>plot <span class="ot">&lt;-</span> <span class="fu">renderPlotly</span>({</span>
+<span id="cb9-11"><a href="#cb9-11" tabindex="-1"></a>            <span class="co"># &quot;&quot; (nothing chosen), NA and NULL all become NULL.</span></span>
+<span id="cb9-12"><a href="#cb9-12" tabindex="-1"></a>            facet.by <span class="ot">&lt;-</span> <span class="fu">blank_to_null</span>(input<span class="sc">$</span>facet.by)</span>
+<span id="cb9-13"><a href="#cb9-13" tabindex="-1"></a>            <span class="co"># Jitter stays put across rebuilds instead of redrawing on every input change.</span></span>
+<span id="cb9-14"><a href="#cb9-14" tabindex="-1"></a>            <span class="fu">with_stable_seed</span>(<span class="fu">build_my_plotly_figure</span>(<span class="fu">data</span>(), <span class="at">facet.by =</span> facet.by))</span>
+<span id="cb9-15"><a href="#cb9-15" tabindex="-1"></a>        })</span>
+<span id="cb9-16"><a href="#cb9-16" tabindex="-1"></a></span>
+<span id="cb9-17"><a href="#cb9-17" tabindex="-1"></a>        <span class="fu">observeEvent</span>(input<span class="sc">$</span>reset, {</span>
+<span id="cb9-18"><a href="#cb9-18" tabindex="-1"></a>            <span class="co"># Restore the group colour picker to the mapping in `defaults`.</span></span>
+<span id="cb9-19"><a href="#cb9-19" tabindex="-1"></a>            <span class="fu">reset_group_colors</span>(session, <span class="st">&quot;palette.colours&quot;</span>, defaults, <span class="fu">groups</span>(), default_palette_values)</span>
+<span id="cb9-20"><a href="#cb9-20" tabindex="-1"></a>            <span class="fu">reset_plotly_inputs</span>(session, defaults)</span>
+<span id="cb9-21"><a href="#cb9-21" tabindex="-1"></a>        })</span>
+<span id="cb9-22"><a href="#cb9-22" tabindex="-1"></a>    })</span>
+<span id="cb9-23"><a href="#cb9-23" tabindex="-1"></a>}</span></code></pre></div>
+<p>On the UI side,
+<code>uniform_subplot_spacing_inputs_ui(ns, defaults)</code> adds the
+subplot spacing controls to a Facet tab
+(<code>reset_plotly_inputs()</code> already resets them, and
+<code>apply_facet_subplot_spacing()</code> applies them), and
+<code>uniform_stats_inputs_ui(ns, defaults)</code> adds the Stats tab
+(<code>reset_stats_inputs()</code> resets it). Seed a
+<code>multiColorPicker()</code> built inside <code>renderUI()</code>
+from <code>default_group_colors(defaults, &quot;palette.colours&quot;)</code>. See
+the “Adding a New Module” vignette for the full list.</p>
 </div>
 <div id="best-practices" class="section level2">
 <h2>Best Practices</h2>
@@ -553,20 +697,20 @@ these helpers, but this is pretty much all you need to do.</p>
 reading it directly is rebuilt once per character — and if the text is
 an expression, most of those characters describe something that cannot
 parse yet:</p>
-<div class="sourceCode" id="cb7"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" tabindex="-1"></a>myModuleServer <span class="ot">&lt;-</span> <span class="cf">function</span>(id, data) {</span>
-<span id="cb7-2"><a href="#cb7-2" tabindex="-1"></a>    filtered <span class="ot">&lt;-</span> <span class="fu">moduleServer</span>(id, <span class="cf">function</span>(input, output, session) {</span>
-<span id="cb7-3"><a href="#cb7-3" tabindex="-1"></a>        <span class="co"># Once, in the moduleServer body (where the wrapper&#39;s own input lives),</span></span>
-<span id="cb7-4"><a href="#cb7-4" tabindex="-1"></a>        <span class="co"># not inside the reactive below. 500-800ms is a good range.</span></span>
-<span id="cb7-5"><a href="#cb7-5" tabindex="-1"></a>        query <span class="ot">&lt;-</span> <span class="fu">debounce</span>(<span class="fu">reactive</span>(input<span class="sc">$</span>query), <span class="dv">700</span>)</span>
-<span id="cb7-6"><a href="#cb7-6" tabindex="-1"></a></span>
-<span id="cb7-7"><a href="#cb7-7" tabindex="-1"></a>        <span class="fu">reactive</span>({</span>
-<span id="cb7-8"><a href="#cb7-8" tabindex="-1"></a>            keep <span class="ot">&lt;-</span> <span class="fu">safe_eval_filter</span>(<span class="fu">query</span>(), <span class="fu">data</span>())</span>
-<span id="cb7-9"><a href="#cb7-9" tabindex="-1"></a>            <span class="cf">if</span> (<span class="fu">is.null</span>(keep)) <span class="fu">data</span>() <span class="cf">else</span> <span class="fu">data</span>()[keep, , drop <span class="ot">=</span> <span class="cn">FALSE</span>]</span>
-<span id="cb7-10"><a href="#cb7-10" tabindex="-1"></a>        })</span>
-<span id="cb7-11"><a href="#cb7-11" tabindex="-1"></a>    })</span>
-<span id="cb7-12"><a href="#cb7-12" tabindex="-1"></a></span>
-<span id="cb7-13"><a href="#cb7-13" tabindex="-1"></a>    <span class="fu">dittoViz_scatterPlotServer</span>(id, filtered)</span>
-<span id="cb7-14"><a href="#cb7-14" tabindex="-1"></a>}</span></code></pre></div>
+<div class="sourceCode" id="cb10"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" tabindex="-1"></a>myModuleServer <span class="ot">&lt;-</span> <span class="cf">function</span>(id, data) {</span>
+<span id="cb10-2"><a href="#cb10-2" tabindex="-1"></a>    filtered <span class="ot">&lt;-</span> <span class="fu">moduleServer</span>(id, <span class="cf">function</span>(input, output, session) {</span>
+<span id="cb10-3"><a href="#cb10-3" tabindex="-1"></a>        <span class="co"># Once, in the moduleServer body (where the wrapper&#39;s own input lives),</span></span>
+<span id="cb10-4"><a href="#cb10-4" tabindex="-1"></a>        <span class="co"># not inside the reactive below. 500-800ms is a good range.</span></span>
+<span id="cb10-5"><a href="#cb10-5" tabindex="-1"></a>        query <span class="ot">&lt;-</span> <span class="fu">debounce</span>(<span class="fu">reactive</span>(input<span class="sc">$</span>query), <span class="dv">700</span>)</span>
+<span id="cb10-6"><a href="#cb10-6" tabindex="-1"></a></span>
+<span id="cb10-7"><a href="#cb10-7" tabindex="-1"></a>        <span class="fu">reactive</span>({</span>
+<span id="cb10-8"><a href="#cb10-8" tabindex="-1"></a>            keep <span class="ot">&lt;-</span> <span class="fu">safe_eval_filter</span>(<span class="fu">query</span>(), <span class="fu">data</span>())</span>
+<span id="cb10-9"><a href="#cb10-9" tabindex="-1"></a>            <span class="cf">if</span> (<span class="fu">is.null</span>(keep)) <span class="fu">data</span>() <span class="cf">else</span> <span class="fu">data</span>()[keep, , drop <span class="ot">=</span> <span class="cn">FALSE</span>]</span>
+<span id="cb10-10"><a href="#cb10-10" tabindex="-1"></a>        })</span>
+<span id="cb10-11"><a href="#cb10-11" tabindex="-1"></a>    })</span>
+<span id="cb10-12"><a href="#cb10-12" tabindex="-1"></a></span>
+<span id="cb10-13"><a href="#cb10-13" tabindex="-1"></a>    <span class="fu">dittoViz_scatterPlotServer</span>(id, filtered)</span>
+<span id="cb10-14"><a href="#cb10-14" tabindex="-1"></a>}</span></code></pre></div>
 <p>Select, numeric, and checkbox inputs need no such treatment — they
 report discrete choices, not keystrokes. See the “Debouncing Free-Text
 Inputs” section of

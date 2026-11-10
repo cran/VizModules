@@ -613,22 +613,33 @@ auto-generated per row).</li>
 <span id="cb5-8"><a href="#cb5-8" tabindex="-1"></a>row_spec <span class="ot">=</span> <span class="fu">list</span>(</span>
 <span id="cb5-9"><a href="#cb5-9" tabindex="-1"></a>    <span class="at">date =</span> <span class="fu">list</span>(<span class="at">fn =</span> shiny<span class="sc">::</span>dateInput, <span class="at">args =</span> <span class="fu">list</span>(<span class="at">label =</span> <span class="st">&quot;Date&quot;</span>, <span class="at">value =</span> <span class="fu">Sys.Date</span>()))</span>
 <span id="cb5-10"><a href="#cb5-10" tabindex="-1"></a>)</span></code></pre></div>
+<p>A <code>&quot;select&quot;</code> field given <code>multiple = TRUE</code>
+reports a character vector of its items, in the order they were picked,
+so a row can hold an ordered list. The scatter module’s
+<strong>Trajectories</strong> list works this way, one row per
+trajectory, each picking the groups its path visits:</p>
+<div class="sourceCode" id="cb6"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" tabindex="-1"></a>row_spec <span class="ot">=</span> <span class="fu">list</span>(</span>
+<span id="cb6-2"><a href="#cb6-2" tabindex="-1"></a>    <span class="at">groups =</span> <span class="fu">list</span>(<span class="at">type =</span> <span class="st">&quot;select&quot;</span>, <span class="at">args =</span> <span class="fu">list</span>(</span>
+<span id="cb6-3"><a href="#cb6-3" tabindex="-1"></a>        <span class="at">label =</span> <span class="st">&quot;Groups, in order&quot;</span>, <span class="at">choices =</span> <span class="fu">c</span>(<span class="st">&quot;setosa&quot;</span>, <span class="st">&quot;versicolor&quot;</span>, <span class="st">&quot;virginica&quot;</span>), <span class="at">multiple =</span> <span class="cn">TRUE</span></span>
+<span id="cb6-4"><a href="#cb6-4" tabindex="-1"></a>    ))</span>
+<span id="cb6-5"><a href="#cb6-5" tabindex="-1"></a>)</span>
+<span id="cb6-6"><a href="#cb6-6" tabindex="-1"></a><span class="co"># elements = list(trajectories1 = list(groups = c(&quot;virginica&quot;, &quot;setosa&quot;)))</span></span></code></pre></div>
 </div>
 <div id="pre-filled-rows-with-elements" class="section level2">
 <h2>Pre-filled Rows with <code>elements</code></h2>
 <p>To show rows on startup with specific values:</p>
-<div class="sourceCode" id="cb6"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" tabindex="-1"></a><span class="fu">multiDynamicInput</span>(</span>
-<span id="cb6-2"><a href="#cb6-2" tabindex="-1"></a>    <span class="st">&quot;models&quot;</span>,</span>
-<span id="cb6-3"><a href="#cb6-3" tabindex="-1"></a>    <span class="at">label =</span> <span class="st">&quot;Models&quot;</span>,</span>
-<span id="cb6-4"><a href="#cb6-4" tabindex="-1"></a>    <span class="at">row_spec =</span> <span class="fu">list</span>(</span>
-<span id="cb6-5"><a href="#cb6-5" tabindex="-1"></a>        <span class="at">model_type =</span> <span class="fu">list</span>(<span class="at">type =</span> <span class="st">&quot;select&quot;</span>, <span class="at">args =</span> <span class="fu">list</span>(<span class="at">choices =</span> <span class="fu">c</span>(<span class="st">&quot;lm&quot;</span>, <span class="st">&quot;glm&quot;</span>))),</span>
-<span id="cb6-6"><a href="#cb6-6" tabindex="-1"></a>        <span class="at">formula    =</span> <span class="fu">list</span>(<span class="at">type =</span> <span class="st">&quot;text&quot;</span>, <span class="at">args =</span> <span class="fu">list</span>(<span class="at">placeholder =</span> <span class="st">&quot;y ~ x&quot;</span>))</span>
-<span id="cb6-7"><a href="#cb6-7" tabindex="-1"></a>    ),</span>
-<span id="cb6-8"><a href="#cb6-8" tabindex="-1"></a>    <span class="at">elements =</span> <span class="fu">list</span>(</span>
-<span id="cb6-9"><a href="#cb6-9" tabindex="-1"></a>        <span class="at">models1 =</span> <span class="fu">list</span>(<span class="at">model_type =</span> <span class="st">&quot;lm&quot;</span>, <span class="at">formula =</span> <span class="st">&quot;revenue ~ units&quot;</span>),</span>
-<span id="cb6-10"><a href="#cb6-10" tabindex="-1"></a>        <span class="at">models2 =</span> <span class="fu">list</span>(<span class="at">model_type =</span> <span class="st">&quot;glm&quot;</span>, <span class="at">formula =</span> <span class="st">&quot;revenue ~ poly(units, 2)&quot;</span>)</span>
-<span id="cb6-11"><a href="#cb6-11" tabindex="-1"></a>    )</span>
-<span id="cb6-12"><a href="#cb6-12" tabindex="-1"></a>)</span></code></pre></div>
+<div class="sourceCode" id="cb7"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" tabindex="-1"></a><span class="fu">multiDynamicInput</span>(</span>
+<span id="cb7-2"><a href="#cb7-2" tabindex="-1"></a>    <span class="st">&quot;models&quot;</span>,</span>
+<span id="cb7-3"><a href="#cb7-3" tabindex="-1"></a>    <span class="at">label =</span> <span class="st">&quot;Models&quot;</span>,</span>
+<span id="cb7-4"><a href="#cb7-4" tabindex="-1"></a>    <span class="at">row_spec =</span> <span class="fu">list</span>(</span>
+<span id="cb7-5"><a href="#cb7-5" tabindex="-1"></a>        <span class="at">model_type =</span> <span class="fu">list</span>(<span class="at">type =</span> <span class="st">&quot;select&quot;</span>, <span class="at">args =</span> <span class="fu">list</span>(<span class="at">choices =</span> <span class="fu">c</span>(<span class="st">&quot;lm&quot;</span>, <span class="st">&quot;glm&quot;</span>))),</span>
+<span id="cb7-6"><a href="#cb7-6" tabindex="-1"></a>        <span class="at">formula    =</span> <span class="fu">list</span>(<span class="at">type =</span> <span class="st">&quot;text&quot;</span>, <span class="at">args =</span> <span class="fu">list</span>(<span class="at">placeholder =</span> <span class="st">&quot;y ~ x&quot;</span>))</span>
+<span id="cb7-7"><a href="#cb7-7" tabindex="-1"></a>    ),</span>
+<span id="cb7-8"><a href="#cb7-8" tabindex="-1"></a>    <span class="at">elements =</span> <span class="fu">list</span>(</span>
+<span id="cb7-9"><a href="#cb7-9" tabindex="-1"></a>        <span class="at">models1 =</span> <span class="fu">list</span>(<span class="at">model_type =</span> <span class="st">&quot;lm&quot;</span>, <span class="at">formula =</span> <span class="st">&quot;revenue ~ units&quot;</span>),</span>
+<span id="cb7-10"><a href="#cb7-10" tabindex="-1"></a>        <span class="at">models2 =</span> <span class="fu">list</span>(<span class="at">model_type =</span> <span class="st">&quot;glm&quot;</span>, <span class="at">formula =</span> <span class="st">&quot;revenue ~ poly(units, 2)&quot;</span>)</span>
+<span id="cb7-11"><a href="#cb7-11" tabindex="-1"></a>    )</span>
+<span id="cb7-12"><a href="#cb7-12" tabindex="-1"></a>)</span></code></pre></div>
 <p>The names (<code>models1</code>, <code>models2</code>) don’t matter
 for input — they’re auto-generated from the label at runtime. The values
 inside each element must match the <code>row_spec</code> field
@@ -638,12 +649,12 @@ names.</p>
 <h2>Reading the Value</h2>
 <p>The value in <code>input[[inputId]]</code> is a named list of
 rows:</p>
-<div class="sourceCode" id="cb7"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" tabindex="-1"></a><span class="co"># With label = &quot;Models&quot; and two rows filled in:</span></span>
-<span id="cb7-2"><a href="#cb7-2" tabindex="-1"></a>input<span class="sc">$</span>models</span>
-<span id="cb7-3"><a href="#cb7-3" tabindex="-1"></a><span class="co">#&gt; list(</span></span>
-<span id="cb7-4"><a href="#cb7-4" tabindex="-1"></a><span class="co">#&gt;   models1 = list(model_type = &quot;lm&quot;, formula = &quot;revenue ~ units&quot;),</span></span>
-<span id="cb7-5"><a href="#cb7-5" tabindex="-1"></a><span class="co">#&gt;   models2 = list(model_type = &quot;glm&quot;, formula = &quot;revenue ~ poly(units, 2)&quot;)</span></span>
-<span id="cb7-6"><a href="#cb7-6" tabindex="-1"></a><span class="co">#&gt; )</span></span></code></pre></div>
+<div class="sourceCode" id="cb8"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" tabindex="-1"></a><span class="co"># With label = &quot;Models&quot; and two rows filled in:</span></span>
+<span id="cb8-2"><a href="#cb8-2" tabindex="-1"></a>input<span class="sc">$</span>models</span>
+<span id="cb8-3"><a href="#cb8-3" tabindex="-1"></a><span class="co">#&gt; list(</span></span>
+<span id="cb8-4"><a href="#cb8-4" tabindex="-1"></a><span class="co">#&gt;   models1 = list(model_type = &quot;lm&quot;, formula = &quot;revenue ~ units&quot;),</span></span>
+<span id="cb8-5"><a href="#cb8-5" tabindex="-1"></a><span class="co">#&gt;   models2 = list(model_type = &quot;glm&quot;, formula = &quot;revenue ~ poly(units, 2)&quot;)</span></span>
+<span id="cb8-6"><a href="#cb8-6" tabindex="-1"></a><span class="co">#&gt; )</span></span></code></pre></div>
 <p>Row names are derived from the <code>label</code> argument
 (lowercased) plus an index: <code>models1</code>, <code>models2</code>,
 etc.</p>
@@ -652,13 +663,13 @@ etc.</p>
 <h2>Updating from the Server</h2>
 <p>Use <code>updateMultiDynamicInput()</code> to replace all rows or
 clear them:</p>
-<div class="sourceCode" id="cb8"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" tabindex="-1"></a><span class="co"># Replace all rows</span></span>
-<span id="cb8-2"><a href="#cb8-2" tabindex="-1"></a><span class="fu">updateMultiDynamicInput</span>(session, <span class="st">&quot;models&quot;</span>, <span class="at">elements =</span> <span class="fu">list</span>(</span>
-<span id="cb8-3"><a href="#cb8-3" tabindex="-1"></a>    <span class="at">models1 =</span> <span class="fu">list</span>(<span class="at">model_type =</span> <span class="st">&quot;lm&quot;</span>, <span class="at">formula =</span> <span class="st">&quot;y ~ x&quot;</span>)</span>
-<span id="cb8-4"><a href="#cb8-4" tabindex="-1"></a>))</span>
-<span id="cb8-5"><a href="#cb8-5" tabindex="-1"></a></span>
-<span id="cb8-6"><a href="#cb8-6" tabindex="-1"></a><span class="co"># Clear all rows</span></span>
-<span id="cb8-7"><a href="#cb8-7" tabindex="-1"></a><span class="fu">updateMultiDynamicInput</span>(session, <span class="st">&quot;models&quot;</span>, <span class="at">clear =</span> <span class="cn">TRUE</span>)</span></code></pre></div>
+<div class="sourceCode" id="cb9"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" tabindex="-1"></a><span class="co"># Replace all rows</span></span>
+<span id="cb9-2"><a href="#cb9-2" tabindex="-1"></a><span class="fu">updateMultiDynamicInput</span>(session, <span class="st">&quot;models&quot;</span>, <span class="at">elements =</span> <span class="fu">list</span>(</span>
+<span id="cb9-3"><a href="#cb9-3" tabindex="-1"></a>    <span class="at">models1 =</span> <span class="fu">list</span>(<span class="at">model_type =</span> <span class="st">&quot;lm&quot;</span>, <span class="at">formula =</span> <span class="st">&quot;y ~ x&quot;</span>)</span>
+<span id="cb9-4"><a href="#cb9-4" tabindex="-1"></a>))</span>
+<span id="cb9-5"><a href="#cb9-5" tabindex="-1"></a></span>
+<span id="cb9-6"><a href="#cb9-6" tabindex="-1"></a><span class="co"># Clear all rows</span></span>
+<span id="cb9-7"><a href="#cb9-7" tabindex="-1"></a><span class="fu">updateMultiDynamicInput</span>(session, <span class="st">&quot;models&quot;</span>, <span class="at">clear =</span> <span class="cn">TRUE</span>)</span></code></pre></div>
 </div>
 <div id="backend-specific-fields" class="section level2">
 <h2>Backend-Specific Fields</h2>
@@ -666,13 +677,13 @@ clear them:</p>
 <code>vignette(&quot;custom-model-lines&quot;)</code>), fields can be tagged with
 a <code>backend</code> attribute. These fields are hidden by default and
 only appear when the matching model type is selected:</p>
-<div class="sourceCode" id="cb9"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" tabindex="-1"></a>row_spec <span class="ot">=</span> <span class="fu">list</span>(</span>
-<span id="cb9-2"><a href="#cb9-2" tabindex="-1"></a>    <span class="at">model_type =</span> <span class="fu">list</span>(<span class="at">type =</span> <span class="st">&quot;select&quot;</span>, <span class="at">args =</span> <span class="fu">list</span>(<span class="at">choices =</span> <span class="fu">c</span>(<span class="st">&quot;lm&quot;</span>, <span class="st">&quot;drm&quot;</span>))),</span>
-<span id="cb9-3"><a href="#cb9-3" tabindex="-1"></a>    <span class="at">formula    =</span> <span class="fu">list</span>(<span class="at">type =</span> <span class="st">&quot;text&quot;</span>, <span class="at">args =</span> <span class="fu">list</span>(<span class="at">placeholder =</span> <span class="st">&quot;y ~ x&quot;</span>)),</span>
-<span id="cb9-4"><a href="#cb9-4" tabindex="-1"></a>    <span class="co"># Only visible when model_type == &quot;drm&quot;</span></span>
-<span id="cb9-5"><a href="#cb9-5" tabindex="-1"></a>    <span class="at">drc_fct    =</span> <span class="fu">list</span>(<span class="at">type =</span> <span class="st">&quot;select&quot;</span>, <span class="at">backend =</span> <span class="st">&quot;drm&quot;</span>,</span>
-<span id="cb9-6"><a href="#cb9-6" tabindex="-1"></a>                      <span class="at">args =</span> <span class="fu">list</span>(<span class="at">choices =</span> <span class="fu">c</span>(<span class="st">&quot;LL.4&quot;</span>, <span class="st">&quot;LL.3&quot;</span>)))</span>
-<span id="cb9-7"><a href="#cb9-7" tabindex="-1"></a>)</span></code></pre></div>
+<div class="sourceCode" id="cb10"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" tabindex="-1"></a>row_spec <span class="ot">=</span> <span class="fu">list</span>(</span>
+<span id="cb10-2"><a href="#cb10-2" tabindex="-1"></a>    <span class="at">model_type =</span> <span class="fu">list</span>(<span class="at">type =</span> <span class="st">&quot;select&quot;</span>, <span class="at">args =</span> <span class="fu">list</span>(<span class="at">choices =</span> <span class="fu">c</span>(<span class="st">&quot;lm&quot;</span>, <span class="st">&quot;drm&quot;</span>))),</span>
+<span id="cb10-3"><a href="#cb10-3" tabindex="-1"></a>    <span class="at">formula    =</span> <span class="fu">list</span>(<span class="at">type =</span> <span class="st">&quot;text&quot;</span>, <span class="at">args =</span> <span class="fu">list</span>(<span class="at">placeholder =</span> <span class="st">&quot;y ~ x&quot;</span>)),</span>
+<span id="cb10-4"><a href="#cb10-4" tabindex="-1"></a>    <span class="co"># Only visible when model_type == &quot;drm&quot;</span></span>
+<span id="cb10-5"><a href="#cb10-5" tabindex="-1"></a>    <span class="at">drc_fct    =</span> <span class="fu">list</span>(<span class="at">type =</span> <span class="st">&quot;select&quot;</span>, <span class="at">backend =</span> <span class="st">&quot;drm&quot;</span>,</span>
+<span id="cb10-6"><a href="#cb10-6" tabindex="-1"></a>                      <span class="at">args =</span> <span class="fu">list</span>(<span class="at">choices =</span> <span class="fu">c</span>(<span class="st">&quot;LL.4&quot;</span>, <span class="st">&quot;LL.3&quot;</span>)))</span>
+<span id="cb10-7"><a href="#cb10-7" tabindex="-1"></a>)</span></code></pre></div>
 <p>In practice you don’t build this manually —
 <code>build_model_row_spec()</code> does it for you by collecting
 <code>fields</code> from all registered backends.</p>
@@ -690,6 +701,46 @@ registered model backends</li>
 </ul>
 </div>
 </div>
+<div id="category-order-controls" class="section level1">
+<h1>Category order controls</h1>
+<p><code>level_order_input()</code> is a drag-and-drop list of a
+categorical column’s levels, built on
+<code>shinyjqui::orderInput()</code>, that sets the order they are
+plotted in. The <code>BarPlot</code>, <code>BoxPlot</code>,
+<code>freqPlot</code> and <code>yPlot</code> modules use it for their
+x-axis; the same three helpers add it to a custom module:</p>
+<div class="sourceCode" id="cb11"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" tabindex="-1"></a>ui <span class="ot">&lt;-</span> <span class="fu">fluidPage</span>(</span>
+<span id="cb11-2"><a href="#cb11-2" tabindex="-1"></a>    <span class="fu">selectInput</span>(<span class="st">&quot;x&quot;</span>, <span class="st">&quot;X&quot;</span>, <span class="fu">c</span>(<span class="st">&quot;department&quot;</span>, <span class="st">&quot;job_level&quot;</span>)),</span>
+<span id="cb11-3"><a href="#cb11-3" tabindex="-1"></a>    <span class="fu">level_order_input</span>(<span class="st">&quot;x.order&quot;</span>, <span class="st">&quot;X Order&quot;</span>,</span>
+<span id="cb11-4"><a href="#cb11-4" tabindex="-1"></a>        <span class="at">items =</span> <span class="fu">level_order_choices</span>(example_demographics, <span class="st">&quot;department&quot;</span>)</span>
+<span id="cb11-5"><a href="#cb11-5" tabindex="-1"></a>    ),</span>
+<span id="cb11-6"><a href="#cb11-6" tabindex="-1"></a>    <span class="fu">plotOutput</span>(<span class="st">&quot;plot&quot;</span>)</span>
+<span id="cb11-7"><a href="#cb11-7" tabindex="-1"></a>)</span>
+<span id="cb11-8"><a href="#cb11-8" tabindex="-1"></a></span>
+<span id="cb11-9"><a href="#cb11-9" tabindex="-1"></a>server <span class="ot">&lt;-</span> <span class="cf">function</span>(input, output, session) {</span>
+<span id="cb11-10"><a href="#cb11-10" tabindex="-1"></a>    data <span class="ot">&lt;-</span> <span class="fu">reactive</span>(example_demographics)</span>
+<span id="cb11-11"><a href="#cb11-11" tabindex="-1"></a>    <span class="co"># Refills the control when the column or data changes, and holds the order to draw.</span></span>
+<span id="cb11-12"><a href="#cb11-12" tabindex="-1"></a>    x.order <span class="ot">&lt;-</span> <span class="fu">setup_level_order</span>(input, session, data, <span class="fu">reactive</span>(input<span class="sc">$</span>x))</span>
+<span id="cb11-13"><a href="#cb11-13" tabindex="-1"></a></span>
+<span id="cb11-14"><a href="#cb11-14" tabindex="-1"></a>    output<span class="sc">$</span>plot <span class="ot">&lt;-</span> <span class="fu">renderPlot</span>({</span>
+<span id="cb11-15"><a href="#cb11-15" tabindex="-1"></a>        df <span class="ot">&lt;-</span> <span class="fu">apply_level_order</span>(<span class="fu">data</span>(), input<span class="sc">$</span>x, <span class="fu">x.order</span>())</span>
+<span id="cb11-16"><a href="#cb11-16" tabindex="-1"></a>        <span class="fu">boxplot</span>(df<span class="sc">$</span>salary <span class="sc">~</span> df[[input<span class="sc">$</span>x]], <span class="at">xlab =</span> input<span class="sc">$</span>x)</span>
+<span id="cb11-17"><a href="#cb11-17" tabindex="-1"></a>    })</span>
+<span id="cb11-18"><a href="#cb11-18" tabindex="-1"></a>}</span>
+<span id="cb11-19"><a href="#cb11-19" tabindex="-1"></a></span>
+<span id="cb11-20"><a href="#cb11-20" tabindex="-1"></a><span class="fu">shinyApp</span>(ui, server)</span></code></pre></div>
+<ul>
+<li><code>level_order_choices()</code> — the levels of a column in
+drawing order, optionally reordered; <code>NULL</code> for a numeric
+column or one with more than <code>max.levels</code> (20) levels, which
+hides the control</li>
+<li><code>setup_level_order()</code> — keeps the control in step with
+its column, restores <code>defaults$x.order</code> on Reset, and returns
+the order to draw (<code>NULL</code> for the default)</li>
+<li><code>apply_level_order()</code> — re-levels the column, so the
+plot, its statistics and their brackets all take the new order</li>
+</ul>
+</div>
 <div id="writing-your-own-custom-input" class="section level1">
 <h1>Writing Your Own Custom Input</h1>
 <p>Both widgets above follow the same shape, and it is the one to copy
@@ -706,19 +757,19 @@ an app brings these stylesheets along — which is how a single unscoped
 selector came to break stock <code>selectInput()</code> dropdowns in
 apps that never used the picker directly (#355).</p>
 <p>Anchor every selector on a class you invented:</p>
-<div class="sourceCode" id="cb10"><pre class="sourceCode css"><code class="sourceCode css"><span id="cb10-1"><a href="#cb10-1" tabindex="-1"></a><span class="co">/* WRONG — `.selectize-dropdown`, `.option` and `.optgroup-header` all belong to</span></span>
-<span id="cb10-2"><a href="#cb10-2" tabindex="-1"></a><span class="co">   selectize, so this restyles every dropdown on the page, including plain</span></span>
-<span id="cb10-3"><a href="#cb10-3" tabindex="-1"></a><span class="co">   selectInput()s and DT&#39;s column filters. */</span></span>
-<span id="cb10-4"><a href="#cb10-4" tabindex="-1"></a><span class="fu">.selectize-dropdown</span> <span class="fu">.selectize-dropdown-content</span> {</span>
-<span id="cb10-5"><a href="#cb10-5" tabindex="-1"></a>  <span class="kw">display</span><span class="ch">:</span> <span class="dv">flex</span><span class="op">;</span></span>
-<span id="cb10-6"><a href="#cb10-6" tabindex="-1"></a>  <span class="kw">flex-direction</span><span class="ch">:</span> <span class="dv">column</span><span class="op">;</span></span>
-<span id="cb10-7"><a href="#cb10-7" tabindex="-1"></a>}</span>
-<span id="cb10-8"><a href="#cb10-8" tabindex="-1"></a></span>
-<span id="cb10-9"><a href="#cb10-9" tabindex="-1"></a><span class="co">/* RIGHT */</span></span>
-<span id="cb10-10"><a href="#cb10-10" tabindex="-1"></a><span class="fu">.mc-palette-dropdown</span> <span class="fu">.selectize-dropdown-content</span> {</span>
-<span id="cb10-11"><a href="#cb10-11" tabindex="-1"></a>  <span class="kw">display</span><span class="ch">:</span> <span class="dv">flex</span><span class="op">;</span></span>
-<span id="cb10-12"><a href="#cb10-12" tabindex="-1"></a>  <span class="kw">flex-direction</span><span class="ch">:</span> <span class="dv">column</span><span class="op">;</span></span>
-<span id="cb10-13"><a href="#cb10-13" tabindex="-1"></a>}</span></code></pre></div>
+<div class="sourceCode" id="cb12"><pre class="sourceCode css"><code class="sourceCode css"><span id="cb12-1"><a href="#cb12-1" tabindex="-1"></a><span class="co">/* WRONG — `.selectize-dropdown`, `.option` and `.optgroup-header` all belong to</span></span>
+<span id="cb12-2"><a href="#cb12-2" tabindex="-1"></a><span class="co">   selectize, so this restyles every dropdown on the page, including plain</span></span>
+<span id="cb12-3"><a href="#cb12-3" tabindex="-1"></a><span class="co">   selectInput()s and DT&#39;s column filters. */</span></span>
+<span id="cb12-4"><a href="#cb12-4" tabindex="-1"></a><span class="fu">.selectize-dropdown</span> <span class="fu">.selectize-dropdown-content</span> {</span>
+<span id="cb12-5"><a href="#cb12-5" tabindex="-1"></a>  <span class="kw">display</span><span class="ch">:</span> <span class="dv">flex</span><span class="op">;</span></span>
+<span id="cb12-6"><a href="#cb12-6" tabindex="-1"></a>  <span class="kw">flex-direction</span><span class="ch">:</span> <span class="dv">column</span><span class="op">;</span></span>
+<span id="cb12-7"><a href="#cb12-7" tabindex="-1"></a>}</span>
+<span id="cb12-8"><a href="#cb12-8" tabindex="-1"></a></span>
+<span id="cb12-9"><a href="#cb12-9" tabindex="-1"></a><span class="co">/* RIGHT */</span></span>
+<span id="cb12-10"><a href="#cb12-10" tabindex="-1"></a><span class="fu">.mc-palette-dropdown</span> <span class="fu">.selectize-dropdown-content</span> {</span>
+<span id="cb12-11"><a href="#cb12-11" tabindex="-1"></a>  <span class="kw">display</span><span class="ch">:</span> <span class="dv">flex</span><span class="op">;</span></span>
+<span id="cb12-12"><a href="#cb12-12" tabindex="-1"></a>  <span class="kw">flex-direction</span><span class="ch">:</span> <span class="dv">column</span><span class="op">;</span></span>
+<span id="cb12-13"><a href="#cb12-13" tabindex="-1"></a>}</span></code></pre></div>
 <p>The mistake is easy to make because the wrong version <em>looks</em>
 scoped — a two-part selector reads like “the content inside my
 dropdown”. The test is the <strong>leftmost</strong> class: if you did
@@ -732,13 +783,13 @@ cannot clip it. That is precisely what makes it unreachable from a
 <code>.my-widget .thing</code> selector — and precisely why the leaking
 rules above were written unscoped. The answer is to give the escaped
 element its own class:</p>
-<div class="sourceCode" id="cb11"><pre class="sourceCode js"><code class="sourceCode javascript"><span id="cb11-1"><a href="#cb11-1" tabindex="-1"></a><span class="fu">$</span>(select)<span class="op">.</span><span class="fu">selectize</span>({</span>
-<span id="cb11-2"><a href="#cb11-2" tabindex="-1"></a>  <span class="dt">dropdownParent</span><span class="op">:</span> <span class="st">&quot;body&quot;</span><span class="op">,</span></span>
-<span id="cb11-3"><a href="#cb11-3" tabindex="-1"></a>  <span class="co">// Selectize replaces its default dropdownClass wholesale, so restate its own</span></span>
-<span id="cb11-4"><a href="#cb11-4" tabindex="-1"></a>  <span class="co">// class alongside ours.</span></span>
-<span id="cb11-5"><a href="#cb11-5" tabindex="-1"></a>  <span class="dt">dropdownClass</span><span class="op">:</span> <span class="st">&quot;selectize-dropdown mc-palette-dropdown&quot;</span><span class="op">,</span></span>
-<span id="cb11-6"><a href="#cb11-6" tabindex="-1"></a>  <span class="op">...</span></span>
-<span id="cb11-7"><a href="#cb11-7" tabindex="-1"></a>})<span class="op">;</span></span></code></pre></div>
+<div class="sourceCode" id="cb13"><pre class="sourceCode js"><code class="sourceCode javascript"><span id="cb13-1"><a href="#cb13-1" tabindex="-1"></a><span class="fu">$</span>(select)<span class="op">.</span><span class="fu">selectize</span>({</span>
+<span id="cb13-2"><a href="#cb13-2" tabindex="-1"></a>  <span class="dt">dropdownParent</span><span class="op">:</span> <span class="st">&quot;body&quot;</span><span class="op">,</span></span>
+<span id="cb13-3"><a href="#cb13-3" tabindex="-1"></a>  <span class="co">// Selectize replaces its default dropdownClass wholesale, so restate its own</span></span>
+<span id="cb13-4"><a href="#cb13-4" tabindex="-1"></a>  <span class="co">// class alongside ours.</span></span>
+<span id="cb13-5"><a href="#cb13-5" tabindex="-1"></a>  <span class="dt">dropdownClass</span><span class="op">:</span> <span class="st">&quot;selectize-dropdown mc-palette-dropdown&quot;</span><span class="op">,</span></span>
+<span id="cb13-6"><a href="#cb13-6" tabindex="-1"></a>  <span class="op">...</span></span>
+<span id="cb13-7"><a href="#cb13-7" tabindex="-1"></a>})<span class="op">;</span></span></code></pre></div>
 <p><code>multiColorPicker</code> does exactly this, which is why
 <code>multiColorPicker.css</code> can scope all fourteen of its dropdown
 rules to <code>.mc-palette-dropdown</code>.</p>

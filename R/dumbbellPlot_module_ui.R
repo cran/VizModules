@@ -56,6 +56,12 @@
 #' - `axis.tickcolor` - Color of tick marks (UI: "Tick Mark Color", default: "black")
 #' - `axis.ticklen` - Length of tick marks (UI: "Tick Mark Length", default: 5)
 #' - `axis.tickwidth` - Width of tick marks (UI: "Tick Mark Width", default: 1)
+#' - `axis.scientific` - Write numeric tick labels in scientific notation (UI: "Scientific Notation Ticks",
+#'   default: FALSE; when off they never switch to it). See [apply_tick_notation()]
+#' - `axis.padding.x` - Space between the data and the plot area's edges along X, as a fraction of the
+#'   data's extent at each end (UI: "X Axis Padding", default: NA = the plot's own). See [apply_axis_padding()]
+#' - `axis.padding.y` - Space between the data and the plot area's edges along Y, as a fraction of the
+#'   data's extent at each end (UI: "Y Axis Padding", default: NA = the plot's own). See [apply_axis_padding()]
 #' - `facet.title.font.size` - Facet subplot title font size (UI: "Facet Subplot Title Size", default: 18)
 #' - `facet.title.font.color` - Facet subplot title font color (UI: "Facet Title Color", default: "#000000")
 #' - `facet.title.font.family` - Facet subplot title font family (UI: "Facet Title Font", default: "Arial")
@@ -182,7 +188,7 @@ dumbbellPlotInputsUI <- function(id, data, defaults = NULL, title = NULL, column
                     defaults, "facet.by", "",
                     function(x) x == "" || x %in% cat.choices
                 ),
-                choices = c("", .facet_check(data))
+                choices = c("", facet_check(data))
             ), documentParameters$facet.by, placement = "top", options = list(container = "body")),
             tipify(viz_select_input(ns("facet.scales"), "Facet Scales",
                 choices = c("fixed", "free", "free_x", "free_y"),
@@ -191,7 +197,7 @@ dumbbellPlotInputsUI <- function(id, data, defaults = NULL, title = NULL, column
                     function(x) x %in% c("fixed", "free", "free_x", "free_y")
                 )
             ), documentParameters$facet.scales, placement = "top", options = list(container = "body")),
-            .uniform_subplot_spacing_inputs_ui(ns, defaults)
+            uniform_subplot_spacing_inputs_ui(ns, defaults)
         ),
         "Aesthetics" = tagList(
             uiOutput(ns("palette.selection")),

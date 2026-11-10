@@ -130,6 +130,9 @@ The following \code{\link[plotthis:BarPlot]{plotthis::BarPlot()}} parameters can
 
 The following parameters implementing new functionality or controlling plotly-specific features are also available:
 \itemize{
+\item \code{x.order} - Order of the X values (UI: "X Order", drag and drop, default: the column's factor level order,
+else sorted). As a default, a character vector of levels of \code{x.data}; levels it leaves out follow in their
+default order. Not shown for an X with more than 20 values
 \item \code{title.font.size} - Plot title font size (UI: "Title Size", default: 26)
 \item \code{title.font.family} - Font family for title text (UI: "Title Font", default: "Arial")
 \item \code{title.font.color} - Color for plot title (UI: "Title Color", default: "#000000")
@@ -151,6 +154,10 @@ The following parameters implementing new functionality or controlling plotly-sp
 \item \code{axis.tickcolor} - Color of tick marks (UI: "Tick mark color", default: "black")
 \item \code{axis.ticklen} - Length of tick marks (UI: "Tick mark length", default: 5)
 \item \code{axis.tickwidth} - Width of tick marks (UI: "Tick mark width", default: 1)
+\item \code{axis.scientific} - Write numeric tick labels in scientific notation (UI: "Scientific Notation Ticks",
+default: FALSE; when off they never switch to it). See \code{\link[=apply_tick_notation]{apply_tick_notation()}}
+\item \code{axis.padding.x} - Space between the data and the plot area's edges along X, as a fraction of the
+data's extent at each end (UI: "X Axis Padding", default: NA = the plot's own). See \code{\link[=apply_axis_padding]{apply_axis_padding()}}
 \item \code{legend.show} - Show the legend and any colorbar (UI: "Show Legend", default: TRUE)
 \item \code{legend.font.family} - Font family of the legend title and labels (UI: "Legend Font", default: "Arial")
 \item \code{legend.font.color} - Font color of the legend title and labels (UI: "Legend Font Color", default: "#000000")

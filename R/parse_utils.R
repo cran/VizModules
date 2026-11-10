@@ -61,11 +61,11 @@
 
 #' Parse a highlight string into the values it names
 #'
-#' Highlight values are typed as a comma- or newline-separated list, but they
-#' have also always been splittable on spaces, which left a value containing a
-#' space (`"CD4 T"`, `"Player A"`) impossible to name. Each comma- or
-#' newline-delimited entry is therefore kept whole when it is one of
-#' `available`, and split on whitespace as before otherwise.
+#' Highlight values are typed as a comma- or newline-separated list, and may
+#' also be separated by spaces. A value containing a space (`"CD4 T"`,
+#' `"Player A"`) would be impossible to name that way, so each comma- or
+#' newline-delimited entry is kept whole when it is one of `available`, and
+#' split on whitespace otherwise.
 #'
 #' @param x A single string, e.g. `"CD4 T, B"` or `"P01 P07"`, or `NULL`.
 #' @param available Character vector of the values the entries name (the
@@ -73,10 +73,15 @@
 #'
 #' @return A character vector of unique, non-blank values, possibly empty.
 #'
+#' @seealso [apply_highlight_styling()], [create_highlight_annotations()],
+#'   [uniform_annotation_inputs_ui()]
+#'
+#' @export
 #' @author Jared Andrews
-#' @rdname INTERNAL_parse_highlight_values
-#' @keywords internal
-.parse_highlight_values <- function(x, available = NULL) {
+#' @examples
+#' parse_highlight_values("CD4 T, B", available = c("CD4 T", "B", "NK"))
+#' parse_highlight_values("P01 P07")
+parse_highlight_values <- function(x, available = NULL) {
     if (is.null(x) || length(x) == 0 || is.na(x[1]) || !nzchar(trimws(x[1]))) {
         return(character(0))
     }
@@ -148,10 +153,15 @@ string_to_linetypes <- function(x) {
 #' @param x A value that may be NA or an empty string.
 #' @return NULL if x is a single NA value or empty string, otherwise x unchanged.
 #'
+#' @seealso [blank_to_null()], [nz_value()]
+#'
+#' @export
 #' @author Jared Andrews
-#' @rdname INTERNAL_na_to_null
-#' @keywords internal
-.na_to_null <- function(x) {
+#' @examples
+#' na_to_null(NA)
+#' na_to_null("")
+#' na_to_null(5)
+na_to_null <- function(x) {
     if (length(x) == 1 && (is.na(x) || identical(x, ""))) {
         return(NULL)
     }
@@ -186,10 +196,14 @@ neg_log10 <- function(x) {
 #'
 #' @import shiny
 #'
+#' @export
 #' @author Jared Andrews
-#' @rdname INTERNAL_require_data_frame
-#' @keywords internal
-.require_data_frame <- function(data) {
+#' @examples
+#' \dontrun{
+#' # First line of a module server, before anything reads `data()`:
+#' data <- require_data_frame(data)
+#' }
+require_data_frame <- function(data) {
     # Callers reassign onto `data`, so resolve the promise before it can recurse.
     force(data)
 
@@ -311,12 +325,14 @@ resolve_palette <- function(groups, selected_colors = NULL, default_palette = NU
 #' @return A named character vector of hex colors, or `NULL` when `defaults`
 #'   supplies no usable mapping.
 #'
-#' @seealso [resolve_palette()], [get_default()]
+#' @seealso [resolve_palette()], [get_default()], [setup_group_colors()], [reset_group_colors()]
 #'
+#' @export
 #' @author Jared Andrews
-#' @rdname INTERNAL_default_group_colors
-#' @keywords internal
-.default_group_colors <- function(defaults, key) {
+#' @examples
+#' default_group_colors(list(palette.colours = c(A = "red", B = "#00FF00")), "palette.colours")
+#' default_group_colors(list(palette.colours = c("red", "blue")), "palette.colours")
+default_group_colors <- function(defaults, key) {
     colors <- get_default(defaults, key, NULL, function(x) {
         is.character(x) && length(x) > 0 && !is.null(names(x)) && all(nzchar(names(x)))
     })
@@ -345,11 +361,17 @@ resolve_palette <- function(groups, selected_colors = NULL, default_palette = NU
 #'
 #' @return Invisibly `NULL`; called for its side effect.
 #'
+#' @seealso [default_group_colors()], [updateMultiColorPicker()], [setup_group_colors()]
+#'
+#' @export
 #' @author Jared Andrews
-#' @rdname INTERNAL_reset_group_colors
-#' @keywords internal
-.reset_group_colors <- function(session, inputId, defaults, groups, default_palette = NULL) {
-    manual <- .default_group_colors(defaults, inputId)
+#' @examples
+#' \dontrun{
+#' # Inside a module's observeEvent(input$reset, ...):
+#' reset_group_colors(session, "palette.colours", defaults, palette_groups(), default_palette_values)
+#' }
+reset_group_colors <- function(session, inputId, defaults, groups, default_palette = NULL) {
+    manual <- default_group_colors(defaults, inputId)
     colors <- if (is.null(manual)) NULL else resolve_palette(groups, NULL, default_palette, manual)
 
     if (is.null(colors) || length(colors) == 0) {
@@ -455,9 +477,11 @@ setup_group_colors <- function(input, key, groups, default_palette = NULL,
 
         store(resolve_palette(
             levels, selected, default_palette,
-            .default_group_colors(defaults, key)
+            default_group_colors(defaults, key)
         ))
-    })
+        # Ahead of the plot's render, so a change reaches it in the same flush
+        # rather than after it has already drawn with the previous colours.
+    }, priority = 1000)
 
     store
 }
@@ -554,7 +578,9 @@ setup_axis_range <- function(input, session, min_key = "y.min", max_key = "y.max
         if (!.same_axis_range(isolate(store()), new)) {
             store(new)
         }
-    })
+        # Ahead of the plot's render, so a new limit reaches it in the same flush
+        # rather than after it has already drawn with the previous one.
+    }, priority = 1000)
 
     store
 }
@@ -608,6 +634,11 @@ setup_axis_range <- function(input, session, min_key = "y.min", max_key = "y.max
 #' grouping column that is numeric is a gradient rather than a nesting, which
 #' the renders already treat as no grouping.
 #'
+#' Anything that is not a single, non-`NA`, non-empty value gives `NULL`: an
+#' input that has not reported yet (`NULL`), `NA`, `""` and a vector of more
+#' than one value alike. A multi-select therefore reads as "no selection", so
+#' handle those inputs explicitly.
+#'
 #' @param value The input value.
 #' @param df Optional data frame, needed only for `numeric_is_null`.
 #' @param numeric_is_null Logical; when `TRUE`, a numeric column in `df` also
@@ -615,10 +646,16 @@ setup_axis_range <- function(input, session, min_key = "y.min", max_key = "y.max
 #'
 #' @return `value`, or `NULL`.
 #'
+#' @seealso [nz_value()], [na_to_null()]
+#'
+#' @export
 #' @author Jared Andrews
-#' @rdname INTERNAL_blank_to_null
-#' @keywords internal
-.blank_to_null <- function(value, df = NULL, numeric_is_null = FALSE) {
+#' @examples
+#' blank_to_null("")
+#' blank_to_null(NULL)
+#' blank_to_null("Species")
+#' blank_to_null("Sepal.Length", df = iris, numeric_is_null = TRUE)
+blank_to_null <- function(value, df = NULL, numeric_is_null = FALSE) {
     if (is.null(value) || length(value) != 1 || is.na(value) || !nzchar(value)) {
         return(NULL)
     }
@@ -681,11 +718,16 @@ setup_axis_range <- function(input, session, min_key = "y.min", max_key = "y.max
 #'   or `NULL`. When supplied, an `input$<key>` read whose `key` is backed by the
 #'   store resolves from the store instead of the client input, so a parameter
 #'   driven by the parent app updates in a single render.
-#' @return A function that wraps reactive expressions. With `params = NULL` this is
-#'   `identity` if auto-update is enabled (expressions will be reactive), or `isolate`
-#'   if auto-update is disabled (expressions will not trigger reactivity). With a
-#'   store supplied it is a wrapper with the same isolation semantics that additionally
-#'   redirects store-backed `input$<key>` reads.
+#' @param track Optional function, or `NULL`. When supplied, it is called with the
+#'   id of every `input$<key>` read through the returned wrapper, so a caller can
+#'   tell which inputs an expression depends on (the modules' cached plot step
+#'   keys its cache on them).
+#' @return A function that wraps reactive expressions. With `params` and `track`
+#'   both `NULL` this is `identity` if auto-update is enabled (expressions will be
+#'   reactive), or `isolate` if auto-update is disabled (expressions will not
+#'   trigger reactivity). Otherwise it is a wrapper with the same isolation
+#'   semantics that additionally redirects store-backed `input$<key>` reads and
+#'   reports the ids read to `track`.
 #'
 #' @seealso [setup_reactive_defaults()]
 #'
@@ -737,7 +779,7 @@ setup_axis_range <- function(input, session, min_key = "y.min", max_key = "y.max
 #'
 #'     shinyApp(ui, server)
 #' }
-setup_auto_update_logic <- function(input, params = NULL) {
+setup_auto_update_logic <- function(input, params = NULL, track = NULL) {
     auto_update <- input$auto.update
     req(!is.null(auto_update))
 
@@ -746,14 +788,17 @@ setup_auto_update_logic <- function(input, params = NULL) {
         input$update
     }
 
-    if (is.null(params)) {
+    if (is.null(params) && is.null(track)) {
         return(if (auto_update) identity else isolate)
     }
 
     function(x) {
         key <- .input_key(substitute(x))
+        if (!is.null(key) && !is.null(track)) {
+            track(key)
+        }
 
-        if (!is.null(key) && params$has(key)) {
+        if (!is.null(key) && !is.null(params) && params$has(key)) {
             if (auto_update) params$get(key) else isolate(params$get(key))
         } else if (auto_update) {
             x
@@ -874,18 +919,26 @@ setup_auto_update_logic <- function(input, params = NULL) {
 
 #' Is an input's value a usable, non-empty string?
 #'
-#' [.has_value()] narrowed to the column-selecting inputs, whose "nothing
-#' chosen" state is the empty string rather than `NULL`.
+#' The check for the column-selecting inputs, whose "nothing chosen" state is
+#' the empty string rather than `NULL`. A Shiny input that has not reported yet
+#' is `NULL`, and both `nzchar(NULL)` and `NULL == ""` are `logical(0)`, which
+#' makes `if (...)` an error rather than `FALSE`; this returns `FALSE` instead.
 #'
 #' @param x A value from a Shiny input.
 #'
 #' @return `TRUE` for a length-1, non-`NA`, non-empty character scalar;
 #'   `FALSE` for anything else, `NULL` included.
 #'
+#' @seealso [blank_to_null()]
+#'
+#' @export
 #' @author Jared Andrews
-#' @rdname INTERNAL_nz_value
-#' @keywords internal
-.nz_value <- function(x) {
+#' @examples
+#' nz_value(NULL)
+#' nz_value("")
+#' nz_value(NA_character_)
+#' nz_value("Species")
+nz_value <- function(x) {
     .has_value(x) && nzchar(x)
 }
 
@@ -1147,53 +1200,195 @@ validate_expression <- function(expr_text, col_names) {
 
 #' Extract parameter documentation from an R function help page
 #'
-#' Parses the Rd documentation for a given function and extracts
-#' parameter descriptions for specified parameter names.
+#' Reads the help page of a function and returns the descriptions of the
+#' parameters asked for, as plain text suitable for UI tooltips. Code is set in
+#' backticks and other Rd markup is reduced to its text.
+#'
+#' Each package's help pages are read once per R session and kept, so building
+#' a module's UI again (another tab, another dataset, another Figure Builder
+#' panel) costs nothing. A package loaded with `pkgload::load_all()` is read
+#' from its source `man/` directory, so its own, current docs are used.
 #'
 #' @param package_name A string in the format "package::function" indicating
 #'   which function's documentation to parse.
 #' @param type The type of documentation section to extract. Currently only
 #'   "param" is supported.
-#' @param selected A list of parameter names to extract. Note that co-documented
-#'   parameters (e.g., `x.by` and `y.by`) should be grouped together in a vector
-#'   within the list or an error will be thrown by `extract_roc_text`.
+#' @param selected A list of parameter names to extract. Co-documented
+#'   parameters (e.g., `x.by` and `y.by`) can be grouped together in a vector
+#'   within the list; each name gets the shared description.
 #' @param cap Logical; if TRUE, capitalize the first letter of each description.
 #'
 #' @return A named list where names are parameter names and values are
 #'   their documentation strings. Returns empty strings for parameters
 #'   not found in the documentation.
 #'
-#' @importFrom roclang extract_roc_text
-#' 
 #' @author Jacob Martin, Jared Andrews
 #' @export
+#' @examples
+#' get_documentation("stats::lm", selected = list("formula", "data"), cap = TRUE)
 get_documentation <- function(package_name, type = "param", selected = NULL, cap = FALSE) {
-    docs <- lapply(selected, function(s) {
-        doc <- tryCatch(
-            extract_roc_text(package_name, type = type, select = s, capitalize = cap),
-            error = function(e) NA_character_
-        )
-
-        if (length(doc) == 0 || all(is.na(doc))) {
-            return("")
-        }
-
-        doc |>
-            gsub("\\\\n", " ", x = _) |>
-            gsub("\\\\", "", x = _) |>
-            gsub("code\\{([^}]+)\\}", "`\\1`", x = _) |>
-            gsub("\n", " ", x = _) |>
-            trimws(x = _)
-    })
+    type <- match.arg(type)
+    parts <- strsplit(package_name, "::", fixed = TRUE)[[1]]
+    params <- if (length(parts) == 2) {
+        tryCatch(.rd_params(parts[[1]], parts[[2]]), error = function(e) character(0))
+    } else {
+        character(0)
+    }
 
     # Expand co-documented parameters (e.g., c("x.by", "y.by")) into
     # separate named elements sharing the same documentation string.
     result <- list()
-    for (i in seq_along(selected)) {
-        param_names <- selected[[i]]
-        for (nm in param_names) {
-            result[[nm]] <- docs[[i]]
+    for (s in selected) {
+        found <- intersect(s, names(params))
+        doc <- if (length(found)) params[[found[[1]]]] else ""
+        if (isTRUE(cap) && nzchar(doc)) {
+            doc <- paste0(toupper(substring(doc, 1, 1)), substring(doc, 2))
+        }
+        for (nm in s) {
+            result[[nm]] <- doc
         }
     }
     result
+}
+
+# Parsed help pages, keyed by package, then by function.
+.rd_cache <- new.env(parent = emptyenv())
+
+#' Parameter descriptions from a function's help page
+#'
+#' @param pkg,fn Package and function (or any alias on its help page).
+#' @return A named character vector, one plain-text description per parameter.
+#'   Co-documented parameters each get the shared description.
+#'
+#' @author Jared Andrews
+#' @rdname INTERNAL_rd_params
+#' @keywords internal
+.rd_params <- function(pkg, fn) {
+    key <- paste0(pkg, "::", fn)
+    if (!is.null(.rd_cache[[key]])) {
+        return(.rd_cache[[key]])
+    }
+
+    rd <- .rd_page(pkg, fn)
+    params <- character(0)
+    if (!is.null(rd)) {
+        args <- Filter(function(x) identical(attr(x, "Rd_tag"), "\\arguments"), rd)
+        items <- if (length(args)) {
+            Filter(function(x) identical(attr(x, "Rd_tag"), "\\item"), args[[1]])
+        } else {
+            list()
+        }
+        for (it in items) {
+            if (length(it) < 2) {
+                next
+            }
+            names_txt <- .rd_text(it[[1]])
+            desc <- .rd_text(it[[2]])
+            for (nm in trimws(strsplit(names_txt, ",", fixed = TRUE)[[1]])) {
+                if (nzchar(nm)) {
+                    params[[nm]] <- desc
+                }
+            }
+        }
+    }
+
+    assign(key, params, envir = .rd_cache)
+    params
+}
+
+#' Find a function's parsed help page
+#'
+#' A package loaded with pkgload is read from its source `man/` directory (the
+#' installed copy, if any, may be out of date); any other from its installed
+#' help database, which is parsed once and kept.
+#'
+#' @param pkg,fn Package and function (or any alias on its help page).
+#' @return The parsed Rd object, or `NULL` when there is none.
+#'
+#' @author Jared Andrews
+#' @rdname INTERNAL_rd_page
+#' @keywords internal
+.rd_page <- function(pkg, fn) {
+    is_dev <- isNamespaceLoaded(pkg) &&
+        exists(".__DEVTOOLS__", envir = asNamespace(pkg), inherits = FALSE)
+
+    if (is_dev) {
+        # Roxygen names a page after the function it documents, so try that
+        # page before falling back to reading every page in the package.
+        man <- file.path(getNamespaceInfo(pkg, "path"), "man")
+        direct <- file.path(man, paste0(fn, ".Rd"))
+        if (file.exists(direct)) {
+            return(tools::parse_Rd(direct))
+        }
+    }
+
+    db_key <- paste0("db:", pkg)
+    db <- .rd_cache[[db_key]]
+    if (is.null(db)) {
+        db <- if (is_dev) {
+            tools::Rd_db(dir = getNamespaceInfo(pkg, "path"))
+        } else {
+            tools::Rd_db(pkg)
+        }
+        aliases <- lapply(db, function(rd) {
+            al <- Filter(function(x) identical(attr(x, "Rd_tag"), "\\alias"), rd)
+            vapply(al, .rd_text, character(1))
+        })
+        db <- list(pages = db, aliases = aliases)
+        assign(db_key, db, envir = .rd_cache)
+    }
+
+    hit <- which(vapply(db$aliases, function(a) fn %in% a, logical(1)))
+    if (length(hit)) db$pages[[hit[[1]]]] else NULL
+}
+
+#' Render an Rd fragment as plain tooltip text
+#'
+#' Code (`\code{}`, `\verb{}` and the like) is set in backticks, links and
+#' emphasis keep their text, quotes become quotes, and whitespace is collapsed.
+#'
+#' @param x An Rd fragment.
+#' @return A single string.
+#'
+#' @author Jared Andrews
+#' @rdname INTERNAL_rd_text
+#' @keywords internal
+.rd_text <- function(x) {
+    walk <- function(node) {
+        tag <- attr(node, "Rd_tag")
+        if (is.character(node)) {
+            return(paste(node, collapse = ""))
+        }
+        inner <- function(i = 1) if (length(node) >= i) walk(node[[i]]) else ""
+        all_kids <- function() paste(vapply(node, walk, character(1)), collapse = "")
+        if (is.null(tag)) {
+            return(all_kids())
+        }
+        switch(tag,
+            "\\code" = , "\\verb" = , "\\samp" = , "\\env" = , "\\option" = , "\\file" = ,
+            "\\command" = , "\\kbd" = paste0("`", all_kids(), "`"),
+            "\\sQuote" = paste0("'", all_kids(), "'"),
+            "\\dQuote" = paste0("\"", all_kids(), "\""),
+            "\\href" = inner(2),
+            "\\eqn" = , "\\deqn" = if (length(node) >= 2) inner(2) else inner(1),
+            "\\dots" = , "\\ldots" = "...",
+            "\\R" = "R",
+            "\\cr" = " ",
+            # A list's items follow bare \item markers; join them with "; ".
+            "\\itemize" = , "\\enumerate" = {
+                chunks <- split(seq_along(node), cumsum(vapply(node, function(k) {
+                    identical(attr(k, "Rd_tag"), "\\item")
+                }, logical(1))))
+                items <- vapply(chunks, function(i) {
+                    trimws(paste(vapply(node[i], walk, character(1)), collapse = ""))
+                }, character(1))
+                paste0(" ", paste(items[nzchar(items)], collapse = "; "), " ")
+            },
+            "\\item" = "",
+            "COMMENT" = , "\\Sexpr" = , "USERMACRO" = , "\\figure" = "",
+            all_kids()
+        )
+    }
+    out <- walk(x)
+    trimws(gsub("[[:space:]]+", " ", out))
 }

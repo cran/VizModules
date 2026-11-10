@@ -30,7 +30,7 @@
 #' @author Jacob Martin, Jared Andrews
 plotthis_BoxPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs = NULL, defaults = NULL) {
     stopifnot(is.reactive(data))
-    data <- .require_data_frame(data)
+    data <- require_data_frame(data)
 
     moduleServer(id, function(input, output, session) {
         params <- setup_reactive_defaults(defaults, input, session)
@@ -60,8 +60,7 @@ plotthis_BoxPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs = NUL
         default_palette_name <- "dittoColors"
 
         # Store last computed stats table for download
-        last_stats_df <- reactiveVal(NULL)
-        palette_lookup <- .flatten_palette_options(default_palettes()[["choices"]])
+        palette_lookup <- flatten_palette_options(default_palettes()[["choices"]])
         default_palette_values <- palette_lookup[[default_palette_name]]
         if (is.null(default_palette_values) || length(default_palette_values) == 0) {
             default_palette_values <- if (length(palette_lookup) > 0) palette_lookup[[1]] else character(0)
@@ -103,7 +102,7 @@ plotthis_BoxPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs = NUL
 
             initial_colors <- isolate(resolve_palette(
                 groups, input$palette.colours, default_palette_values,
-                .default_group_colors(defaults, "palette.colours")
+                default_group_colors(defaults, "palette.colours")
             ))
 
             # The picker is seeded with this, so it is also what the plot should be
@@ -126,6 +125,9 @@ plotthis_BoxPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs = NUL
         # The comparisons on offer for the current x and group.by.
         pair_choices <- function() generate_pair_strings(data(), input$x.data, input$group.by)
 
+        # The dragged x order the plot draws, NULL for the default one.
+        x_order <- setup_level_order(input, session, data, reactive(input$x.data), defaults)
+
         # Update stat comparison pairs when x or group.by changes, selecting any
         # that defaults$stat.pairs names (all pairs are tested when none are).
         observeEvent(c(input$x.data, input$group.by), {
@@ -136,12 +138,13 @@ plotthis_BoxPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs = NUL
             freezeReactiveValue(input, "stat.pairs")
             update_viz_select(session, "stat.pairs",
                 choices = c("", pair_strings),
-                selected = .default_stat_pairs(defaults, pair_strings)
+                selected = default_stat_pairs(defaults, pair_strings)
             )
-        })
+        }, priority = 998)
 
         # Reset functionality
         observeEvent(input$reset, {
+            updateCheckboxInput(session, "webgl", value = get_default(defaults, "webgl", TRUE, is.logical))
             char.choices <- c("", names(data())[vapply(data(), function(x) !is.numeric(x), logical(1))])
             num.choices <- c("", names(data())[vapply(data(), is.numeric, logical(1))])
             default.y <- get_default(defaults, "y.data", num.choices[2], function(x) x %in% num.choices)
@@ -156,9 +159,10 @@ plotthis_BoxPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs = NUL
             max.y <- if (!is.null(y.range)) y.range$max else 1
             min.y <- if (!is.null(y.range)) y.range$min else 0
 
-            # Data
+            # Data. Group By is the capped pool the UI offers (see plotthis_BoxPlotInputsUI()).
+            group.choices <- discrete_choices(data(), keep = get_default(defaults, "group.by", NULL))
             update_viz_select(session, "group.by",
-                selected = get_default(defaults, "group.by", "", function(x) x == "" || x %in% char.choices)
+                selected = get_default(defaults, "group.by", "", function(x) x == "" || x %in% group.choices)
             )
             update_viz_select(session, "x.data",
                 selected = get_default(defaults, "x.data", char.choices[2], function(x) x %in% char.choices)
@@ -216,10 +220,10 @@ plotthis_BoxPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs = NUL
 
             # Action Button
             # Group colors
-            .reset_group_colors(session, "palette.colours", defaults, palette_groups(), default_palette_values)
+            reset_group_colors(session, "palette.colours", defaults, palette_groups(), default_palette_values)
 
             reset_plotly_inputs(session, defaults)
-            .reset_manual_edits(edit_store)
+            reset_manual_edits(edit_store)
             reset_legend_inputs(session, defaults)
 
             # Lines
@@ -229,7 +233,7 @@ plotthis_BoxPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs = NUL
             reset_axes_inputs(session, defaults)
 
             # Stats
-            .reset_stats_inputs(session, defaults, pair_choices())
+            reset_stats_inputs(session, defaults, pair_choices())
         })
 
         # How high the significance brackets will reach, so the y-axis can reserve
@@ -245,12 +249,15 @@ plotthis_BoxPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs = NUL
                 return(NULL)
             }
 
-            .stat_bracket_headroom(
-                df = data(), x = input$x.data, y = input$y.data,
+            stat_bracket_headroom(
+                # Measured against the x order drawn, which sets which brackets
+                # can share a level.
+                df = .box_ordered_data(data(), input$x.data, input$sort_x, x_order())$data,
+                x = input$x.data, y = input$y.data,
                 # A numeric group.by is a fill gradient, not a nested grouping,
                 # exactly as the render treats it.
-                group.by = .blank_to_null(input$group.by, data(), numeric_is_null = TRUE),
-                facet.by = .blank_to_null(input$facet.by),
+                group.by = blank_to_null(input$group.by, data(), numeric_is_null = TRUE),
+                facet.by = blank_to_null(input$facet.by),
                 per.facet = isTRUE(input$stat.per.facet),
                 input = input,
                 dodge.width = .PLOTTHIS_DODGE_WIDTH
@@ -276,7 +283,9 @@ plotthis_BoxPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs = NUL
                 updateNumericInput(session, "y.max", value = y_range$max)
                 updateNumericInput(session, "y.min", value = y_range$min)
             }
-        })
+            # Just after setup_axis_range()'s observer and before the render, so the
+            # plot draws once with the new column's limits rather than the old ones.
+        }, priority = 999)
 
         observeEvent(c(input$facet.by, input$x.data),
             {
@@ -288,66 +297,61 @@ plotthis_BoxPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs = NUL
                     update_viz_select(session, "facet.scale", selected = "free_x")
                 }
             },
-            ignoreInit = FALSE
+            ignoreInit = FALSE, priority = 998
         )
 
         observeEvent(input$facet.by, {
-            .toggle_facet_title_inputs(session, .nz_value(input$facet.by), hidden = hide.inputs)
-            # Sorting x is not applied to a faceted plot, so clear it rather than
-            # leave a key on screen that does nothing.
-            if (.nz_value(input$facet.by)) {
-                updateTextInput(session, "sort_x", value = "")
-            }
+            toggle_facet_title_inputs(session, nz_value(input$facet.by), hidden = hide.inputs)
         })
 
-        generate_BoxPlot <- reactive({
-            isolate_fn <- setup_auto_update_logic(input, params)
+        # The plot itself: everything that changes what is drawn, with the stats
+        # table and any notes raised along the way. It is cached (see
+        # cached_structure()), so it must have no side effects; the styling
+        # inputs are applied to it in generate_BoxPlot().
+        draw_BoxPlot <- function(isolate_fn) {
+            notes <- list()
+            stats_df <- NULL
 
             # Resolved server-side, so they already clear any significance brackets.
             y.limits <- isolate_fn(y_range_store())
 
             # Facet By Null option Upstream:
             facet.by <- NULL
-            if (.nz_value(isolate_fn(input$facet.by))) {
+            if (nz_value(isolate_fn(input$facet.by))) {
                 facet.by <- isolate_fn(input$facet.by)
             }
 
             group.by <- NULL
-            if (.nz_value(isolate_fn(input$group.by))) {
+            if (nz_value(isolate_fn(input$group.by))) {
                 group.by <- isolate_fn(input$group.by)
             }
 
-            # plotthis evaluates sort_x with rlang::parse_expr() inside summarise(),
-            # so the typed text is code, and it has to clear the same AST check as
-            # every other user expression before it gets anywhere near that. Sorting
-            # is not applied while faceted (see the facet.by observer above).
-            sort.x <- NULL
-            sort.text <- isolate_fn(input$sort_x)
-            if (is.null(facet.by) && .nz_value(sort.text) && nzchar(trimws(sort.text))) {
-                sort.x <- suppressWarnings(
-                    .validate_expression_with(sort.text, names(data()), .sort_allowed_calls())
-                )
-                if (is.null(sort.x)) {
-                    showNotification(
-                        paste0(
-                            "'Sort X By' was ignored. Use data columns with basic math and ",
-                            "summary functions only (e.g. 'mean(", isolate_fn(input$y.data), ")')."
-                        ),
-                        type = "warning"
-                    )
-                }
+            # The x order -- Sort X By when set, else the dragged X Order -- is set
+            # on the frame itself, so the plot, the tests and the brackets all
+            # read the same one. Faceted, every panel shares it.
+            x.col <- isolate_fn(input$x.data)
+            ordered <- .box_ordered_data(data(), x.col, isolate_fn(input$sort_x), isolate_fn(x_order()))
+            if (!ordered$sort.ok) {
+                notes <- c(notes, list(.structure_note(
+                    paste0(
+                        "'Sort X By' was ignored. Use data columns with basic math and ",
+                        "summary functions only (e.g. 'mean(", isolate_fn(input$y.data), ")')."
+                    ),
+                    id = "sort-x-ignored", type = "warning"
+                )))
             }
+            df <- ordered$data
             highlight <- validate_expression(isolate_fn(input$highlight), names(data()))
 
             # Convert NA to NULL for facet.ncol and facet.nrow
-            facet.ncol <- .na_to_null(isolate_fn(input$facet.ncol))
-            facet.nrow <- .na_to_null(isolate_fn(input$facet.nrow))
+            facet.ncol <- na_to_null(isolate_fn(input$facet.ncol))
+            facet.nrow <- na_to_null(isolate_fn(input$facet.nrow))
 
             palette_values <- resolve_palette(
                 isolate_fn(palette_groups()),
                 isolate_fn(palette_store()),
                 default_palette_values,
-                .default_group_colors(defaults, "palette.colours")
+                default_group_colors(defaults, "palette.colours")
             )
             palcolor_arg <- NULL
             if (!is.null(palette_values) && length(palette_values) > 0) {
@@ -359,15 +363,14 @@ plotthis_BoxPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs = NUL
 
             # A numeric group.by is not a nesting (the UI only offers categorical
             # columns, but a default can name one); ignore it, as the stats do.
-            if (!is.null(group.by) && is.numeric(data()[[group.by]])) {
+            if (!is.null(group.by) && is.numeric(df[[group.by]])) {
                 group.by <- NULL
             }
             p <- BoxPlot(
-                data = data(),
-                x = isolate_fn(input$x.data),
+                data = df,
+                x = x.col,
                 y = isolate_fn(input$y.data),
                 flip = isolate_fn(input$rotate),
-                sort_x = sort.x,
                 theme = "theme_this",
                 theme_args = theme_args,
                 y_max = y.limits$max,
@@ -411,19 +414,11 @@ plotthis_BoxPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs = NUL
                 )
             }
 
-            fig <- apply_title_layout(
-                fig,
-                input,
-                isolate_fn,
-                title_y = 0.95,
-                title_x = isolate_fn(input$axis.title.horizontal.position)
-            )
-
             # Statistical annotations
             if (isolate_fn(input$stats.enabled)) {
                 stat_pairs <- parse_pair_strings(isolate_fn(input$stat.pairs))
                 stats_df <- compute_pairwise_stats(
-                    df = data(), x = isolate_fn(input$x.data),
+                    df = df, x = x.col,
                     y = isolate_fn(input$y.data), pairs = stat_pairs,
                     test = isolate_fn(input$stat.test),
                     p.adjust.method = isolate_fn(input$stat.p.adjust),
@@ -433,16 +428,14 @@ plotthis_BoxPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs = NUL
                     sig.threshold = isolate_fn(input$stat.sig.threshold)
                 )
 
-                last_stats_df(stats_df)
-
                 if (isTRUE(isolate_fn(input$rotate))) {
                     # Rotated, the values run along the x-axis and there is no room
                     # above them for brackets. The tests still reach the source download.
-                    .note_brackets_skipped(session)
+                    notes <- c(notes, list(.brackets_skipped_note()))
                 } else {
                     stat_result <- create_stat_annotations(
-                        stats_df = stats_df, fig = fig, df = data(),
-                        x = isolate_fn(input$x.data), y = isolate_fn(input$y.data),
+                        stats_df = stats_df, fig = fig, df = df,
+                        x = x.col, y = isolate_fn(input$y.data),
                         display = isolate_fn(input$stat.display),
                         hide.ns = isolate_fn(input$stat.hide.ns),
                         sig.threshold = isolate_fn(input$stat.sig.threshold),
@@ -468,64 +461,40 @@ plotthis_BoxPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs = NUL
                         y.max = y.limits$max
                     )
                 }
-            } else {
-                # Nothing was tested for this figure, so the source download must
-                # not ship the table from an earlier one.
-                last_stats_df(NULL)
             }
 
-
-            # Apply axis styling to all subplot axes (handles faceting)
-            xaxis_style <- create_axis_styles(input, axis_side = "x", isolate_fn = isolate_fn)
-            yaxis_style <- create_axis_styles(input, axis_side = "y", isolate_fn = isolate_fn)
-
-            fig <- apply_subplot_axis_styling(fig, xaxis_style, yaxis_style)
-
-            # Apply axis title font to shared facet annotation titles
-            if (!is.null(facet.by) && nzchar(facet.by)) {
-                fig <- apply_axis_title_to_annotations(fig, input, isolate_fn)
-            }
-
-            # Add reference lines
-            fig <- add_reference_lines(fig,
-                hline.intercepts = isolate_fn(input$hline.intercepts),
-                hline.colors = isolate_fn(input$hline.colors),
-                hline.widths = isolate_fn(input$hline.widths),
-                hline.linetypes = isolate_fn(input$hline.linetypes),
-                hline.opacities = isolate_fn(input$hline.opacities),
-                vline.intercepts = isolate_fn(input$vline.intercepts),
-                vline.colors = isolate_fn(input$vline.colors),
-                vline.widths = isolate_fn(input$vline.widths),
-                vline.linetypes = isolate_fn(input$vline.linetypes),
-                vline.opacities = isolate_fn(input$vline.opacities),
-                abline.slopes = isolate_fn(input$abline.slopes),
-                abline.intercepts = isolate_fn(input$abline.intercepts),
-                abline.colors = isolate_fn(input$abline.colors),
-                abline.widths = isolate_fn(input$abline.widths),
-                abline.linetypes = isolate_fn(input$abline.linetypes),
-                abline.opacities = isolate_fn(input$abline.opacities)
-            )
 
             # Hide jitter points from legend if they are shown
             if (isolate_fn(input$add.points)) {
                 fig <- .hide_jitter_from_legend(fig)
             }
 
-            config_list <- add_plot_config(
-                download.format = isolate_fn(input$download.format),
-                include.modebar.buttons = TRUE, facet.by = facet.by
+            # Many points draw far faster with WebGL (see auto_webgl()).
+            if (!isFALSE(isolate_fn(input$webgl))) {
+                fig <- auto_webgl(fig)
+            }
+
+            # Nothing was tested when stats are off, so the source download gets no
+            # table from an earlier figure.
+            list(fig = .ensure_built(fig), facet.by = facet.by, stats = stats_df, notes = notes)
+        }
+        base_BoxPlot <- cached_structure(
+            draw_BoxPlot, input, session, data, params = params,
+            extra = function() list(y_range_store(), palette_groups(), palette_store(), x_order())
+        )
+        notify <- .structure_notifier(session)
+
+        # The stats table behind the brackets drawn, for the source download.
+        last_stats_df <- reactive(base_BoxPlot()$stats)
+
+        # The plot, styled: titles, fonts, axes, reference lines and legend.
+        generate_BoxPlot <- reactive({
+            isolate_fn <- setup_auto_update_logic(input, params)
+            base <- base_BoxPlot()
+            notify(base)
+            apply_uniform_styling(base$fig, input, isolate_fn,
+                facet.by = base$facet.by, title_y = 0.95, padding.axes = "x"
             )
-
-            fig <- do.call(config, c(list(p = fig), config_list))
-            fig <- apply_plotly_newshape(fig, input, isolate_fn)
-
-            # Apply the uniform legend visibility and font inputs
-            fig <- apply_legend_inputs(fig, input, isolate_fn)
-
-            # Make single-panel x/y axis titles draggable (matches faceted behaviour)
-            fig <- axis_titles_as_annotations(fig)
-
-            fig
         })
 
         # Returning all UI inputs:
@@ -578,5 +547,75 @@ plotthis_BoxPlotServer <- function(id, data, hide.inputs = NULL, hide.tabs = NUL
 #' @rdname INTERNAL_box_free_y
 #' @keywords internal
 .box_free_y <- function(facet.by, facet.scale) {
-    .nz_value(facet.by) && isTRUE(facet.scale %in% c("free", "free_y"))
+    nz_value(facet.by) && isTRUE(facet.scale %in% c("free", "free_y"))
+}
+
+
+#' The box plot's data with its x levels in the order drawn
+#'
+#' A Sort X By key wins over the dragged X Order. Either way the order is set on
+#' the frame as factor levels, which plotthis keeps, and which the tests and
+#' brackets read, so all three agree. The key is evaluated once per x level over
+#' all the data, as [plotthis::BoxPlot()]'s `sort_x` does, so a faceted plot
+#' shares one order across its panels.
+#'
+#' @param df The module's data.
+#' @param x The x column.
+#' @param sort.text The Sort X By text.
+#' @param x.order The dragged order, or `NULL`.
+#'
+#' @return `list(data, sort.ok)`; `sort.ok` is `FALSE` when a non-blank key was
+#'   rejected or could not be evaluated, and was therefore ignored.
+#'
+#' @author Jared Andrews
+#' @rdname INTERNAL_box_ordered_data
+#' @keywords internal
+.box_ordered_data <- function(df, x, sort.text, x.order = NULL) {
+    sort.levels <- NULL
+    sort.ok <- TRUE
+    if (nz_value(sort.text) && nzchar(trimws(sort.text))) {
+        # The typed text is code, so it has to clear the same AST check as every
+        # other user expression before it is evaluated.
+        sort.x <- suppressWarnings(.validate_expression_with(sort.text, names(df), .sort_allowed_calls()))
+        sort.levels <- .box_sort_levels(df, x, sort.x)
+        sort.ok <- !is.null(sort.levels)
+    }
+    list(data = apply_level_order(df, x, sort.levels %__% x.order), sort.ok = sort.ok)
+}
+
+
+#' The x levels ordered by a sort key
+#'
+#' Mirrors [plotthis::BoxPlot()]'s `sort_x`: the key is summarised per x level
+#' and the levels are arranged by it, ascending, ties kept in their default order.
+#'
+#' @param df The module's data.
+#' @param x The x column.
+#' @param sort.x A validated sort expression, or `NULL`.
+#'
+#' @return A character vector of levels, or `NULL` when there is no key or it
+#'   does not give one value per level.
+#'
+#' @importFrom dplyr summarise group_by across all_of
+#'
+#' @author Jared Andrews
+#' @rdname INTERNAL_box_sort_levels
+#' @keywords internal
+.box_sort_levels <- function(df, x, sort.x) {
+    if (is.null(sort.x) || is.null(df) || !nz_value(x) || !x %in% names(df)) {
+        return(NULL)
+    }
+    expr <- str2lang(sort.x)
+    summ <- tryCatch(
+        suppressWarnings(summarise(
+            group_by(df, across(all_of(x))),
+            .sort_x = !!expr, .groups = "drop"
+        )),
+        error = function(e) NULL
+    )
+    if (is.null(summ) || anyDuplicated(summ[[x]]) || !is.atomic(summ$.sort_x)) {
+        return(NULL)
+    }
+    lv <- as.character(summ[[x]][order(summ$.sort_x, method = "radix")])
+    lv[!is.na(lv)]
 }

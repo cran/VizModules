@@ -51,8 +51,10 @@ get_default <- function(defaults, key, fallback, validator = NULL) {
 #'
 #' @param ns A namespace function, typically created by `NS(id)`.
 #' @param defaults A named list of default values for the inputs.
-#' @param include.fit.lines Logical; whether to include "line of best fit" and
-#'   "linear model line" inputs. Only applicable for scatter plots. Default is FALSE.
+#' @param include.fit.lines Logical; whether to include the fit and model line
+#'   inputs: "line of best fit", "linear model line", custom model lines, and
+#'   whether those lines are listed in the legend (`model.legend.show`, off by
+#'   default). Only applicable for scatter plots. Default is FALSE.
 #'
 #' @return A `tagList` containing the line input UI elements.
 #'
@@ -230,6 +232,17 @@ uniform_lines_inputs_ui <- function(ns, defaults = NULL, include.fit.lines = FAL
                 placement = "top", options = tip_opts
             ),
             tipify(
+                materialSwitch(ns("model.legend.show"), "Model Lines in Legend",
+                    value = get_default(defaults, "model.legend.show", FALSE, is.logical),
+                    status = "success"
+                ),
+                paste(
+                    "List the best fit, linear model and custom model lines in the legend.",
+                    "Off, a line drawn for a Color By group still hides and shows with that group."
+                ),
+                placement = "top", options = tip_opts
+            ),
+            tipify(
                 materialSwitch(ns("custom.model.enable"), "Custom Model Lines",
                     value = get_default(defaults, "custom.model.enable", FALSE, is.logical),
                     status = "success"
@@ -275,8 +288,19 @@ uniform_lines_inputs_ui <- function(ns, defaults = NULL, include.fit.lines = FAL
 #'   x and y axes (e.g., horizontal bar plots). Default is FALSE.
 #' @param include.flip Logical; whether to include the "Flip" input for flipping
 #'   the axis. Default is FALSE.
+#' @param include.padding Which of `"x"` and `"y"` get an axis padding input
+#'   (`axis.padding.x`, `axis.padding.y`; see [apply_axis_padding()]). Leave out
+#'   an axis that has its own limit inputs. Default is both.
 #'
 #' @return A `tagList` containing the axis input UI elements.
+#'
+#' @details
+#' Alongside the fonts, lines, gridlines, and ticks, the inputs include
+#' `axis.scientific`, which writes numeric tick labels in scientific notation
+#' (off by default, so they never switch to it on their own; see
+#' [apply_tick_notation()]), and `axis.padding.x`/`axis.padding.y`, the space
+#' between the data and the edges of the plot area as a fraction of the data's
+#' extent at each end (blank keeps the plot's own padding).
 #'
 #' @importFrom shiny numericInput checkboxInput tagList
 #' @importFrom colourpicker colourInput
@@ -289,7 +313,10 @@ uniform_lines_inputs_ui <- function(ns, defaults = NULL, include.fit.lines = FAL
 #' ns <- shiny::NS("plot")
 #' uniform_axes_inputs_ui(ns)
 #' uniform_axes_inputs_ui(ns, include.rotate = TRUE, include.flip = TRUE)
-uniform_axes_inputs_ui <- function(ns, defaults = NULL, include.rotate = FALSE, include.flip = FALSE) {
+#' # A plot with its own y-axis limit inputs: x padding only.
+#' uniform_axes_inputs_ui(ns, include.padding = "x")
+uniform_axes_inputs_ui <- function(ns, defaults = NULL, include.rotate = FALSE, include.flip = FALSE,
+                                   include.padding = c("x", "y")) {
     font_choices <- .font_family_choices
 
     rotate_input <- if (include.rotate) {
@@ -423,6 +450,39 @@ uniform_axes_inputs_ui <- function(ns, defaults = NULL, include.rotate = FALSE, 
             min = 0,
             step = 0.1
         ),
+        tipify(
+            checkboxInput(ns("axis.scientific"), "Scientific Notation Ticks",
+                value = get_default(defaults, "axis.scientific", FALSE, is.logical)
+            ),
+            "Write numeric tick labels as powers of ten. Off, they are never in scientific notation.",
+            placement = "top", options = list(container = "body")
+        ),
+        if ("x" %in% include.padding) {
+            tipify(
+                numericInput(ns("axis.padding.x"), "X Axis Padding",
+                    value = get_default(defaults, "axis.padding.x", NA, is.numeric),
+                    min = 0, step = 0.01
+                ),
+                paste(
+                    "Space between the data and the edges of the plot area along X, as a fraction of",
+                    "the data's extent at each end. 0 fills the plot area. Leave blank for the default."
+                ),
+                placement = "top", options = list(container = "body")
+            )
+        },
+        if ("y" %in% include.padding) {
+            tipify(
+                numericInput(ns("axis.padding.y"), "Y Axis Padding",
+                    value = get_default(defaults, "axis.padding.y", NA, is.numeric),
+                    min = 0, step = 0.01
+                ),
+                paste(
+                    "Space between the data and the edges of the plot area along Y, as a fraction of",
+                    "the data's extent at each end. 0 fills the plot area. Leave blank for the default."
+                ),
+                placement = "top", options = list(container = "body")
+            )
+        },
         numericInput(ns("facet.title.font.size"), "Facet Subplot Title Size",
             value = get_default(defaults, "facet.title.font.size", 18, is.numeric),
             min = 1,
@@ -457,10 +517,14 @@ uniform_axes_inputs_ui <- function(ns, defaults = NULL, include.rotate = FALSE, 
 #' @importFrom colourpicker colourInput
 #' @importFrom shinyBS tipify
 #'
+#' @seealso [reset_stats_inputs()], [default_stat_pairs()], [stat_bracket_headroom()],
+#'   [create_stat_annotations()], [apply_stat_annotations()]
+#'
+#' @export
 #' @author Jared Andrews
-#' @rdname INTERNAL_uniform_stats_inputs_ui
-#' @keywords internal
-.uniform_stats_inputs_ui <- function(ns, defaults = NULL) {
+#' @examples
+#' uniform_stats_inputs_ui(shiny::NS("stats"))
+uniform_stats_inputs_ui <- function(ns, defaults = NULL) {
     tip_opts <- list(container = "body")
     tagList(
         tipify(
@@ -611,7 +675,7 @@ uniform_axes_inputs_ui <- function(ns, defaults = NULL, include.rotate = FALSE, 
 #' modules. Includes interactive download controls, plot margin adjustments,
 #' and user-drawn shape styling for Plotly's drawing tools. (Subplot spacing
 #' controls live in each module's "Facet" tab via
-#' `.uniform_subplot_spacing_inputs_ui()`.)
+#' `uniform_subplot_spacing_inputs_ui()`.)
 #'
 #' @param ns A namespace function, typically created by `NS(id)`.
 #' @param defaults A named list of default values for the inputs.
@@ -746,12 +810,15 @@ uniform_plotly_inputs_ui <- function(ns, defaults = NULL, include.shapes = TRUE)
 #' @importFrom shiny numericInput tagList
 #' @importFrom shinyBS tipify
 #'
+#' @seealso [subplot_spacing_defaults()], [apply_facet_subplot_spacing()], [reset_plotly_inputs()]
+#'
+#' @export
 #' @author Jared Andrews
-#' @rdname INTERNAL_uniform_subplot_spacing_inputs_ui
-#' @keywords internal
-.uniform_subplot_spacing_inputs_ui <- function(ns, defaults = NULL) {
+#' @examples
+#' uniform_subplot_spacing_inputs_ui(shiny::NS("spacing"), defaults = list(subplot.margin = 0.05))
+uniform_subplot_spacing_inputs_ui <- function(ns, defaults = NULL) {
     tip_opts <- list(container = "body")
-    spacing <- .subplot_spacing_defaults(defaults)
+    spacing <- subplot_spacing_defaults(defaults)
 
     tagList(
         tipify(
@@ -782,7 +849,7 @@ uniform_plotly_inputs_ui <- function(ns, defaults = NULL, include.shapes = TRUE)
 
 #' Resolve the subplot spacing defaults
 #'
-#' Shared by [.uniform_subplot_spacing_inputs_ui()] and [reset_plotly_inputs()]
+#' Shared by [uniform_subplot_spacing_inputs_ui()] and [reset_plotly_inputs()]
 #' so the controls start and reset to the same values. A `subplot.margin` entry
 #' sets both directions at once (linePlot uses it for its tighter default);
 #' `subplot.margin.x`/`subplot.margin.y` override it per direction.
@@ -791,10 +858,12 @@ uniform_plotly_inputs_ui <- function(ns, defaults = NULL, include.shapes = TRUE)
 #'
 #' @return A list with numeric `x` and `y`.
 #'
+#' @export
 #' @author Jared Andrews
-#' @rdname INTERNAL_subplot_spacing_defaults
-#' @keywords internal
-.subplot_spacing_defaults <- function(defaults) {
+#' @examples
+#' subplot_spacing_defaults(NULL)
+#' subplot_spacing_defaults(list(subplot.margin = 0.05, subplot.margin.y = 0.2))
+subplot_spacing_defaults <- function(defaults) {
     both <- get_default(defaults, "subplot.margin", NULL, is.numeric)
     list(
         x = get_default(defaults, "subplot.margin.x", both %||% 0.03, is.numeric),
@@ -879,6 +948,97 @@ uniform_legend_inputs_ui <- function(ns, defaults = NULL) {
                 min = 0, step = 1
             ),
             "Font size of the legend entry labels.",
+            placement = "top", options = tip_opts
+        )
+    )
+}
+
+
+#' Generate uniform Color Scale input UI
+#'
+#' Creates a standardized tagList of the inputs that set a continuous colour scale,
+#' for a plotly figure with a colorbar such as a heatmap:
+#'
+#' - `colorscale.colors` - The five colour stops, lowest value first, as a
+#'   [multiColorPicker()] (UI: "Color Scale", default: the "RdYlBu" preset). In
+#'   `defaults`, five colours, named by stop or in order
+#' - `colorscale.palette` - The preset selected, one of "RdYlBu", "Jet",
+#'   "Blue-White-Red", "Viridis", "Magma", or "Cividis". Set in `defaults` only
+#' - `colorscale.reverse` - Run the colours from high to low (UI: "Reverse Colors", default: FALSE)
+#' - `colorscale.min` - Value at the lowest colour (UI: "Scale Min", default: NA, the data's minimum)
+#' - `colorscale.mid` - Value at the middle colour (UI: "Scale Mid", default: NA, the centre of the limits)
+#' - `colorscale.max` - Value at the highest colour (UI: "Scale Max", default: NA, the data's maximum)
+#' - `colorbar.title` - Title of the colorbar (UI: "Colorbar Title", default: "Value")
+#'
+#' Pass the inputs to [resolve_colorscale()], and restore them with
+#' [reset_colorscale_inputs()]. The picker's five stops are fixed, so it needs no
+#' `renderUI()` and no [setup_group_colors()] store: read it directly, as
+#' `isolate_fn(input$colorscale.colors)`.
+#'
+#' The colorbar's fonts and visibility follow the Legend tab, through
+#' [apply_legend_styling()].
+#'
+#' @param ns A namespace function, typically created by `NS(id)`.
+#' @param defaults A named list of default values for the inputs.
+#'
+#' @return A `tagList` containing the colour scale input UI elements.
+#'
+#' @importFrom shiny numericInput tagList textInput
+#' @importFrom shinyBS tipify
+#' @importFrom shinyWidgets materialSwitch
+#'
+#' @seealso [resolve_colorscale()], [reset_colorscale_inputs()]
+#'
+#' @author Jared Andrews
+#' @export
+#' @examples
+#' ns <- shiny::NS("plot1")
+#' uniform_colorscale_inputs_ui(ns)
+#' uniform_colorscale_inputs_ui(ns, defaults = list(
+#'     colorscale.palette = "Viridis", colorscale.min = 0, colorscale.max = 1,
+#'     colorbar.title = "Beta value"
+#' ))
+uniform_colorscale_inputs_ui <- function(ns, defaults = NULL) {
+    tip_opts <- list(container = "body")
+    limit <- function(id, label, tip) {
+        tipify(
+            numericInput(ns(id), label, value = get_default(defaults, id, NA, is.numeric)),
+            tip,
+            placement = "top", options = tip_opts
+        )
+    }
+    tagList(
+        # In a tagList of its own, or organize_inputs() cannot tell these inputs are a
+        # group, and stacks them in one cell.
+        tagList(multiColorPicker(ns("colorscale.colors"), "Color Scale",
+            groups = .colorscale_stops,
+            palette_options = .colorscale_presets,
+            selected_palette = get_default(
+                defaults, "colorscale.palette", names(.colorscale_presets)[1],
+                function(x) x %in% names(.colorscale_presets)
+            ),
+            colors = get_default(
+                defaults, "colorscale.colors", NULL,
+                function(x) is.character(x) && length(x) == length(.colorscale_stops)
+            ),
+            compact = TRUE
+        )),
+        tipify(
+            materialSwitch(ns("colorscale.reverse"), "Reverse Colors",
+                value = get_default(defaults, "colorscale.reverse", FALSE, is.logical),
+                status = "success"
+            ),
+            "Run the colors from the highest value to the lowest.",
+            placement = "top", options = tip_opts
+        ),
+        limit("colorscale.min", "Scale Min", "Value at the lowest color. Empty for the minimum of the data."),
+        limit("colorscale.mid", "Scale Mid", "Value at the middle color. Empty for the center of the limits."),
+        limit("colorscale.max", "Scale Max", "Value at the highest color. Empty for the maximum of the data."),
+        tipify(
+            textInput(ns("colorbar.title"), "Colorbar Title",
+                value = get_default(defaults, "colorbar.title", "Value", is.character)
+            ),
+            "Title of the colorbar.",
             placement = "top", options = tip_opts
         )
     )

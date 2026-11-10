@@ -59,13 +59,19 @@ The following \code{\link[=linePlot]{linePlot()}} parameters can be accessed via
 \item \code{facet.ncol} - Number of columns in the facet grid (UI: "Columns", default: NULL; blank = auto)
 \item \code{plot.mode} - Plot type (UI: "Plot type", default: "lines")
 \item \code{line.type} - Line type (UI: "Line type", default: "solid")
-\item \code{error.bar} - Show error bars (UI: "Error Bars", default: TRUE; requires a categorical X and a single Y)
-\item \code{error.type} - What the error bars show: "sd", "sem" or "ci95" (UI: "Error Bar Type", defaults key:
-\code{error.bar.type}, default: "sd")
+\item \code{error.bar} - Show the interval as error bars (UI: "Error Bars", default: TRUE; requires a single X and a single
+Y, and a categorical X unless the error type is "columns")
+\item \code{error.ribbon} - Show the interval as a shaded band behind each line (UI: "Error Ribbon", default: FALSE; same
+requirements as \code{error.bar})
+\item \code{error.type} - What the error bars and ribbon show: "sd", "sem", "ci95" or "columns" (UI: "Error Type",
+defaults key: \code{error.bar.type}, default: "sd")
 \item \code{error.ci.method} - How a "ci95" interval is computed: "normal" or "t" (UI: "Confidence Interval Method",
-defaults key: \code{error.bar.ci.method}, default: "normal"; only shown while the error bar type is "ci95")
+defaults key: \code{error.bar.ci.method}, default: "normal"; only shown while the error type is "ci95")
+\item \code{error.lower}, \code{error.upper} - Numeric columns holding each point's lower and upper bound (UI: "Lower Bound" and
+"Upper Bound", default: ""; only shown while the error type is "columns")
 \item \code{error.colour} - Error bar color (UI: "Error Bar Colour", defaults key: \code{error.bar.colour}, default: "#000000")
 \item \code{error.width} - Error bar cap width (UI: "Error Bar Width", defaults key: \code{error.bar.width}, default: 1)
+\item \code{error.ribbon.opacity} - Ribbon fill opacity, 0 to 1 (UI: "Ribbon Opacity", default: 0.25)
 \item \code{palette.selection} - Color palette (UI: palette picker, derived from palette)
 \item \code{axis.showline} - Show axis border lines (UI: "Show Axis Borders", default: TRUE)
 \item \code{axis.mirror} - Mirror axis lines on opposite side (UI: "Mirror Axis Borders", default: TRUE)
@@ -80,6 +86,12 @@ defaults key: \code{error.bar.ci.method}, default: "normal"; only shown while th
 \item \code{axis.tickcolor} - Color of tick marks (UI: "Tick Mark Color", default: "black")
 \item \code{axis.ticklen} - Length of tick marks (UI: "Tick Mark Length", default: 5)
 \item \code{axis.tickwidth} - Width of tick marks (UI: "Tick Mark Width", default: 1)
+\item \code{axis.scientific} - Write numeric tick labels in scientific notation (UI: "Scientific Notation Ticks",
+default: FALSE; when off they never switch to it). See \code{\link[=apply_tick_notation]{apply_tick_notation()}}
+\item \code{axis.padding.x} - Space between the data and the plot area's edges along X, as a fraction of the
+data's extent at each end (UI: "X Axis Padding", default: NA = the plot's own). See \code{\link[=apply_axis_padding]{apply_axis_padding()}}
+\item \code{axis.padding.y} - Space between the data and the plot area's edges along Y, as a fraction of the
+data's extent at each end (UI: "Y Axis Padding", default: NA = the plot's own). See \code{\link[=apply_axis_padding]{apply_axis_padding()}}
 \item \code{facet.title.font.size} - Facet subplot title font size (UI: "Facet Subplot Title Size", default: 18)
 \item \code{facet.title.font.color} - Facet subplot title font color (UI: "Facet Title Color", default: "#000000")
 \item \code{facet.title.font.family} - Facet subplot title font family (UI: "Facet Title Font", default: "Arial")

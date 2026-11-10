@@ -79,7 +79,7 @@ facet strips or the legend instead
 \item \code{y.breaks} - Custom continuous-axis breaks (not implemented)
 \item \code{x.labels} - Override group labels (not implemented)
 \item \code{x.labels.rotate} - Rotate group labels (handled by the Axes tab tick-angle controls)
-\item \code{x.reorder} - Reorder x-axis groups (not implemented)
+\item \code{x.reorder} - Reorder x-axis groups (use \code{x.order}, the "Group Order" input, instead)
 \item \code{boxplot.width} - Boxplot width (controlled via \code{boxgap} and \code{boxgroupgap})
 \item \code{boxplot.outlier.size} - Outlier point size (not implemented)
 \item \code{boxplot.position.dodge} - Boxplot dodge (controlled via \code{boxgap})
@@ -151,6 +151,11 @@ groups, or between the \code{color.by} levels within each group when \code{color
 
 The following parameters implementing new functionality or controlling plotly-specific features are also available:
 \itemize{
+\item \code{webgl} - Draw the points with WebGL once there are 5,000 or more, as set by the
+\code{VizModules.webgl.threshold} option (UI: "Plot with WebGL", default: TRUE)
+\item \code{x.order} - Order of the \code{group.by} groups along the x-axis (UI: "Group Order", drag and drop, default: the
+column's factor level order, else sorted). As a default, a character vector of levels of \code{group.by}; levels
+it leaves out follow in their default order. Not shown for a \code{group.by} with more than 20 groups
 \item \code{boxmode} - Always "overlay": the boxes carry explicit x positions matching
 ggplot's dodge, so plotly.js is not asked to dodge them
 \item \code{boxgap} - Boxplot position dodge (UI: "Boxplot Position Dodge", default: 0.3)
@@ -176,6 +181,10 @@ ggplot's dodge, so plotly.js is not asked to dodge them
 \item \code{axis.tickcolor} - Color of tick marks (UI: "Tick Mark Color", default: "black")
 \item \code{axis.ticklen} - Length of tick marks (UI: "Tick Mark Length", default: 5)
 \item \code{axis.tickwidth} - Width of tick marks (UI: "Tick Mark Width", default: 1)
+\item \code{axis.scientific} - Write numeric tick labels in scientific notation (UI: "Scientific Notation Ticks",
+default: FALSE; when off they never switch to it). See \code{\link[=apply_tick_notation]{apply_tick_notation()}}
+\item \code{axis.padding.x} - Space between the data and the plot area's edges along X, as a fraction of the
+data's extent at each end (UI: "X Axis Padding", default: NA = the plot's own). See \code{\link[=apply_axis_padding]{apply_axis_padding()}}
 \item \code{legend.font.family} - Font family of the legend title and labels (UI: "Legend Font", default: "Arial")
 \item \code{legend.font.color} - Font color of the legend title and labels (UI: "Legend Font Color", default: "#000000")
 \item \code{legend.title.size} - Legend title font size (UI: "Legend Title Size", default: 14)

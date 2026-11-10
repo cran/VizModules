@@ -102,6 +102,38 @@ knitr::opts_chunk$set(
 #     )
 # }
 
+## ----fig-fn-------------------------------------------------------------------
+# cutoffScatterInputsUI <- function(id, data, defaults = NULL) {
+#     ns <- NS(id)
+#     tagList(
+#         numericInput(ns("cutoff"), "Y Cutoff", value = NA),
+#         dittoViz_scatterPlotInputsUI(id, data, defaults = defaults)
+#     )
+# }
+# 
+# cutoffScatterServer <- function(id, data_reactive, defaults = NULL) {
+#     dittoViz_scatterPlotServer(
+#         id, data_reactive,
+#         defaults = defaults,
+#         fig.fn = function(fig, input, isolate_fn) {
+#             # The wrapper's input shares the module's id, so it is on this `input` too.
+#             # isolate_fn() respects the module's Auto Update setting.
+#             cutoff <- isolate_fn(input$cutoff)
+#             if (is.null(cutoff) || is.na(cutoff)) {
+#                 return(fig)
+#             }
+#             # Append rather than replace: facet strips, brackets and line labels share this list.
+#             fig$x$layout$annotations <- c(fig$x$layout$annotations, list(list(
+#                 text = paste("Cutoff:", cutoff), showarrow = FALSE,
+#                 xref = "paper", x = 1, xanchor = "right",
+#                 yref = "y", y = cutoff, yanchor = "bottom"
+#             )))
+#             fig$x$layout$yaxis$title$text <- paste0(isolate_fn(input$y.by), " (cutoff ", cutoff, ")")
+#             fig
+#         }
+#     )
+# }
+
 ## ----manual-edits-------------------------------------------------------------
 # customPlotServer <- function(id, data_reactive) {
 #     moduleServer(id, function(input, output, session) {
@@ -112,8 +144,60 @@ knitr::opts_chunk$set(
 #         output$plot <- renderPlotly({
 #             # 2. Create your plotly object with your plotting function
 #             fig <- build_my_plotly_figure(data_reactive(), input)
-#             # 3. Restore + capture edits on every render, then return the figure.
+#             # 3. Restore + capture edits on every render. Last: when only the
+#             #    layout changed, it sends just that and ends the render.
 #             finalize_manual_edits(fig, plot_source, edit_store, session)
+#         })
+#     })
+# }
+
+## ----two-steps----------------------------------------------------------------
+# customPlotServer <- function(id, data_reactive, defaults = NULL) {
+#     moduleServer(id, function(input, output, session) {
+#         params <- setup_reactive_defaults(defaults, input, session)
+#         plot_source <- session$ns("customplot")
+#         edit_store <- setup_manual_edits(input, session, plot_source)
+# 
+#         # What is drawn: cached, keyed on the data and every input read here.
+#         draw_plot <- function(isolate_fn) {
+#             p <- my_plot_function(data_reactive(), x = isolate_fn(input$x.by))
+#             list(fig = plotly::ggplotly(p))
+#         }
+#         base_plot <- cached_structure(draw_plot, input, session, data_reactive, params = params)
+# 
+#         # How it looks: re-run for a styling change, without redrawing.
+#         generate_plot <- reactive({
+#             isolate_fn <- setup_auto_update_logic(input, params)
+#             apply_uniform_styling(base_plot()$fig, input, isolate_fn)
+#         })
+# 
+#         output$plot <- renderPlotly({
+#             finalize_manual_edits(apply_render_margins(generate_plot(), input), plot_source, edit_store, session)
+#         })
+#     })
+# }
+
+## ----extension-helpers--------------------------------------------------------
+# extendedServer <- function(id, data, defaults = NULL, hide.inputs = NULL) {
+#     moduleServer(id, function(input, output, session) {
+#         data <- require_data_frame(data)
+# 
+#         # A faceted plot has no editable main title: swap in the facet title inputs.
+#         observe({
+#             toggle_facet_title_inputs(session, nz_value(input$facet.by), hidden = hide.inputs)
+#         })
+# 
+#         output$plot <- renderPlotly({
+#             # "" (nothing chosen), NA and NULL all become NULL.
+#             facet.by <- blank_to_null(input$facet.by)
+#             # Jitter stays put across rebuilds instead of redrawing on every input change.
+#             with_stable_seed(build_my_plotly_figure(data(), facet.by = facet.by))
+#         })
+# 
+#         observeEvent(input$reset, {
+#             # Restore the group colour picker to the mapping in `defaults`.
+#             reset_group_colors(session, "palette.colours", defaults, groups(), default_palette_values)
+#             reset_plotly_inputs(session, defaults)
 #         })
 #     })
 # }

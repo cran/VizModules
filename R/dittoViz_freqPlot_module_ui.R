@@ -26,7 +26,7 @@
 #' level of each supplied grouping column.
 #'
 #' Unlike the facet and grouping selectors this deliberately does not go through
-#' [.facet_check()]: samples are the unit of observation rather than a facet, so a
+#' [facet_check()]: samples are the unit of observation rather than a facet, so a
 #' study with more than fifty of them is perfectly reasonable. Columns with a level
 #' for (nearly) every row are excluded instead, since a row identifier would give
 #' one observation per "sample" and so a frequency of 0 or 1 everywhere.
@@ -64,7 +64,7 @@
 
 #' Normalize the multi-select `vars.use` input
 #'
-#' [.blank_to_null()] returns `NULL` for anything that is not length one, so a
+#' [blank_to_null()] returns `NULL` for anything that is not length one, so a
 #' multi-value selection would read as "no selection" and silently draw every
 #' facet. Empty entries are dropped and an empty result becomes `NULL`, which is
 #' [dittoViz::freqPlot()]'s "use them all".
@@ -99,8 +99,8 @@
 #' @rdname INTERNAL_freq_stats_group_col
 #' @keywords internal
 .freq_stats_group_col <- function(group.by, color.by) {
-    color.by <- .blank_to_null(color.by)
-    group.by <- .blank_to_null(group.by)
+    color.by <- blank_to_null(color.by)
+    group.by <- blank_to_null(group.by)
     if (is.null(color.by) || identical(color.by, group.by)) NULL else color.by
 }
 
@@ -237,7 +237,7 @@
 #' - `color.panel` - Managed internally via the palette selection UI
 #' - `y.breaks` - Custom continuous-axis breaks (not implemented)
 #' - `x.labels` - Override group labels (not implemented)
-#' - `x.reorder` - Reorder x-axis groups (not implemented)
+#' - `x.reorder` - Reorder x-axis groups (use `x.order`, the "Group Order" input, instead)
 #' - `x.labels.rotate` - Rotate group labels (handled by the Axes tab tick-angle controls)
 #' - `var.labels.rename` - Rename facet labels (not implemented)
 #' - `var.labels.reorder` - Reorder facet labels (not implemented)
@@ -297,6 +297,12 @@
 #' The following parameters implementing new functionality or controlling plotly-specific
 #' features are also available:
 #'
+#' - `webgl` - Draw the points with WebGL once there are 5,000 or more, as set by the
+#'   `VizModules.webgl.threshold` option (UI: "Plot with WebGL", default: TRUE)
+#' - `x.order` - Order of the `group.by` groups along the x-axis (UI: "Group Order", drag and drop,
+#'   default: the column's factor level order, else sorted). As a default, a character vector of
+#'   levels of `group.by`; levels it leaves out follow in their default order. Not shown for a
+#'   `group.by` with more than 20 groups
 #' - `boxmode` - Always "overlay": the boxes carry explicit x positions matching
 #'   ggplot's dodge, so plotly.js is not asked to dodge them
 #' - `boxgap` - Boxplot position dodge (UI: "Boxplot Position Dodge", default: 0.3)
@@ -322,6 +328,10 @@
 #' - `axis.tickcolor` - Color of tick marks (UI: "Tick Mark Color", default: "black")
 #' - `axis.ticklen` - Length of tick marks (UI: "Tick Mark Length", default: 5)
 #' - `axis.tickwidth` - Width of tick marks (UI: "Tick Mark Width", default: 1)
+#' - `axis.scientific` - Write numeric tick labels in scientific notation (UI: "Scientific Notation Ticks",
+#'   default: FALSE; when off they never switch to it). See [apply_tick_notation()]
+#' - `axis.padding.x` - Space between the data and the plot area's edges along X, as a fraction of the
+#'   data's extent at each end (UI: "X Axis Padding", default: NA = the plot's own). See [apply_axis_padding()]
 #' - `legend.font.family` - Font family of the legend title and labels (UI: "Legend Font", default: "Arial")
 #' - `legend.font.color` - Font color of the legend title and labels (UI: "Legend Font Color", default: "#000000")
 #' - `legend.title.size` - Legend title font size (UI: "Legend Title Size", default: 14)
@@ -403,7 +413,7 @@ dittoViz_freqPlotInputsUI <- function(id, data, defaults = NULL, title = NULL, c
 
     # Frequencies are tabulated over levels, so only low-cardinality categorical
     # columns are meaningful for any of the structural selectors.
-    cat.choices <- .facet_check(data)
+    cat.choices <- facet_check(data)
 
     var.default <- get_default(
         defaults, "var",
@@ -521,7 +531,14 @@ dittoViz_freqPlotInputsUI <- function(id, data, defaults = NULL, title = NULL, c
                 placement = "top", options = list(container = "body")
             ),
             helpText("Order not currently respected"),
-            uiOutput(ns("palette.selection"))
+            uiOutput(ns("palette.selection")),
+            level_order_input(ns("x.order"), "Group Order",
+                items = level_order_choices(data, group.default, get_default(defaults, "x.order", NULL, is.character)),
+                tooltip = paste(
+                    "Drag the Group By groups into the order to plot them along the x-axis.",
+                    "Not shown for a Group By with more than 20 groups."
+                )
+            )
         ),
         "Scale" = tagList(
             tipify(
@@ -582,6 +599,7 @@ dittoViz_freqPlotInputsUI <- function(id, data, defaults = NULL, title = NULL, c
                 documentParameters$jitter.color,
                 placement = "top", options = list(container = "body")
             ),
+            webgl_input(ns, defaults),
             tipify(
                 numericInput(ns("hover.round.digits"), "Hover Round Digits",
                     value = get_default(defaults, "hover.round.digits", 5, is.numeric),
@@ -736,7 +754,7 @@ dittoViz_freqPlotInputsUI <- function(id, data, defaults = NULL, title = NULL, c
                 placement = "top", options = list(container = "body")
             )
         ),
-        "Stats" = .uniform_stats_inputs_ui(ns, defaults),
+        "Stats" = uniform_stats_inputs_ui(ns, defaults),
         "Facet" = tagList(
             helpText("Faceted on the frequency variable; use \"Levels To Show\" to pick facets."),
             tipify(
@@ -758,7 +776,7 @@ dittoViz_freqPlotInputsUI <- function(id, data, defaults = NULL, title = NULL, c
                 step = 1, min = 0,
                 value = get_default(defaults, "split.nrow", NA, is.numeric)
             ), documentParameters$split.nrow, placement = "top", options = list(container = "body")),
-            .uniform_subplot_spacing_inputs_ui(ns, defaults)
+            uniform_subplot_spacing_inputs_ui(ns, defaults)
         ),
         "Annotations" = uniform_annotation_inputs_ui(ns, defaults, choices,
             annotate.note = paste(
@@ -769,7 +787,7 @@ dittoViz_freqPlotInputsUI <- function(id, data, defaults = NULL, title = NULL, c
         ),
         "Legend" = uniform_legend_inputs_ui(ns, defaults),
         "Plotly" = uniform_plotly_inputs_ui(ns, defaults),
-        "Axes" = uniform_axes_inputs_ui(ns, defaults),
+        "Axes" = uniform_axes_inputs_ui(ns, defaults, include.padding = "x"),
         "Lines" = uniform_lines_inputs_ui(ns, defaults)
     )
 

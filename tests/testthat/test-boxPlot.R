@@ -1,39 +1,3 @@
-# The plot output cannot be driven from testServer, but the reactive that builds
-# the figure can, given a complete set of inputs.
-.box_inputs <- function(...) {
-    base <- list(
-        x.data = "department", y.data = "salary", group.by = "", show.outliers = TRUE,
-        boxplot.width = 0.8, sort_x = "", rotate = FALSE, y.min = 0, y.max = NA,
-        auto.update = TRUE, update = 0,
-        add.points = FALSE, pt.size = 1, pt.alpha = 1, jitter.width = 0.3, pt.color = "#000000",
-        highlight = "", highlight.colour = "#000000", highlight.size = 1, highlight.alpha = 1,
-        facet.by = "", facet.scale = "fixed", facet.ncol = NA, facet.nrow = NA, facet.by.row = TRUE,
-        subplot.margin.x = 0.03, subplot.margin.y = 0.1,
-        stats.enabled = FALSE, stat.test = "wilcox.test", stat.p.adjust = "holm",
-        stat.display = "p.adj", stat.sig.threshold = 0.05, stat.hide.ns = FALSE,
-        stat.paired = FALSE, stat.pairs = "", stat.per.facet = TRUE,
-        stat.bracket.style = "capped", stat.bracket.inset = 0.025,
-        stat.step.increase = 0.06, stat.text.bump = 0.04,
-        stat.line.color = "#000000", stat.line.width = 1,
-        download.format = "svg", legend.title.size = 14, legend.text.size = 12,
-        title.font.size = 26, title.font.family = "Arial", title.font.color = "#000000",
-        axis.title.font.size = 18, axis.title.font.color = "#000000",
-        axis.title.font.family = "Arial", axis.title.horizontal.position = 0.5,
-        axis.showline = TRUE, axis.mirror = TRUE, show.grid.x = TRUE, show.grid.y = TRUE,
-        grid.color = "#CCCCCC", axis.linecolor = "black", axis.linewidth = 0.5,
-        axis.tickfont.size = 12, axis.tickfont.color = "black",
-        axis.tickfont.family = "Arial", axis.tickangle.x = 0, axis.tickangle.y = 0,
-        axis.ticks = "outside", axis.tickcolor = "black", axis.ticklen = 5,
-        axis.tickwidth = 1, facet.title.font.size = 18,
-        facet.title.font.color = "#000000", facet.title.font.family = "Arial",
-        hline.intercepts = "", vline.intercepts = "", abline.slopes = "", abline.intercepts = "",
-        shape.fill = "rgba(0, 0, 0, 0)", shape.line.color = "black", shape.line.width = 4,
-        shape.linetype = "solid", shape.opacity = 1,
-        margin.l = 70, margin.r = 90, margin.t = 70, margin.b = 70
-    )
-    utils::modifyList(base, list(...))
-}
-
 # The x categories in the order the figure draws them.
 .box_x_order <- function(fig) {
     built <- plotly::plotly_build(fig)
@@ -71,6 +35,64 @@ test_that("Sort X By never evaluates code", {
             expect_false(exists(sentinel, envir = globalenv()))
         }
     )
+})
+
+test_that("Sort X By orders every facet panel by one global order (#372)", {
+    cleared <- FALSE
+    local_mocked_bindings(updateTextInput = function(session, inputId, ...) {
+        if (identical(inputId, "sort_x")) cleared <<- TRUE
+        invisible(NULL)
+    })
+    shiny::testServer(
+        plotthis_BoxPlotServer,
+        args = list(id = "box", data = shiny::reactive(example_demographics)),
+        {
+            do.call(session$setInputs, .box_inputs(sort_x = "median(salary)"))
+            suppressWarnings(session$flushReact())
+            session$setInputs(facet.by = "gender")
+            suppressWarnings(session$flushReact())
+            # Faceting used to clear the sort key.
+            expect_false(cleared)
+
+            medians <- tapply(example_demographics$salary, example_demographics$department, median)
+            orders <- .panel_x_orders(suppressWarnings(generate_BoxPlot()))
+            expect_gt(length(orders), 0)
+            for (o in orders) {
+                expect_equal(o, names(sort(medians)))
+            }
+        }
+    )
+})
+
+test_that("the X Order input sets the x order, and Sort X By wins over it", {
+    dept <- rev(levels(example_demographics$department))
+    shiny::testServer(
+        plotthis_BoxPlotServer,
+        args = list(id = "box", data = shiny::reactive(example_demographics)),
+        {
+            suppressWarnings(do.call(session$setInputs, .box_inputs()))
+            session$setInputs(x.order = dept)
+            expect_equal(.box_x_order(suppressWarnings(generate_BoxPlot())), dept)
+
+            session$setInputs(sort_x = "median(salary)")
+            medians <- tapply(example_demographics$salary, example_demographics$department, median)
+            expect_equal(.box_x_order(suppressWarnings(generate_BoxPlot())), names(sort(medians)))
+        }
+    )
+})
+
+test_that(".box_ordered_data rejects a bad sort key and falls back to the X Order", {
+    df <- example_demographics
+    out <- .box_ordered_data(df, "department", "system('echo')", c("Sales", "HR"))
+    expect_false(out$sort.ok)
+    expect_equal(head(levels(out$data$department), 2), c("Sales", "HR"))
+
+    out <- .box_ordered_data(df, "department", "", NULL)
+    expect_true(out$sort.ok)
+    expect_identical(out$data, df)
+
+    # A key that gives more than one value per category cannot order them.
+    expect_null(.box_sort_levels(df, "department", "salary"))
 })
 
 test_that("turning statistics off drops them from the source download", {
@@ -118,6 +140,27 @@ test_that("turning statistics off drops them from the source download", {
 test_that("significance brackets stay within the axis they are drawn on", {
     out <- .box_stats_figure(example_demographics, .box_inputs(stats.enabled = TRUE))
     expect_brackets_within_axes(out$fig, min.count = 3)
+})
+
+test_that("the statistics follow the plot drawn, including one served from the cache", {
+    shiny::testServer(
+        plotthis_BoxPlotServer,
+        args = list(id = "box", data = shiny::reactive(example_demographics)),
+        {
+            suppressWarnings({
+                do.call(session$setInputs, .box_inputs(stats.enabled = TRUE))
+                session$setInputs(stat.pairs = "")
+            })
+            salary <- last_stats_df()
+            suppressWarnings(session$setInputs(y.data = "age"))
+            age <- last_stats_df()
+            expect_false(isTRUE(all.equal(salary, age)))
+
+            # Back to salary: drawn from the cache, and its statistics come with it.
+            suppressWarnings(session$setInputs(y.data = "salary"))
+            expect_equal(last_stats_df(), salary)
+        }
+    )
 })
 
 test_that("a rotated box plot tests but draws no brackets over its values", {
@@ -169,8 +212,12 @@ test_that("under a free y facet scale each panel's brackets sit on its own data"
                 group.by = "", fill.by = "", facet.by = "", y.min = 0, y.max = NA
             ), list(...))
         },
+        # Bars sharing a Group stack, positives up and negatives down from zero.
         range = function(col) {
-            list(min = 0, max = max(tapply(example_bar[[col]], example_bar$Group, sum)) * .bar_axis_scale)
+            v <- example_bar[[col]]
+            up <- tapply(pmax(v, 0), example_bar$Group, sum)
+            down <- tapply(pmin(v, 0), example_bar$Group, sum)
+            list(min = min(0, down), max = max(up) * .bar_axis_scale)
         }
     )
 )
@@ -292,6 +339,61 @@ test_that("SplitBarPlot x.min/x.max defaults survive startup until the columns c
             suppressWarnings(session$setInputs(x.data = "Numbers"))
             expect_equal(sent[["x.max"]], axis_range()$max)
             expect_equal(sent[["x.min"]], -axis_range()$max)
+        }
+    )
+})
+
+test_that("BoxPlot Group By leaves out categoricals with too many levels", {
+    df <- .wide_id_df()
+    group <- .select_choices(as.character(plotthis_BoxPlotInputsUI("box", df)), "box-group.by")
+    expect_true(all(c("grp", "grp2", "flag") %in% group))
+    expect_false(any(c("id", "val") %in% group))
+
+    # An explicit default naming the wide column is honoured.
+    html <- as.character(plotthis_BoxPlotInputsUI("box", df, defaults = list(group.by = "id")))
+    expect_true("id" %in% .select_choices(html, "box-group.by"))
+})
+
+test_that("significance brackets follow the sorted x order, faceted or not (#372)", {
+    set.seed(11)
+    df <- data.frame(
+        grp = rep(c("A", "B", "C"), each = 20, times = 2),
+        panel = rep(c("p1", "p2"), each = 60),
+        value = rep(c(a <- rnorm(20, 10), a, rnorm(20, 50)), 2),
+        stringsAsFactors = FALSE
+    )
+    for (facet in c("", "panel")) {
+        # Sorted C, B, A: C is compared with both others, so it is at one end of
+        # every significant bracket. In the unsorted order it would be at 3.
+        out <- .box_stats_figure(df, .box_inputs(
+            x.data = "grp", y.data = "value", facet.by = facet, sort_x = "-median(value)",
+            stats.enabled = TRUE, stat.hide.ns = TRUE, y.min = NA
+        ))
+        for (o in .panel_x_orders(out$fig)) {
+            expect_equal(o, c("C", "A", "B"), info = facet)
+        }
+        expect_brackets_within_axes(out$fig, min.count = 2)
+        spans <- .bracket_spans(out$fig)
+        expect_gte(length(spans), 2)
+        for (s in spans) {
+            expect_equal(s[1], 1, info = facet)
+        }
+    }
+})
+
+test_that("the X Order input sets the x order of the BarPlot", {
+    shiny::testServer(
+        plotthis_BarPlotServer,
+        args = list(id = "bar", data = shiny::reactive(example_bar)),
+        {
+            suppressWarnings(do.call(session$setInputs, .box_inputs(
+                x.data = "Group", y.data = "Values", fill.by = "", width = 0.9, alpha = 1,
+                expand = "", palreverse = FALSE, lower.quantile = 0, upper.quantile = 1,
+                lower.cutoff = NA, upper.cutoff = NA
+            )))
+            groups <- rev(sort(unique(example_bar$Group)))
+            session$setInputs(x.order = groups)
+            expect_equal(.panel_x_orders(suppressWarnings(generate_BarPlot()))[[1]], groups)
         }
     )
 })
